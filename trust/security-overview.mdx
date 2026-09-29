@@ -1,0 +1,102 @@
+---
+title: "Atlasent security: architecture and controls overview"
+sidebarTitle: "Security Overview"
+description: "Security overview covering tenant isolation, cryptography, API key controls, audit chain integrity, and Atlasent's fail-closed operational commitments."
+---
+
+Atlasent's security architecture is organized around a single principle: authorization must be enforced at execution time, not described in a document and hoped for. The same principle that governs how your agents are authorized governs how Atlasent manages its own systems — technical controls are preferred over policy-only controls, and every failure path collapses to a safe default. This page describes the customer-visible security properties you can rely on when you deploy Atlasent in production.
+
+## Operational security commitments
+
+Atlasent makes four foundational commitments to every customer.
+
+1. **Execution-time authorization** — Consequential actions cannot run without a valid, unexpired permit. The evaluation is in the critical path, not an advisory check.
+2. **Non-bypassable controls** — Permit verification is enforced at the database level, not just in the SDK. There is no API path that issues an allow decision without writing to the audit chain first.
+3. **Immutable evidence** — Audit entries are written before the API responds and cannot be modified. Insertion, deletion, or modification of historical entries is detectable through hash-chain verification.
+4. **Bounded blast radius** — API key scopes limit what any single key can do. A key scoped to `evaluate` cannot read or export audit data. A key scoped to `audit` cannot issue evaluations.
+
+## Security controls
+
+| Control | Implementation |
+|---|---|
+| Data isolation | Row-Level Security (RLS) per tenant — no cross-tenant data access possible |
+| In-transit encryption | TLS 1.3 on all API endpoints |
+| At-rest encryption | AES-256-GCM via managed provider |
+| API key hashing | Keys stored as bcrypt hashes — plain text never persisted |
+| Audit chain signing | SHA-256 hash-chaining + HMAC-SHA256 permit tokens (GA today). Ed25519-signed portable evidence bundles on Wave 3 roadmap — not yet GA. |
+| Fail-closed default | Missing policy, network error, or timeout blocks execution |
+| Permit nonce ledger | UNIQUE constraint prevents replay attacks at DB level |
+
+<Note>
+  API keys are shown in plain text only once — at creation time. Atlasent stores only the bcrypt hash. If you lose a key, rotate it immediately from the Console under **Settings → API Keys**. There is no way to retrieve the original value.
+</Note>
+
+## Tenant isolation
+
+Every read and write operation in the Atlasent database is filtered by `organization_id` through database-level Row-Level Security policies. This isolation is enforced at the storage layer — it is not a query filter that application code can bypass. No cross-tenant data access path exists at any layer of the stack, including in the API, the Console, or internal tooling.
+
+## Cryptography
+
+Atlasent uses the following cryptographic primitives:
+
+- **TLS 1.3** for all customer-facing API endpoints. TLS versions below 1.2 are disabled.
+- **AES-256-GCM** for data at rest, managed at the storage provider layer.
+- **bcrypt** for API key storage. Plain text is never persisted after the creation response.
+- **SHA-256 hash-chaining** for audit chain integrity at GA. Each entry references the hash of the previous entry, making insertion, deletion, or modification of historical entries detectable.
+- **HMAC-SHA256** for permit token integrity at GA.
+- **Ed25519** for portable signed evidence bundles (Wave 3 roadmap, not yet GA). Ed25519 is not used for the audit chain itself today.
+
+<Warning>
+  Ed25519-signed audit chain entries are on the Wave 3 roadmap and are not yet generally available. The current audit chain uses SHA-256 hash-chaining and HMAC-SHA256 permit tokens. Do not represent Ed25519 chain signing as available today in validation documentation.
+</Warning>
+
+## Fail-closed guarantees
+
+Every failure path in the Atlasent SDK and API collapses to a deny decision rather than a silent allow. Specifically:
+
+- API unreachable → **deny**
+- Request timeout (10 seconds) → **deny**
+- Malformed API response → **deny**
+- API returns `allow` without a `permit_token` → **deny**
+- Unknown decision string → **deny**
+- Permit verification returns unrecognized error code → **invalid** (treated as not valid)
+
+No path in the SDK, the MCP server, or the GitHub Actions gate returns a permissive result on error.
+
+## Access controls
+
+Atlasent uses scoped API keys with `<resource>:<action>` permission strings. Keys carry only the minimum scopes required for their use case. You can additionally restrict any key to specific CIDR blocks at creation time and set per-key rate limits.
+
+Console sessions use a 1-hour JWT expiry with a 30-minute inactivity timeout. Personnel with production access are maintained on a named list, reviewed quarterly. No shared credentials exist at any level.
+
+## Vulnerability disclosure
+
+Report security vulnerabilities by emailing [security@atlasent.io](mailto:security@atlasent.io) with the subject line `[Security]`. For active breaches or key compromise, use the subject line `[URGENT SECURITY]`.
+
+- **Acknowledgment SLA:** 2 business days
+- **Initial triage SLA:** 5 business days
+- **Remediation SLAs:** Critical — 7 days; High — 30 days; Medium — 90 days
+
+The most recent third-party penetration test summary is available under NDA on request.
+
+## Operational security
+
+| Control | Implementation |
+|---|---|
+| Incident response | Documented IR plan, on-call rotation, blameless post-incident review within 5 business days |
+| Personnel | Confidentiality agreements at hire; background checks before production access; mandatory annual security training |
+| Endpoint posture | Managed devices via MDM; disk encryption; screen-lock; remote-wipe capability. BYOD prohibited for production access |
+| Physical security | Atlasent operates no data centers — all compute runs on sub-processors with audited physical security |
+| Backups | Daily backups retained 30 days; monthly cold-storage retained 7 years; restore drills quarterly |
+| Dependency scanning | Continuous on every PR; infrastructure scanning weekly |
+
+## Related resources
+
+<CardGroup cols={2}>
+  <Card title="Compliance Status" icon="clipboard-check" href="/trust/compliance-status">
+    Current framework certifications, roadmap dates, and the Vendor Qualification Package (VQP).
+  </Card>
+  <Card title="Sub-processors" icon="list-tree" href="/trust/subprocessors">
+    Every third party that processes Customer Personal Data, with locations and data categories.
+  </Card>
+</CardGroup>

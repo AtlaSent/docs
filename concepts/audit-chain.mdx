@@ -1,0 +1,120 @@
+---
+title: "Tamper-evident audit chain for compliance evidence"
+sidebarTitle: "Audit Chain"
+description: "How Atlasent's append-only, SHA-256 hash-linked audit chain works, what compliance frameworks it satisfies, and how to export and verify it offline."
+---
+
+Every call to `/v1/evaluate` — regardless of outcome — writes one entry to the audit chain before Atlasent returns a response. The chain is append-only and SHA-256 hash-linked: you can prove to any auditor that the record has not been altered since it was written. Tamper detection works offline without relying on Atlasent's servers.
+
+## How the chain works
+
+The audit chain achieves tamper-evidence through three mechanisms operating together:
+
+- **Append-only storage.** There are no UPDATE or DELETE operations on audit rows. This is enforced at the database layer, not just the application layer.
+- **SHA-256 hash linking.** Each entry contains a `previous_hash` field set to `SHA-256(previous entry)`. If anyone modifies a past entry, the hash of that entry changes, which breaks the link to every subsequent entry — the tampering is immediately visible during verification.
+- **Cryptographic signing (roadmap).** Ed25519 signing of chain heads is on the roadmap. When available, you will be able to verify signatures on an air-gapped machine using the open-source CLI and Atlasent's published public key.
+
+The `chain_hash` for each entry is computed as:
+
+```
+chain_hash = SHA-256(previous_chain_hash + "|" + canonical_entry_payload)
+```
+
+The genesis entry uses the literal string `"GENESIS"` as the `previous_chain_hash`.
+
+## Audit entry structure
+
+Each audit entry conforms to the `AuditEvent` schema. Decision-specific fields (the decision value, matched policy, and permit ID) live in a typed `payload` object so the chain shape stays uniform across event types.
+
+```json
+{
+  "chain_version": 5,
+  "org_id": "org_01j...",
+  "sequence": 42,
+  "event_type": "evaluation",
+  "actor_id": "user_123",
+  "decision": "allow",
+  "decision_id": "dec_01j...",
+  "engine_version": "wire-v1@1.0.0",
+  "previous_hash": "a3f2c...",
+  "entry_hash": "b94e7...",
+  "signature": null
+}
+```
+
+The `sequence` field is a monotonically increasing integer scoped to your org. Combined with the hash link, it lets a verifier detect both modification of existing entries and insertion of new entries between two existing ones.
+
+## Every decision is recorded
+
+Atlasent writes an audit entry for every evaluation — `allow`, `deny`, `hold`, and `escalate` alike. You always have a complete record of what was requested and what was decided, not just a record of successful actions.
+
+<Note>
+  The audit entry is written **before** Atlasent returns the evaluation response. Even if your code crashes immediately after receiving a decision, the record already exists in the chain.
+</Note>
+
+## Compliance mapping
+
+| Framework | How the audit chain satisfies it |
+|---|---|
+| 21 CFR Part 11 §11.10(e) | Append-only, sequence-numbered, tamper-detectable — computer-generated on every call |
+| EU Annex 11 §12.1 | Computer-generated audit trail that cannot be altered after the fact |
+| ICH E6 GCP §5.5.3 | Attributable (actor ID), contemporaneous (written before response), original entries |
+| SOC 2 CC7 | Immutable, hash-linked operational log with cryptographic integrity proof |
+
+## Exporting and verifying offline
+
+You can export your audit chain as a self-contained bundle and verify it on any machine — including an air-gapped one — without any network access to Atlasent.
+
+**Export:**
+
+```bash
+# Export via API
+curl -X POST https://api.atlasent.io/v1/audit/exports \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"time_range": {"start": "2026-01-01T00:00:00Z", "end": "2026-03-31T23:59:59Z"}}' \
+  -o audit-export.ndjson
+```
+
+**Verify:**
+
+```bash
+# Install the standalone verification CLI
+brew install atlasent/tap/audit-verify
+# or download from GitHub releases
+
+# Verify the exported chain
+atlasent-audit-verify \
+  --input audit-export.ndjson \
+  --keys https://api.atlasent.io/v1/public-keys
+```
+
+The verify command:
+1. Recomputes the `chain_hash` for every entry from its canonical payload.
+2. Confirms each entry's hash matches the `previous_hash` of the next entry.
+3. Reports any hash chain breaks or gaps found in the sequence.
+
+When Ed25519 signing becomes generally available, the CLI will also verify signatures against Atlasent's published public key, with `signing_key_id` embedded in the bundle for long-retention verification.
+
+<Tip>
+  Store the audit export bundle alongside your compliance evidence package. Any auditor with the open-source CLI and Atlasent's public key can verify the chain's integrity independently.
+</Tip>
+
+## Linking your records to the chain
+
+Store the `permit_id` (`pt_…`) from each protected action alongside your own system-of-record entry. This makes the chain two-way navigable: you can look up the Atlasent decision for any record in your database, and you can look up your record for any audit entry.
+
+```python
+permit = protect(actor="user_123", action="ehr.write", context={...})
+db.records.create({
+    **payload,
+    "atlasent_permit_id": permit.permit_id,  # the two-way link
+})
+```
+
+## Related
+
+- [Permit](/concepts/permit) — the token whose full lifecycle is recorded in the chain.
+- [Runtime Flow](/concepts/runtime-flow) — when and how audit entries are written during the four-hop lifecycle.
+- [Deny Codes](/concepts/deny-codes) — the codes that appear in `deny` audit entries.
+- [Glossary](/concepts/glossary) — definitions for Audit Chain, Proof, Proof Bundle, and Audit Hash.

@@ -1,0 +1,159 @@
+---
+title: "Export Atlasent authorization events to your SIEM platform"
+sidebarTitle: "SIEM Export"
+description: "Stream permit, deny, override, and governance events to Splunk, Elastic, QRadar, or any HTTPS webhook destination. Requires an Enterprise plan."
+---
+
+Atlasent SIEM export delivers every authorization event — permits, denials, overrides, and governance events — to your Security Information and Event Management system in real time over HTTPS. Use the stream to correlate Atlasent decisions with the rest of your security telemetry, build detection rules around patterns like repeated denials or override bursts, and retain events in your own infrastructure independent of Atlasent's audit chain. Events are delivered in batches to a destination URL you control, using the format and authentication method you configure.
+
+<Warning>
+  SIEM export is an **Enterprise plan** feature. Calling any SIEM API endpoint on a non-Enterprise organization returns `HTTP 402`. Upgrade in **Settings → Billing** before configuring.
+</Warning>
+
+## Supported formats
+
+Choose the format that matches your SIEM's ingest endpoint:
+
+| Format | Destination |
+|---|---|
+| `splunk_hec` | Splunk HTTP Event Collector |
+| `elastic_ecs` | Elastic Common Schema (Elasticsearch or Logstash) |
+| `qradar_cef` | IBM QRadar Common Event Format |
+| `json` | Generic webhook — any destination not listed above |
+
+The `splunk_hec` format adds `sourcetype: atlasent` and a Unix epoch `time` field. The `elastic_ecs` format adds `@timestamp`, `event.category`, and `atlasent.org_id`. The `qradar_cef` format delivers a `text/plain; charset=utf-8` body compatible with IBM QRadar, ArcSight, and any CEF-aware SIEM. Use `json` for custom pipelines.
+
+## SDK quickstart
+
+Configure SIEM export with the Atlasent SDK before enabling live streaming. Test connectivity first to confirm your destination is reachable and your credentials are accepted.
+
+<CodeGroup>
+
+```typescript TypeScript
+const siemConfig = await client.siem.configure({
+  format: 'splunk_hec',
+  destination: 'https://splunk.company.com:8088/services/collector',
+  token: process.env.SPLUNK_HEC_TOKEN!,
+  events: ['evaluation.*', 'permit.*', 'escalation.*'],
+});
+```
+
+```python Python
+siem_config = client.siem.configure(
+    format='elastic_ecs',
+    destination='https://logs.company.com:9200',
+    api_key=os.environ['ELASTIC_API_KEY'],
+    events=['evaluation.*', 'permit.*'],
+)
+```
+
+</CodeGroup>
+
+After saving the configuration, test connectivity before enabling live delivery:
+
+<CodeGroup>
+
+```typescript TypeScript
+import { AtlaSentClient } from "@atlasent/sdk";
+
+const client = new AtlaSentClient({ apiKey: process.env.ATLASENT_API_KEY! });
+const ORG_ID = "org_acme";
+
+const config = await client.upsertSiemConfig(ORG_ID, {
+  destinationUrl: "https://splunk.acme.internal:8088/services/collector",
+  format: "splunk_hec",
+  authType: "bearer",
+  credential: process.env.SPLUNK_HEC_TOKEN!,
+  enabled: true,
+  includedEventTypes: ["permit", "deny", "override", "governance"],
+  batchSize: 100,
+  retryCount: 3,
+});
+console.log("Config saved:", config.updatedAt);
+
+const test = await client.testSiemDelivery(ORG_ID);
+if (test.success) {
+  console.log(`Delivery OK (${test.latencyMs} ms)`);
+} else {
+  console.error("Delivery failed:", test.error);
+}
+```
+
+```python Python
+import os
+from atlasent import AtlaSentClient
+from atlasent.siem import upsert_siem_config, siem_test_delivery
+
+client = AtlaSentClient(api_key="ak_live_...", base_url="https://api.atlasent.io")
+ORG_ID = "org_acme"
+
+config = upsert_siem_config(
+    client,
+    ORG_ID,
+    destination_url="https://splunk.acme.internal:8088/services/collector",
+    format="splunk_hec",
+    auth_type="bearer",
+    credential=os.environ["SPLUNK_HEC_TOKEN"],
+    enabled=True,
+    included_event_types=["permit", "deny", "override", "governance"],
+    batch_size=100,
+    retry_count=3,
+)
+print("Config saved:", config["updatedAt"])
+
+result = siem_test_delivery(client, ORG_ID)
+if result["success"]:
+    print(f"Delivery OK ({result.get('durationMs')} ms)")
+else:
+    print("Delivery failed:", result.get("error"))
+```
+
+</CodeGroup>
+
+## Configuration reference
+
+All fields map to `PATCH /v1/orgs/{orgId}/siem-config`. Fields you omit on an update retain their existing values.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `destinationUrl` | `string` | — | HTTPS endpoint that receives event batches (required; must use `https://`) |
+| `format` | `string` | `"json"` | Wire format: `splunk_hec`, `elastic_ecs`, `qradar_cef`, or `json` |
+| `authType` | `string` | `"bearer"` | Auth method: `bearer`, `basic`, `api_key`, or `none` |
+| `credential` | `string` | _(keep existing)_ | Secret for the chosen `authType`; write-only, never returned in GET responses |
+| `enabled` | `boolean` | `true` | Set to `false` to pause delivery while retaining the configuration |
+| `includedEventTypes` | `string[]` | All types | Subset of `permit`, `deny`, `override`, `governance` to stream |
+| `batchSize` | `integer` | `100` | Events per delivery batch (1–1000) |
+| `retryCount` | `integer` | `3` | Retry attempts on delivery failure before dropping a batch (0–10) |
+
+## Event types
+
+| Type | Description |
+|---|---|
+| `permit` | A policy evaluation returned `allow` and a permit was issued |
+| `deny` | A policy evaluation returned `deny` |
+| `override` | A human approver overrode a `deny` or `hold` decision |
+| `governance` | A governance event: hold expiry, escalation routed, or policy change applied |
+
+## Testing connectivity
+
+Before enabling live event streaming, send a synthetic test event to confirm your destination is reachable and that authentication succeeds:
+
+```
+POST /v1/orgs/{orgId}/siem-exports/test
+```
+
+On success, the endpoint returns:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "durationMs": 143
+}
+```
+
+A `statusCode: 0` with a non-empty `error` string indicates a network error — DNS failure, connection refused, or a 10-second timeout. The test endpoint returns `409` if SIEM is not configured or `enabled` is `false`; configure and enable SIEM first.
+
+<Note>
+  SIEM export does **not** replace the signed audit bundle for compliance purposes. For an FDA or EMA inspection, provide the signed audit bundle — it is the canonical, verifiable record. SIEM export is a convenience stream for your security operations team.
+</Note>

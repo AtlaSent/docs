@@ -1,0 +1,194 @@
+---
+title: "TypeScript SDK for Atlasent execution-time authorization"
+sidebarTitle: "TypeScript"
+description: "Install @atlasent/sdk, configure the client, and gate actions with protect(), withPermit(), requirePermit(), and evaluate() in Node.js or edge runtimes."
+---
+
+The Atlasent TypeScript SDK (`@atlasent/sdk`) is the primary integration path for Node.js services, serverless functions, and edge runtimes. It exposes typed models generated directly from the Atlasent OpenAPI spec, retries transient failures with exponential backoff, and surfaces authorization outcomes as structured errors so your catch blocks always know exactly what went wrong.
+
+## Installation
+
+<Warning>
+  `@atlasent/sdk` is **not yet published to npm**. The package is in active development and will be available on npm once the publishing gate clears. In the meantime, install the SDK from a GitHub release tarball or contact [support@atlasent.io](mailto:support@atlasent.io) to request early access.
+</Warning>
+
+Once published, you will be able to install the package using your preferred package manager:
+
+<CodeGroup>
+```bash npm
+npm install @atlasent/sdk
+```
+```bash yarn
+yarn add @atlasent/sdk
+```
+```bash pnpm
+pnpm add @atlasent/sdk
+```
+</CodeGroup>
+
+The SDK supports Node.js 18+, Bun, Deno, Vercel Edge Functions, and Cloudflare Workers. It uses the native `fetch` API internally, so no Node.js built-ins are required in edge environments.
+
+## Client setup
+
+Create a single `AtlaSentClient` instance and reuse it for the lifetime of your process. The client reads your API key from the `ATLASENT_API_KEY` environment variable if you pass `process.env.ATLASENT_API_KEY`.
+
+```typescript
+import { AtlaSentClient } from '@atlasent/sdk';
+
+const client = new AtlaSentClient({
+  apiKey: process.env.ATLASENT_API_KEY,
+});
+```
+
+## protect() — fail-closed gate
+
+`protect()` is the canonical execution-boundary primitive. It evaluates the request, verifies the resulting permit, and only invokes your callback if both steps succeed. If the policy returns anything other than `allow`, or if the permit cannot be verified, `protect()` throws before your callback runs.
+
+```typescript
+await client.protect(
+  {
+    actor: { id: 'user_123', role: 'engineer' },
+    action: { type: 'production.deploy' },
+    target: { id: 'my-service', environment: 'production' },
+    context: { git_sha: process.env.GITHUB_SHA! },
+  },
+  async (permit) => {
+    // Only runs if permitted
+    console.log('Deploying with permit:', permit.token);
+    await deploy();
+  }
+);
+```
+
+There is no `allowed: false` return value. If `protect()` resolves without throwing, the action is authorized end-to-end.
+
+## withPermit() — explicit permit scope
+
+Use `withPermit()` when you need to hold the permit object before executing the action — for example, to persist the permit token alongside your own record for two-way audit navigation.
+
+```typescript
+const permit = await client.withPermit({
+  actor: { id: 'user_123', role: 'engineer' },
+  action: { type: 'production.deploy' },
+  target: { id: 'my-service', environment: 'production' },
+  context: {},
+});
+
+try {
+  await deploy();
+} finally {
+  await permit.consume();
+}
+```
+
+`protect()` and `withPermit()` produce identical wire calls and identical audit-chain entries. Pick the form that fits your call site.
+
+## requirePermit() — descriptor form
+
+Use `requirePermit()` for dangerous operations that carry richer context such as `resource_id` and `environment`. This form accepts a structured `ProtectedAction` descriptor rather than inline fields.
+
+```typescript
+import { AtlaSentDeniedError, AtlaSentError } from '@atlasent/sdk';
+
+await client.requirePermit(
+  {
+    action_type: 'database.table.drop',
+    actor_id: 'agent:code-agent',
+    resource_id: 'prod-db.users',
+    environment: 'production',
+    context: { reversibility: 'irreversible', blast_radius: 'customer_data' },
+  },
+  async () => {
+    await db.raw('DROP TABLE users');
+  },
+);
+```
+
+## Error model
+
+`protect()`, `withPermit()`, and `requirePermit()` all throw typed errors on failure. Catch `AtlaSentDeniedError` for policy outcomes and `AtlaSentError` for network or service failures. `AtlaSentDeniedError` inherits from `AtlaSentError`, so catching `AtlaSentError` handles both if you want a single catch-all.
+
+```typescript
+import { AtlaSentDeniedError, AtlaSentError } from '@atlasent/sdk';
+
+try {
+  await client.protect({ ... }, async () => { ... });
+} catch (err) {
+  if (err instanceof AtlaSentDeniedError) {
+    console.error('Denied:', err.decision, err.denyCode);
+    // Outcomes: err.isRevoked, err.isExpired, err.isConsumed, err.isNotFound
+  } else if (err instanceof AtlaSentError) {
+    // Fail-closed: network error or timeout
+    console.error('Authorization unavailable — action blocked');
+  }
+}
+```
+
+<Warning>
+  When you catch `AtlaSentError` (transport or service failure), always treat it as a denial. Never fall back to permitting the action if the authorization service is unreachable — that defeats the fail-closed guarantee.
+</Warning>
+
+## Four-value decision with evaluate()
+
+`protect()` and `withPermit()` collapse `deny`, `hold`, and `escalate` into `AtlaSentDeniedError`. If you need to inspect the specific outcome — for example, to route a `hold` to an approval queue — use the raw `evaluate()` primitive instead.
+
+```typescript
+const result = await client.evaluate({
+  actor: { id: 'user_123', role: 'engineer' },
+  action: { type: 'production.deploy' },
+  target: { id: 'my-service', environment: 'production' },
+  context: {},
+});
+
+switch (result.decision) {
+  case 'allow':
+    console.log('Permit token:', result.permit?.token);
+    break;
+  case 'deny':
+    console.error('Denied:', result.denyCode);
+    break;
+  case 'hold':
+    console.log('Action on hold');
+    break;
+  case 'escalate':
+    console.log('Requires approval:', result.escalationId);
+    break;
+}
+```
+
+<Note>
+  `evaluate()` does not verify the permit for you. If you use `evaluate()` directly and the decision is `allow`, you must call `verifyPermitById()` before executing the action.
+</Note>
+
+## Edge runtime usage
+
+The SDK works in Cloudflare Workers, Vercel Edge Functions, and any runtime that supports the native `fetch` API. Instantiate the client inside the request handler so it picks up the environment's secrets correctly.
+
+```typescript
+// Cloudflare Worker example
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const client = new AtlaSentClient({
+      apiKey: env.ATLASENT_API_KEY,
+    });
+
+    await client.protect(
+      {
+        actor: { id: 'worker-agent' },
+        action: { type: 'process_request' },
+        target: { id: new URL(request.url).pathname },
+        context: {},
+      },
+      async () => {
+        // Authorized — handle the request
+      }
+    );
+
+    return handleRequest(request, env);
+  },
+};
+```
+
+<Tip>
+  In edge runtimes, avoid creating the client at module scope if your environment injects secrets per-request. Create the client inside the handler to ensure it always picks up the correct API key.
+</Tip>

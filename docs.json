@@ -1,0 +1,147 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Atlasent",
+  "theme": "luma",
+  "colors": {
+    "primary": "#0b699a",
+    "light": "#64c4cb",
+    "dark": "#d7e8ed"
+  },
+  "favicon": "https://media.brand.dev/6cdb6cd6-ca9b-4e45-b168-5d172d2b5554.jpg",
+  "logo": {
+    "light": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
+    "dark": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Console",
+        "href": "https://app.atlasent.io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://app.atlasent.io"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart/overview",
+              "quickstart/api-key",
+              "quickstart/first-evaluation",
+              "quickstart/verify-permit",
+              "quickstart/audit-export"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/overview",
+              "concepts/runtime-flow",
+              "concepts/policy",
+              "concepts/permit",
+              "concepts/audit-chain",
+              "concepts/deny-codes",
+              "concepts/glossary"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/protected-actions",
+              "guides/deploy-gate",
+              "guides/policy-authoring",
+              "guides/execution-binding",
+              "guides/approvals",
+              "guides/webhooks",
+              "guides/audit-verification"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/github-action",
+              "integrations/mcp-server",
+              "integrations/langchain",
+              "integrations/llamaindex",
+              "integrations/slack-approval-bot",
+              "integrations/siem-export"
+            ]
+          },
+          {
+            "group": "SDKs",
+            "pages": [
+              "sdks/overview",
+              "sdks/typescript",
+              "sdks/python",
+              "sdks/go",
+              "sdks/cli"
+            ]
+          },
+          {
+            "group": "Compliance",
+            "pages": [
+              "compliance/overview",
+              "compliance/21-cfr-part-11",
+              "compliance/eu-annex-11",
+              "compliance/ich-e6-gcp",
+              "compliance/gxp-change-control"
+            ]
+          },
+          {
+            "group": "Trust & Security",
+            "pages": [
+              "trust/index",
+              "trust/security-overview",
+              "trust/compliance-status",
+              "trust/subprocessors",
+              "trust/contact"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication",
+              "api-reference/errors",
+              "api-reference/rate-limits",
+              "api-reference/pagination",
+              "api-reference/versioning"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/endpoints/evaluate",
+              "api-reference/endpoints/verify-permit",
+              "api-reference/endpoints/audit",
+              "api-reference/endpoints/policies",
+              "api-reference/endpoints/permits",
+              "api-reference/endpoints/escalations",
+              "api-reference/endpoints/webhooks"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/AtlaSent-Systems-Inc"
+    }
+  }
+}

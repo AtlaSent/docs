@@ -1,0 +1,119 @@
+---
+title: "Gate production deploys with the Atlasent GitHub Action"
+sidebarTitle: "GitHub Action"
+description: "Use atlasent-action in a GitHub Actions workflow to gate production deployments — require an Atlasent permit before any deploy step runs."
+---
+
+The Atlasent GitHub Action calls `/v1/evaluate` before your deploy step and stops the job if authorization is denied, held, or escalates without resolution. Drop it into any existing workflow as a single step — no SDK installation required. If the Atlasent API is unreachable for any reason, the action fails the job rather than silently allowing the deploy through.
+
+## Minimal usage
+
+Add the gate step before your deploy step. Store your API key in **Repository Settings → Secrets and variables → Actions** as `ATLASENT_API_KEY`.
+
+```yaml
+- name: Atlasent Deploy Gate
+  uses: atlasent-systems-inc/atlasent-action@v1
+  with:
+    api-key: ${{ secrets.ATLASENT_API_KEY }}
+    action-type: production.deploy
+    actor-id: ${{ github.actor }}
+    target-id: my-service
+    context: |
+      {
+        "git_sha": "${{ github.sha }}",
+        "branch": "${{ github.ref_name }}"
+      }
+```
+
+If the decision is `allow`, the action sets `permit-token` and `evaluation-id` outputs and the workflow continues. On any other decision — `deny`, `hold`, or `escalate` — the step fails and the job stops before the deploy step runs.
+
+## Full deployment workflow
+
+Use the `id` field on the gate step to reference its outputs in downstream steps. Pass the permit token to your deploy script so it can write the token into the audit record.
+
+```yaml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Atlasent Deploy Gate
+        id: gate
+        uses: atlasent-systems-inc/atlasent-action@v1
+        with:
+          api-key: ${{ secrets.ATLASENT_API_KEY }}
+          action-type: production.deploy
+          actor-id: ${{ github.actor }}
+          target-id: ${{ github.repository }}
+          environment: production
+          context: |
+            {
+              "git_sha": "${{ github.sha }}",
+              "branch": "${{ github.ref_name }}",
+              "run_id": "${{ github.run_id }}"
+            }
+
+      - name: Deploy
+        run: ./deploy.sh
+        env:
+          PERMIT_TOKEN: ${{ steps.gate.outputs.permit-token }}
+```
+
+## Wait-for-approval mode
+
+Set `wait-for-approval: true` to block the job when the decision is `hold` or `escalate` instead of failing immediately. The job suspends and polls until a reviewer approves or denies in the Atlasent Console (or connected [Slack bot](/integrations/slack-approval-bot)).
+
+```yaml
+- name: Atlasent Deploy Gate (wait for approval)
+  uses: atlasent-systems-inc/atlasent-action@v1
+  with:
+    api-key: ${{ secrets.ATLASENT_API_KEY }}
+    action-type: production.deploy
+    actor-id: ${{ github.actor }}
+    target-id: ${{ github.repository }}
+    wait-for-approval: true
+```
+
+<Note>
+  GitHub Actions jobs time out after 6 hours by default. Set `timeout-minutes` on the job to a value that matches your expected approval window so the job does not consume runner minutes indefinitely.
+</Note>
+
+## Inputs
+
+| Input | Required | Description |
+|---|---|---|
+| `api-key` | Yes | API key with `evaluate` scope |
+| `action-type` | Yes | Action type slug (e.g. `production.deploy`) |
+| `actor-id` | Yes | Identity of the deployer |
+| `target-id` | Yes | Resource being deployed |
+| `environment` | No | Target environment (default: `production`) |
+| `context` | No | JSON object of additional context fields |
+| `wait-for-approval` | No | Block and wait if escalation is required (default: `false`) |
+| `fail-on-deny` | No | Fail the step on deny (default: `true`) |
+
+## Outputs
+
+| Output | Description |
+|---|---|
+| `decision` | The authorization decision: `allow`, `deny`, `hold`, or `escalate` |
+| `permit-token` | Single-use permit token (only present on `allow`) |
+| `evaluation-id` | Unique ID for this evaluation, for audit chaining |
+
+## Fail-closed guarantee
+
+If the Atlasent API is unreachable — network partition, DNS failure, or any HTTP error — the action **fails the job**. There is no "skip on outage" mode. A deploy that bypasses authorization is indistinguishable from one that was never checked, so the action treats an API error the same as a `deny`.
+
+<Warning>
+  Do not set `fail-on-deny: false` in production workflows. That setting exists for testing and dry-run purposes only. With it disabled, a denied evaluation will not stop the deploy step from running.
+</Warning>
+
+## Audit trail
+
+Every workflow run creates an evaluation record in the Atlasent audit chain. The record automatically includes the GitHub Actions context — repository, ref, SHA, run ID, and actor — so you can cross-reference any deployment permit with the exact commit and workflow run that triggered it. View evaluation records in the Atlasent Console under **Audit → Evaluations**.

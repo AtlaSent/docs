@@ -1,0 +1,228 @@
+---
+title: "Escalations API: create and manage human approval requests"
+sidebarTitle: "Escalations"
+description: "The escalations API lets you create, list, and resolve human-in-the-loop approval requests when an evaluation returns the escalate decision."
+---
+
+When `POST /v1/evaluate` returns an `escalate` decision, the action cannot proceed until a human approver explicitly approves or rejects it. Escalations are the mechanism that connects Atlasent's authorization engine to your team's review workflow. You create an escalation to open a request, notify reviewers, track quorum progress, and then resolve it by casting approve or reject votes. Every state transition is recorded in the audit chain, and a resolved escalation — approved or rejected — is final.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/escalations` | Create a new approval request |
+| `GET` | `/v1/escalations` | List escalations for your organization |
+| `GET` | `/v1/escalations/{id}` | Get a specific escalation with approval records |
+| `POST` | `/v1/escalations/{id}/respond` | Cast an approve or reject vote |
+
+---
+
+## Escalation state machine
+
+```
+pending → approved
+pending → rejected
+pending → expired
+pending → cancelled
+```
+
+All four terminal states are final. You cannot reopen a terminal escalation. Casting a vote on a terminal escalation returns `409 conflict`.
+
+### Quorum tiers
+
+| Tier | Approval rule |
+|---|---|
+| `standard` | First approver to vote wins immediately (single approver). |
+| `dual` | Requires 2 approves; a single reject terminates as rejected. |
+| `emergency` | One expedited approver — designed for time-sensitive actions. |
+
+---
+
+## POST /v1/escalations
+
+Creates a new escalation tied to an `escalate` decision. The escalation starts in `pending` status and waits for approver votes.
+
+### Request body
+
+<ParamField body="decision_id" type="string" required>
+  The `decision_id` from the originating `POST /v1/evaluate` call that returned `escalate`. This links the escalation to the authorization record.
+</ParamField>
+
+<ParamField body="reason" type="string" required>
+  Human-readable explanation of why the action requires approval. Displayed to reviewers in their approval interface.
+</ParamField>
+
+<ParamField body="notify" type="array">
+  List of email addresses or user IDs to notify. Atlasent sends each recipient an approval request with a direct link to the escalation.
+</ParamField>
+
+### Escalation object fields
+
+<ResponseField name="id" type="string">
+  Stable unique identifier for the escalation (prefix `esc_`).
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current lifecycle status — `pending`, `approved`, `rejected`, `expired`, or `cancelled`.
+</ResponseField>
+
+<ResponseField name="decision_id" type="string">
+  The originating decision ID.
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  The reason provided at creation.
+</ResponseField>
+
+<ResponseField name="created_by" type="string">
+  The actor ID that created the escalation.
+</ResponseField>
+
+<ResponseField name="resolved_by" type="string">
+  The actor ID that cast the deciding vote. `null` while pending.
+</ResponseField>
+
+<ResponseField name="resolved_at" type="string">
+  ISO 8601 timestamp when the escalation reached a terminal status. `null` while pending.
+</ResponseField>
+
+<ResponseField name="response" type="string">
+  The final decision — `approve` or `reject`. `null` while pending.
+</ResponseField>
+
+<ResponseField name="comment" type="string">
+  Optional rationale provided by the approver when responding.
+</ResponseField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.atlasent.io/v1/escalations \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "decision_id": "dec_01j8x9y2k...",
+    "reason": "Production deploy requires manual approval",
+    "notify": ["alice@company.com", "bob@company.com"]
+  }'
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "id": "esc_01j8abc...",
+  "status": "pending",
+  "decision_id": "dec_01j8x9y2k...",
+  "reason": "Production deploy requires manual approval",
+  "created_by": "user_123",
+  "resolved_by": null,
+  "resolved_at": null,
+  "response": null,
+  "comment": null,
+  "created_at": "2026-05-26T10:00:00Z"
+}
+```
+
+---
+
+## GET /v1/escalations
+
+Lists escalations for your organization, optionally filtered by status or originating decision.
+
+### Query parameters
+
+<ParamField query="status" type="string">
+  Filter by status — `pending`, `approved`, `rejected`, `expired`, or `cancelled`.
+</ParamField>
+
+<ParamField query="decision_id" type="string">
+  Filter escalations linked to a specific decision.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum results to return. Default `50`, maximum `200`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor from a previous response.
+</ParamField>
+
+---
+
+## GET /v1/escalations/{id}
+
+Fetches a single escalation with its full approval record history and current quorum progress.
+
+### Path parameters
+
+<ParamField path="id" type="string" required>
+  The escalation ID (prefix `esc_`).
+</ParamField>
+
+---
+
+## POST /v1/escalations/{id}/respond
+
+Casts an approve or reject vote on a pending escalation. Requires the `hitl:approve` or `admin` role on the caller's credential. When the vote reaches the quorum threshold, the escalation transitions to `approved` or `rejected` immediately.
+
+### Path parameters
+
+<ParamField path="id" type="string" required>
+  The escalation ID to respond to.
+</ParamField>
+
+### Request body
+
+<ParamField body="response" type="string" required>
+  The vote — either `"approve"` or `"reject"`.
+</ParamField>
+
+<ParamField body="comment" type="string">
+  Optional rationale stored in the approval record and surfaced to auditors.
+</ParamField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.atlasent.io/v1/escalations/esc_01j.../respond \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "response": "approve",
+    "comment": "Reviewed the deploy plan, looks good"
+  }'
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "id": "esc_01j8abc...",
+  "status": "approved",
+  "decision_id": "dec_01j8x9y2k...",
+  "reason": "Production deploy requires manual approval",
+  "created_by": "user_123",
+  "resolved_by": "user_alice",
+  "resolved_at": "2026-05-26T10:08:30Z",
+  "response": "approve",
+  "comment": "Reviewed the deploy plan, looks good"
+}
+```
+
+## Error codes
+
+| HTTP status | Error code | Description |
+|---|---|---|
+| `401` | `unauthorized` | No valid credential provided. |
+| `403` | `forbidden` | Credential lacks the `hitl:approve` or `admin` role (respond endpoint only). |
+| `404` | `not_found` | Escalation ID not found or does not belong to your organization. |
+| `409` | `conflict` | Escalation is already in a terminal status — no further votes accepted. |
+
+<Note>
+  Once an escalation reaches a terminal status (`approved`, `rejected`, `expired`, or `cancelled`), it is permanently closed. If you need to re-evaluate the action, call `POST /v1/evaluate` again to obtain a new decision and create a fresh escalation.
+</Note>

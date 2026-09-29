@@ -1,0 +1,163 @@
+---
+title: "Protected actions: catalog and configuration guide"
+sidebarTitle: "Protected Actions"
+description: "Explore the 5 canonical protected action types, understand the domain.verb naming convention, and learn how to declare your own custom protected actions."
+---
+
+Atlasent organizes every governed operation around the concept of a **protected action** — a named, policy-evaluated unit of work that cannot execute without a valid permit. Every protected action follows the same runtime sequence (`evaluate → permit → verify → execute → audit`), carries a structured context payload for policy decisions, and leaves tamper-evident audit evidence regardless of the outcome. This catalog documents the five canonical protected action types that ship with every Atlasent deployment, then shows you exactly what you need to declare a new one.
+
+## Naming convention
+
+Action types follow the `domain.verb` or `domain.object.verb` pattern using lowercase dot-separated segments. The segments should describe *what is being acted on* and *what the action does*, not how it is triggered.
+
+```
+production.deploy
+vendor.payment.release
+customer.data.export
+reconciliation.certify
+model.agent.execute_tool
+```
+
+<Tip>
+  Keep action type slugs stable. Policies, audit records, and permit tokens all reference the slug by exact string match. Renaming a slug after deployment requires a coordinated policy migration.
+</Tip>
+
+## Canonical action catalog
+
+Every evaluation — whether it results in `allow`, `deny`, `hold`, or `escalate` — produces an audit record carrying the evaluation ID, policy version, actor, action, resource, context, and outcome. The table below summarizes the five canonical types.
+
+| Action type | Protects | Key context fields |
+|---|---|---|
+| `production.deploy` | Production deployments | `git_sha`, `branch`, `review_count` |
+| `vendor.payment.release` | Vendor payment disbursements | `amount`, `vendor_id`, `approver_id` |
+| `customer.data.export` | Bulk PII/customer data exports | `record_count`, `destination`, `requestor_id` |
+| `reconciliation.certify` | Financial-close certifications | `period`, `balance_diff`, `certifier_id` |
+| `model.agent.execute_tool` | LLM agent tool calls | `tool_name`, `agent_id`, `session_id` |
+
+---
+
+## `production.deploy`
+
+Gate a deploy of a service to a production environment from CI. This is the most commonly enforced action type and is the basis for the [Deploy Gate](/guides/deploy-gate) integration.
+
+**Resource:** The service, environment, branch ref, and commit SHA being deployed.
+
+**Context fields used by policy:** `git_sha`, `branch`, `environment`, `review_count`, `deployer_id`, `ticket_id`.
+
+**Expected outcomes:**
+
+| Path | Trigger | Result |
+|---|---|---|
+| `allow` | Inside release window, change ticket present, required reviews satisfied | `permit_token` issued; verify consumes once |
+| `deny` | Outside release window or missing change ticket | No permit; reason cites the failing constraint |
+| `escalate` | Approver not on authorized list | No permit; hold awaits human approval |
+
+**Audit evidence:** An `evaluate.production.deploy` record containing actor, ref, SHA, policy version, decision, and reason. On `allow`, a `verify.production.deploy` record references the permit ID, permit hash, and verification timestamp. The deploy job log must carry both the evaluation ID and permit ID so the post-deploy reconciler can close the chain.
+
+---
+
+## `vendor.payment.release`
+
+Gate the release of an outbound vendor payment from accounts payable. Used to enforce dual-approval requirements and three-way match validation before funds leave the organization.
+
+**Resource:** Payment ID, vendor ID, amount, currency, and ledger account.
+
+**Context fields used by policy:** `amount`, `vendor_id`, `approver_id`, `purchase_order`, `three_way_match`.
+
+**Expected outcomes:**
+
+| Path | Trigger | Result |
+|---|---|---|
+| `allow` | Amount under controller threshold and three-way match passes | Permit issued; payment release proceeds after verify |
+| `deny` | Three-way match fails or FX band breached | No permit; payment held in AP queue |
+| `escalate` | Amount above controller threshold | Hold pending CFO approval; permit only after approval artifact attached |
+
+**Audit evidence:** An `evaluate.vendor.payment.release` record with payment ID, amount, ledger account, initiator and approver identities, and outcome. On `allow`, the verify record binds the permit to the payment ID. The AP ledger entry must reference the permit ID; the reconciler rejects any release row without a matching permit.
+
+---
+
+## `customer.data.export`
+
+Gate an export of customer records out of the system of record. Enforces data governance requirements including purpose declaration, row caps, encryption requirements, and approved destination checks.
+
+**Resource:** Dataset identifier, row count, destination, format, and encryption configuration.
+
+**Context fields used by policy:** `record_count`, `destination`, `requestor_id`, `purpose`, `dpa_reference`.
+
+**Expected outcomes:**
+
+| Path | Trigger | Result |
+|---|---|---|
+| `allow` | Requestor authorized, purpose declared, row count under cap, encryption set | Permit issued; export job streams under permit |
+| `deny` | PII export to an unapproved destination or missing DPA reference | No permit; job is not started |
+| `escalate` | Row count exceeds cap or destination outside listed regions | Hold pending DPO approval |
+
+**Audit evidence:** An `evaluate.customer.data.export` record with dataset, row count, destination, requestor, purpose, DPA reference, policy version, decision, and reason. On `allow`, the export driver writes the permit ID into the export manifest object and into the `audit.export_completed` event when the job finishes.
+
+---
+
+## `reconciliation.certify`
+
+Gate certification of a period-end reconciliation. Certification is a legally meaningful act used in accounting close flows and requires tamper-evident evidence of who approved it under what policy.
+
+**Resource:** Period, account, reconciliation ID, and variance amount.
+
+**Context fields used by policy:** `period`, `balance_diff`, `certifier_id`, `dual_approval_required`, `supporting_evidence_uri`.
+
+**Expected outcomes:**
+
+| Path | Trigger | Result |
+|---|---|---|
+| `allow` | Certifier on authorized controller list, dual approval satisfied, supporting evidence attached | Permit issued; certification record written |
+| `deny` | Certifier not authorized, variance above tolerance, or evidence missing | No permit; reconciliation stays open |
+| `escalate` | Dual approval required but second approver not present | Hold pending second approver |
+
+**Audit evidence:** An `evaluate.reconciliation.certify` record with period, account, certifier, second approver, dual-approval flag, variance, policy version, decision, and reason. The certification record itself must carry the permit ID; a reconciliation row marked certified without a matching permit fails the post-close audit reconciler.
+
+---
+
+## `model.agent.execute_tool`
+
+Gate an AI agent's invocation of any tool whose effect leaves the model sandbox — database writes, third-party API calls, shell commands, payments, or deploys. This action type prevents autonomous agents from taking irreversible actions without explicit policy authorization.
+
+**Resource:** Tool name, arguments, reversibility flag, and blast radius classification.
+
+**Context fields used by policy:** `tool_name`, `agent_id`, `session_id`, `human_in_the_loop`, `model`.
+
+**Expected outcomes:**
+
+| Path | Trigger | Result |
+|---|---|---|
+| `allow` | Tool on the agent's allow list for this session, blast radius within session budget | Permit issued; executor runs the tool inside the permit scope |
+| `deny` | Tool not on allow list, or irreversible tool without `human_in_the_loop` | No permit; executor never invokes the tool |
+| `escalate` | Tool requires human-in-the-loop and none is present | Hold pending operator confirmation |
+
+**Audit evidence:** An `evaluate.model.agent.execute_tool` record with agent ID, session ID, model, tool name, arguments hash, blast radius, policy version, decision, and reason. On `allow`, the tool invocation event must reference the permit ID; the agent harness rejects any tool result that does not bind to a verified permit.
+
+---
+
+## Declaring a new protected action
+
+Before you build a new protected action, confirm it can answer all five questions below. An action that cannot answer all five does not belong as a protected action — it belongs as a feature flag or a plain authorization check.
+
+<Steps>
+  <Step title="Define the action type slug">
+    Choose a stable, lowercase, dot-separated slug following the `domain.object.verb` convention. This string must be identical in your code, your policy rules, and your audit records. Example: `billing.invoice.void`.
+  </Step>
+  <Step title="Describe the resource object">
+    Identify the thing being acted on clearly enough that an auditor can find it later. Include stable identifiers (IDs, account numbers, file paths) rather than display names. Example: `{ invoice_id: "inv_01HZ...", customer_id: "cust_...", amount_cents: 49900 }`.
+  </Step>
+  <Step title="Enumerate the context fields">
+    List the fields your policy needs to make a decision. Keep the set small and explicit — do not pass the entire request object. Example: `{ approver_id, reason_code, duplicate_check_passed }`.
+  </Step>
+  <Step title="Specify the expected outcomes">
+    For each possible decision (`allow`, `deny`, `hold`, `escalate`), write down which input conditions produce it. This becomes your policy's test matrix and your runbook entry.
+  </Step>
+  <Step title="Define the audit evidence">
+    Describe what record is written on each decision path, and identify which downstream system must carry the permit ID so the reconciler can close the chain. If you cannot name that downstream system, the binding is incomplete.
+  </Step>
+</Steps>
+
+<Note>
+  New action types should be added to your organization's internal protected-actions catalog before they ship to production. The catalog entry is the contract between the team that authors the policy and the team that wires the call site.
+</Note>

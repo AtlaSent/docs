@@ -1,0 +1,116 @@
+---
+title: "Atlasent MCP server: authorize AI agent tool calls"
+sidebarTitle: "MCP Server"
+description: "Install the Atlasent MCP server so any MCP-compatible AI agent checks authorization before executing tools — no language-specific SDK required."
+---
+
+The Atlasent MCP server exposes `atlasent_evaluate` and `atlasent_verify_permit` as [Model Context Protocol](https://modelcontextprotocol.io) tools. Any MCP-compatible host — Claude Desktop, Cursor, Windsurf, or a custom agent — can call Atlasent authorization without installing a language-specific SDK. The server runs as a local process and communicates with your agent host over stdio or HTTP transport.
+
+## Installation
+
+<Steps>
+
+### Install the MCP server
+
+Install globally with npm, or run on demand with npx (no prior install required):
+
+<CodeGroup>
+
+```bash npm
+npm install -g @atlasent/mcp-server
+```
+
+```bash npx
+npx -y @atlasent/mcp-server
+```
+
+</CodeGroup>
+
+### Add your API key to the environment
+
+Create an API key with `evaluate` scope in the Atlasent Console under **Settings → API Keys**. You will pass it to the server via the `ATLASENT_API_KEY` environment variable.
+
+### Register with your MCP host
+
+#### Claude Desktop
+
+Add the following block to your Claude Desktop config file and restart the application:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "atlasent": {
+      "command": "npx",
+      "args": ["-y", "@atlasent/mcp-server"],
+      "env": {
+        "ATLASENT_API_KEY": "ak_live_..."
+      }
+    }
+  }
+}
+```
+
+#### HTTP transport (Cursor, Windsurf, custom agents)
+
+Start the server in HTTP mode and point your MCP host at the local port:
+
+```bash
+ATLASENT_API_KEY=ak_live_... npx @atlasent/mcp-server --transport http --port 3100
+```
+
+Then configure your host to connect to `http://localhost:3100`.
+
+</Steps>
+
+## Available tools
+
+Once the server is running, your agent host can call these tools:
+
+| Tool | Description |
+|---|---|
+| `atlasent_evaluate` | Evaluate whether an action is permitted for an actor |
+| `atlasent_verify_permit` | Consume a single-use permit token before executing |
+
+<Note>
+  Treat a tool error from Atlasent as a **deny**, not as permission to proceed. If `atlasent_evaluate` returns an error, the agent must not execute the consequential action.
+</Note>
+
+## How an agent should use the tools
+
+Guide your agent to follow this sequence for any consequential action:
+
+1. Call `atlasent_evaluate` **before** the action with the actor ID, action type, and target.
+2. Halt and surface the denial reason if `decision` is anything other than `allow`.
+3. Call `atlasent_verify_permit` immediately before executing the action to consume the single-use token.
+4. Record the decision ID in your application audit log.
+
+## Example agent conversation
+
+The following shows how Claude uses the Atlasent tools automatically when you instruct it to check authorization before acting:
+
+```
+User: Deploy version 2.1.4 to production
+
+Claude: I'll check if this deployment is authorized...
+[Calling atlasent_evaluate]
+{"actor": {"id": "claude-agent"}, "action": {"type": "production.deploy"}, ...}
+
+[Result: {"decision": "allow", "permit": {"token": "pt_01j..."}}]
+
+Deployment authorized. Proceeding with deployment...
+[Calling atlasent_verify_permit]
+{"permit_token": "pt_01j..."}
+
+Deployment complete. Audit record written.
+```
+
+<Tip>
+  Include a system prompt instruction such as "Before executing any write, deploy, or delete action, call `atlasent_evaluate` and halt if the decision is not `allow`." This makes the authorization check part of the agent's standing behavior rather than requiring per-prompt reminders.
+</Tip>
+
+## Policy resources
+
+The MCP server also exposes your active policy bundles as MCP resources at `atlasent://policies/{policy_id}`. Attach a policy resource to a Claude conversation to give the model direct context about which actions are permitted under your current rules.

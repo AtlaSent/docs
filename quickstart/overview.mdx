@@ -1,0 +1,61 @@
+---
+title: "Get started with Atlasent: authorization in 5 minutes"
+sidebarTitle: "Overview"
+description: "A 4-step quickstart that walks you through creating an API key, making a first evaluation, verifying a permit, and exporting a signed audit bundle."
+---
+
+Atlasent is an execution-time authorization platform: every protected action follows an `evaluate → permit → verify → execute → audit` lifecycle before anything runs. This quickstart wires that full cycle end-to-end using the canonical action `production.deploy`, so you have a working, auditable authorization round-trip in under five minutes.
+
+<Steps>
+  <Step title="Create and configure your API key">
+    Generate a scoped API key in the Atlasent Console at [app.atlasent.io](https://app.atlasent.io) and store it securely as an environment variable so every SDK and `curl` call can reach the API.
+
+    [Create your API key →](/quickstart/api-key)
+  </Step>
+  <Step title="Make your first protected action call">
+    Call `POST /v1/evaluate` — using the SDK's `protect()` / `withPermit()` helpers or raw `curl` — and receive a signed permit token along with a four-value decision: `allow`, `deny`, `hold`, or `escalate`.
+
+    [Make your first evaluation →](/quickstart/first-evaluation)
+  </Step>
+  <Step title="Verify a permit before executing">
+    Call `POST /v1/verify-permit` to confirm that the permit is still current, has not been revoked, and has not expired before your code takes a state-changing action.
+
+    [Verify a permit →](/quickstart/verify-permit)
+  </Step>
+  <Step title="Export and verify your audit bundle">
+    Export a cryptographically signed, hash-chained audit bundle that serves as tamper-evident compliance evidence, then verify it offline with the `atlasent-audit-verify` CLI.
+
+    [Export the audit bundle →](/quickstart/audit-export)
+  </Step>
+</Steps>
+
+## What you need
+
+- An [Atlasent Console](https://app.atlasent.io) account (free to create).
+- A terminal with `curl`, or Node.js 20+ / Python 3.11+ installed.
+- About five minutes.
+
+## What you'll have at the end
+
+By the time you finish step 4, you will have a complete `evaluate → permit → verify → audit-export` round-trip running against your own organization, a signed audit bundle on disk that is verifiable offline, and enough context to wire Atlasent into your real agent or CI pipeline.
+
+<Tip>
+  This guide is written for developers. If you are evaluating Atlasent as a Quality or Compliance lead, read the [Compliance overview](/compliance/overview) first to understand how the audit chain maps to 21 CFR Part 11 and EU Annex 11 requirements.
+</Tip>
+
+## Quick reference
+
+<CardGroup cols={2}>
+  <Card title="Step 1 — API Key" icon="key" href="/quickstart/api-key">
+    Create a scoped key in the Console and set it as an environment variable.
+  </Card>
+  <Card title="Step 2 — First Evaluation" icon="bolt" href="/quickstart/first-evaluation">
+    Call `/v1/evaluate` and interpret the four decision values.
+  </Card>
+  <Card title="Step 3 — Verify Permit" icon="shield-check" href="/quickstart/verify-permit">
+    Confirm a permit is still valid before executing a protected action.
+  </Card>
+  <Card title="Step 4 — Audit Export" icon="file-export" href="/quickstart/audit-export">
+    Export and offline-verify a signed audit bundle for compliance evidence.
+  </Card>
+</CardGroup>

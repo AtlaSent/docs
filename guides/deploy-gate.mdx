@@ -1,0 +1,211 @@
+---
+title: "Deploy Gate: govern and gate production deployments"
+sidebarTitle: "Deploy Gate"
+description: "Configure and use Atlasent's Deploy Gate to enforce 10 deterministic policy rules before every production deployment, with full GitHub Actions integration."
+---
+
+The Deploy Gate is Atlasent's purpose-built enforcement layer for the `production.deploy` action type. It evaluates 10 deterministic rules against your deployment context and returns one of ten canonical decision codes before a single byte reaches production. Whether you integrate through the TypeScript SDK, a direct API call, or the official GitHub Actions workflow, the Deploy Gate gives you a non-bypassable authorization checkpoint that produces tamper-evident audit evidence on every path — permit or deny.
+
+## How it works
+
+When you call the Deploy Gate, Atlasent evaluates your request against the 10 rules in order and returns a decision code. On `allow`, the SDK wraps your deploy function inside a permit scope so the action only runs when fully authorized. On any other outcome, an `AtlaSentDeniedError` is thrown and your deploy does not proceed.
+
+## Decision codes
+
+| Code | Meaning | Recommended action |
+|---|---|---|
+| `ALLOW` | All rules passed — deploy is authorized | Proceed |
+| `DENY_POLICY` | A structural policy rule blocked the request | Review active policy and fix the failing condition |
+| `DENY_AUTHORITY` | Deployer's role is not in the approved set | Check role assignment in Settings → Team |
+| `DENY_ENVIRONMENT` | Permit was issued for a different environment | Re-request a permit for the correct environment |
+| `VERIFY_FAILED` | Permit exists but was not verified server-side | Call `/v1/verify-permit` before re-evaluating |
+| `ESCALATE_REQUIRED` | Request is in an inconsistent state requiring human review | Open an escalation and await approval |
+| `NO_ACTIVE_POLICY` | No active policy covers this action type | Publish a policy for `production.deploy` |
+| `PILOT_MODE` | Rules 2–6 are in shadow mode — deployment is not blocked | Review shadow findings and harden policy before disabling pilot mode |
+| `TTL_EXPIRED` | Permit's `issued_at` is older than 15 minutes | Re-request and re-verify the permit, then retry |
+| `OVERRIDE_APPROVED` | Both `override_reason` and `authority_basis` present — override path taken | Proceed; override is recorded in the audit chain |
+
+## The 10 policy rules
+
+The Deploy Gate evaluates these rules in sequence. The first rule that fails determines the decision code returned.
+
+1. **Confirmation required** — `context.evaluation_confirmed` must be `true`
+2. **Approved roles only** — actor role must be `admin`, `approver`, or `deploy_engineer`
+3. **Permit required and verified** — `context.permit` must exist with `verified: true`
+4. **Permit environment match** — `context.permit.environment` must equal `context.environment`
+5. **Permit action match** — `context.permit.action_type` must equal `production.deploy`
+6. **Permit TTL (15 min)** — `context.permit.issued_at` must be within 15 minutes of evaluation time
+7. **Immutable audit evidence** — evaluation is recorded to the audit chain automatically by the `Evaluator` wrapper
+8. **Override gate** — if `context.override` is present, both `override_reason` and `authority_basis` must be provided; otherwise `ESCALATE_REQUIRED`
+9. **Pilot mode fail-open** — when `context.pilot_mode` is `true`, rules 2–6 produce shadows instead of hard denies; malformed timestamps still escalate
+10. **Inconsistency guard** — contradictory state (e.g. `evaluation_confirmed: true` but no permit present) escalates rather than allowing or denying
+
+## Deploy Gate context shape
+
+Pass this structure when calling the Deploy Gate. All fields marked required must be present; omitting them triggers rule failures immediately.
+
+```typescript
+interface DeployGateContext {
+  git_sha: string;        // Required: commit SHA being deployed
+  branch: string;         // Required: source branch
+  environment: string;    // Required: target environment
+  review_count?: number;  // Number of approved PR reviews
+  deployer_id?: string;   // Identity of the person or system deploying
+  ticket_id?: string;     // Optional change ticket reference
+}
+```
+
+<Note>
+  Never self-assert `permit.verified: true` in your context. The `verified` field is set server-side by `POST /v1/verify-permit`. Any value you set locally is overwritten during evaluation.
+</Note>
+
+## Standard permit flow
+
+The full authorize-then-deploy sequence follows three steps:
+
+```
+1. POST /v1/evaluate
+   body: { agent, action: "production.deploy", context }
+   → { decision: "allow", permitId, auditHash }
+
+2. POST /v1/verify-permit
+   body: { permitId }
+   → permit.verified = true (written server-side)
+
+3. POST /v1/evaluate (re-evaluate with verified permit in context)
+   → { decision: "ALLOW" }
+```
+
+The TypeScript SDK `withDeployPermit` helper performs all three steps for you in a single call.
+
+## TypeScript SDK
+
+Use `client.protect()` with the `DEPLOYMENT_PRODUCTION_ACTION` constant to wrap your deploy function inside a permit scope. The deploy function only runs when the full evaluate-verify-permit round trip succeeds.
+
+```typescript
+import { AtlaSentClient, DEPLOYMENT_PRODUCTION_ACTION } from '@atlasent/sdk';
+
+const client = new AtlaSentClient({ apiKey: process.env.ATLASENT_API_KEY });
+
+await client.protect(
+  {
+    actor: { id: process.env.GITHUB_ACTOR!, role: 'engineer' },
+    action: { type: DEPLOYMENT_PRODUCTION_ACTION },
+    target: { id: 'my-service', environment: 'production' },
+    context: {
+      git_sha: process.env.GITHUB_SHA!,
+      branch: process.env.GITHUB_REF_NAME!,
+      review_count: 2,
+    },
+  },
+  async (permit) => {
+    await runProductionDeploy();
+  }
+);
+```
+
+Use the `DEPLOY_GATE_CODES` constant object instead of string literals when inspecting decision codes — this ensures your code stays in sync with SDK version updates.
+
+```typescript
+import { DEPLOY_GATE_CODES } from '@atlasent/sdk';
+
+try {
+  await client.protect({ ... }, async (permit) => {
+    await runProductionDeploy();
+  });
+} catch (err) {
+  if (err.code === DEPLOY_GATE_CODES.TTL_EXPIRED) {
+    // Re-request and re-verify the permit, then retry
+  }
+  if (err.code === DEPLOY_GATE_CODES.DENY_AUTHORITY) {
+    console.error('Deployer role not authorized. Check your role assignment in Settings → Team.');
+  }
+  throw err;
+}
+```
+
+## GitHub Actions integration
+
+Add the Atlasent Deploy Gate as a step in your workflow. The action evaluates the deployment against your active policy and fails the step if the decision is anything other than `allow`.
+
+```yaml
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AtlaSent Deploy Gate
+        uses: atlasent-systems-inc/atlasent-action@main
+        with:
+          api-key: ${{ secrets.ATLASENT_API_KEY }}
+          action: production.deploy
+          actor: ${{ github.actor }}
+          environment: production
+          git-sha: ${{ github.sha }}
+          branch: ${{ github.ref_name }}
+          review-count: ${{ github.event.pull_request.reviews.length }}
+
+      - name: Run deployment
+        run: ./scripts/deploy.sh
+        env:
+          ATLASENT_PERMIT_ID: ${{ steps.atlasent.outputs.permit_id }}
+```
+
+<Tip>
+  Always store `ATLASENT_API_KEY` as a GitHub Actions secret, not as a plain environment variable. Use `ask_live_*` keys only in your production workflow; use `ask_test_*` keys in staging and PR workflows.
+</Tip>
+
+## Override path
+
+For break-glass scenarios — SEV1 incidents or emergency hotfixes — you can request an override by providing both `override_reason` and `authority_basis` in the context. A partial override claim (only one of the two fields) causes the gate to return `ESCALATE_REQUIRED` rather than allowing.
+
+```typescript
+await client.protect(
+  {
+    actor: { id: 'actor:oncall-lead', role: 'admin' },
+    action: { type: DEPLOYMENT_PRODUCTION_ACTION },
+    target: { id: 'checkout-api', environment: 'production' },
+    context: {
+      git_sha: process.env.GITHUB_SHA!,
+      branch: 'hotfix/sev1-payment-timeout',
+      environment: 'production',
+      override: {
+        override_reason: 'SEV1 incident — hotfix required to restore payment processing',
+        authority_basis: 'incident.SEV1',
+        approver_actor_id: 'actor:oncall-lead',
+      },
+    },
+  },
+  async (permit) => {
+    await runProductionDeploy();
+  }
+);
+```
+
+A successful override returns `OVERRIDE_APPROVED` rather than `ALLOW`. Both codes are authorization grants; full audit evidence is written for both paths.
+
+<Warning>
+  Overrides are audited at the same level of detail as normal deployments. Every `OVERRIDE_APPROVED` decision records the override reason, authority basis, and approver identity in the immutable audit chain. Do not use overrides to skip legitimate review processes.
+</Warning>
+
+## Pilot mode
+
+Set `pilot_mode: true` in your context to run the Deploy Gate in observation mode. In pilot mode, hard-deny rules 2–6 are recorded as shadows instead of blocking the deployment. This lets you validate your context shapes and policy configuration against a live environment without enforcing policy.
+
+Malformed timestamps (unparseable `issued_at`) always escalate even in pilot mode — pilot mode does not suppress structural errors.
+
+## Audit evidence
+
+Every `production.deploy` evaluation automatically writes:
+
+- A full context snapshot to the evaluation record
+- An entry appended to the immutable audit chain (hash-linked, Ed25519 signed)
+
+The SDK handles audit writes — your code does not need to call the audit API directly. Evidence is written for every outcome, not just `allow`.

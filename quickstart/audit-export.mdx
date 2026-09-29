@@ -1,0 +1,122 @@
+---
+title: "Step 4: Export and verify your signed audit bundle"
+sidebarTitle: "Audit Export"
+description: "Export a hash-linked audit bundle for compliance evidence and verify its chain integrity offline using the atlasent-audit-verify CLI tool."
+---
+
+Every evaluation, permit issuance, and verify event in Atlasent is hash-linked into an immutable, append-only audit chain. When you export an audit bundle, you receive a self-contained NDJSON artifact you can hand to an auditor, store in your evidence repository, or verify on an air-gapped machine — no network connection required.
+
+## Export the bundle
+
+Call `POST /v1/audit/exports` with the time range you want to cover. Atlasent assembles all evaluation, permit, and verify events in that window into a single signed NDJSON file:
+
+```bash
+curl -X POST https://api.atlasent.io/v1/audit/exports \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "time_range": {
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-05-31T23:59:59Z"
+    }
+  }'
+```
+
+The API responds with a download URL. Save the file locally:
+
+```bash
+curl -L "<download_url_from_response>" -o audit-export.ndjson
+```
+
+<Note>
+  The `audit` scope is required on your API key to call this endpoint. If your key was created with only the `evaluate` and `verify` scopes, generate a separate key with the `audit` scope for your export pipeline.
+</Note>
+
+## Verify the bundle offline
+
+Use the `atlasent-audit-verify` CLI to confirm the bundle's hash chain is intact. You need the bundle file and the Atlasent public key URL — nothing else:
+
+```bash
+# Install the CLI
+brew install atlasent/tap/audit-verify
+# Or download a binary from GitHub Releases:
+# https://github.com/AtlaSent-Systems-Inc/audit-verify/releases
+
+# Verify the bundle
+atlasent-audit-verify \
+  --input audit-export.ndjson \
+  --keys https://api.atlasent.io/v1/public-keys
+```
+
+A successful verification prints output similar to:
+
+```
+✓ chain continuity:    312 entries, no gaps
+✓ hash linkage:        all prev_hash fields match
+✓ manifest:            entry count and chain_hash match
+
+Bundle is intact.
+```
+
+<Tip>
+  You can give the `audit-export.ndjson` file and the `atlasent-audit-verify` binary to your FDA inspector or external auditor. They can reproduce the full verification on an air-gapped machine using only the public key — no Atlasent account or network access required.
+</Tip>
+
+## What the bundle contains
+
+Each export bundle is a single NDJSON file where every line is a signed audit entry. The bundle envelope carries the following top-level fields:
+
+| Field | What it contains |
+|---|---|
+| `chain_hash` | SHA-256 of the full audit entry sequence, computed over every entry in chain order. |
+| `signature` | Cryptographic signature over the bundle (Ed25519 when signing is GA; `null` until then). |
+| `entries` | All evaluation, permit issuance, and verify events in the requested time window, in chain order. |
+| `signing_key_id` | The key version Atlasent used to sign this bundle, so verifiers can fetch the correct public key. |
+| `issued_at` | ISO 8601 timestamp at which Atlasent generated this bundle. |
+
+## What the bundle proves
+
+A verified bundle provides five independently checkable guarantees:
+
+1. **Completeness** — every evaluation and verify event in the time window is present, with no gaps in the hash chain.
+2. **Integrity** — no entry has been altered after the fact; any modification breaks the SHA-256 chain linkage.
+3. **Authenticity** — when Ed25519 signing is generally available, the signature will confirm the bundle was produced by Atlasent and not forged. Until then, the hash chain itself provides integrity evidence.
+4. **Attribution** — every entry records the actor ID, action type, and target that were evaluated.
+5. **Non-repudiation** — the signed chain and key version allow any third party to independently verify the bundle without trusting Atlasent's servers.
+
+## Compliance framework coverage
+
+| Framework requirement | How the bundle satisfies it |
+|---|---|
+| **21 CFR Part 11 §11.10(b)** — Accurate and complete copies of records | The export covers a user-specified time window with no entry gaps, and the hash chain proves completeness. |
+| **21 CFR Part 11 §11.10(c)** — Protection of records; tamper-evident | The SHA-256 hash chain makes any post-hoc modification detectable. |
+| **21 CFR Part 11 §11.10(e)** — Secure, computer-generated audit trails | Atlasent generates entries server-side at evaluation time; no client can inject or suppress entries. |
+| **EU Annex 11 §9** — Audit trails | Each entry carries actor, action, timestamp, and decision, satisfying the attributable-and-contemporaneous requirement. |
+| **ALCOA+** (Attributable, Legible, Contemporaneous, Original, Accurate, Complete, Consistent, Enduring, Available) | Every field maps to one or more ALCOA+ attributes; the signed chain satisfies enduring and available. |
+
+<Note>
+  For the full compliance mapping — including field-level evidence for each 21 CFR Part 11 clause — see the [Compliance → 21 CFR Part 11](/compliance/21-cfr-part-11) reference page.
+</Note>
+
+## You're done
+
+You now have a complete Atlasent integration running end-to-end:
+
+- ✅ A scoped API key stored securely as an environment variable
+- ✅ A protected action evaluated and permitted via `POST /v1/evaluate`
+- ✅ A permit verified and consumed via `POST /v1/verify-permit`
+- ✅ A signed, offline-verifiable audit bundle exported from `POST /v1/audit/exports`
+
+The next step is wiring this same cycle into your real agent or service. Pick an SDK guide to go deeper:
+
+<CardGroup cols={3}>
+  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript">
+    Full API reference, error types, and advanced patterns for Node.js and edge runtimes.
+  </Card>
+  <Card title="Python SDK" icon="python" href="/sdks/python">
+    Sync and async clients, context manager usage, and retry configuration.
+  </Card>
+  <Card title="REST API" icon="code" href="/api-reference">
+    Complete OpenAPI reference for all Atlasent endpoints.
+  </Card>
+</CardGroup>

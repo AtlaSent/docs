@@ -1,0 +1,59 @@
+---
+title: "Atlasent Trust Center: security and compliance portal"
+sidebarTitle: "Trust Center"
+description: "The Atlasent Trust Center provides security documentation, compliance status, sub-processor list, and contacts for procurement and security teams."
+---
+
+The Atlasent Trust Center is the single URL to share with your security team, procurement reviewers, or Quality lead when they ask "can we trust Atlasent with this data?" Every section cross-links to canonical evidence — compliance framework mappings, security architecture detail, legal documents, and sub-processor disclosures — so any question is one navigation step from its answer.
+
+<Note>
+  Trust portal representations are accurate as of the document dates shown on each page. They are provided for informational purposes and are not warranties. They do not create contractual commitments and are superseded by the express terms of any executed agreement between Atlasent and your organization, including the MSA, DPA, BAA, SLA, AUP, and Order Form. Any inconsistency between this portal and the DPA is resolved in favor of the DPA.
+</Note>
+
+## What Atlasent is
+
+Atlasent is execution-time authorization infrastructure. It sits in the execution path of high-impact automated actions — AI agents, CI/CD pipelines, and regulated workflows — and answers one question before any consequential action runs: is this actor authorized to take this action right now, against this target, in this context? Customer data is logically segregated by `organization_id` at the database row-level security layer. No cross-tenant access path exists at any layer of the stack.
+
+## Explore the Trust Center
+
+<CardGroup cols={2}>
+  <Card title="Security Overview" icon="shield-check" href="/trust/security-overview">
+    Encryption in transit and at rest, tenant isolation, API key controls, audit chain integrity, fail-closed guarantees, and vulnerability disclosure.
+  </Card>
+  <Card title="Compliance Status" icon="clipboard-check" href="/trust/compliance-status">
+    Current frameworks — 21 CFR Part 11, EU Annex 11, ALCOA+, GDPR — alongside the SOC 2 and HIPAA BAA roadmap with target dates.
+  </Card>
+  <Card title="Sub-processors" icon="list-tree" href="/trust/subprocessors">
+    Every third party that processes Customer Personal Data on Atlasent's behalf, with their role, data handled, and location. Includes 30-day advance change notification.
+  </Card>
+  <Card title="Contact" icon="envelope" href="/trust/contact">
+    Routing table for security, privacy, legal, compliance, and procurement inquiries with response time expectations for each topic.
+  </Card>
+</CardGroup>
+
+## Quick links for enterprise buyers
+
+The following artifacts are the ones enterprise procurement teams request most often. You can request all of them from [security@atlasent.io](mailto:security@atlasent.io) or [compliance@atlasent.io](mailto:compliance@atlasent.io).
+
+<Accordion title="Security questionnaire responses (CAIQ v4)">
+  Atlasent maintains a pre-filled CAIQ v4 (Consensus Assessment Initiative Questionnaire) that maps each question to the relevant control in the Atlasent security architecture. Request the latest version from [security@atlasent.io](mailto:security@atlasent.io). The pre-fill is updated quarterly.
+</Accordion>
+
+<Accordion title="Vendor Qualification Package (VQP)">
+  The VQP is a structured document for regulated-industry customers that maps Atlasent's controls to GxP framework requirements (21 CFR Part 11, EU Annex 11, ICH E6 GCP). It contains ten sections covering vendor profile, system description, control mapping, and contractual schedules. Request a copy from [compliance@atlasent.io](mailto:compliance@atlasent.io).
+</Accordion>
+
+<Accordion title="Data Processing Agreement (DPA)">
+  Atlasent's standard DPA incorporates EU Standard Contractual Clauses (Modules 2 and 3) and the UK International Data Transfer Addendum. Request the current template from [privacy@atlasent.io](mailto:privacy@atlasent.io). Turnaround is 2 business days.
+</Accordion>
+
+<Accordion title="Responsible disclosure and penetration testing">
+  Report security vulnerabilities to [security@atlasent.io](mailto:security@atlasent.io) with the subject line `[Security]`. Atlasent acknowledges all reports within 2 business days and provides an initial triage assessment within 5 business days. The most recent third-party penetration test summary is available under NDA on request.
+</Accordion>
+
+## How Atlasent keeps this portal honest
+
+- The compliance lead reviews every page in this portal on the first of every month.
+- Compliance claims on this portal must match the canonical claims table in [Compliance Overview](/compliance/overview), which is CI-gated against product copy.
+- Any change to the security posture requires a parallel update here before it goes live and a corresponding update to DPA Annex II.
+- If you find a discrepancy between this portal and any other Atlasent document, email [compliance@atlasent.io](mailto:compliance@atlasent.io) and the other copy will be corrected.

@@ -1,0 +1,147 @@
+---
+title: "Deny codes: machine codes for why Atlasent blocked"
+sidebarTitle: "Deny Codes"
+description: "A complete reference for every Atlasent deny code, grouped by engine and deploy-gate category, with TypeScript and Python handling examples."
+---
+
+When Atlasent's evaluation returns anything other than `allow`, the response carries a `deny_code` — a short, stable machine-readable string — alongside a human-readable `deny_reason`. You can safely branch your routing logic, dashboards, and alerting rules on `deny_code` values; they form a closed enum that Atlasent does not rename or remove without a deprecation notice.
+
+Deny codes appear on `deny`, `hold`, and `escalate` decisions alike. The code names *why* the engine reached that state, not merely whether the action was outright blocked. A `hold` code means the action is paused pending an external condition; an `escalate` code means it has been routed to a human reviewer queue.
+
+<Note>
+  Pin your client code to `deny_code` values, not to `deny_reason` strings. Reason strings are human-readable and may change without notice; the codes are the stable contract.
+</Note>
+
+## Engine deny codes
+
+These codes are returned by the rule engine on any evaluation.
+
+| Code | Meaning |
+|---|---|
+| `DENY_POLICY` | A policy rule explicitly denied this action |
+| `DENY_AUTHORITY` | The actor lacks authority for this action type |
+| `DENY_ENVIRONMENT` | The action is not permitted in this environment |
+| `VERIFY_FAILED` | Permit verification failed — the permit is expired, already consumed, or invalid |
+| `ESCALATE_REQUIRED` | The action requires human approval before it can proceed |
+| `NO_ACTIVE_POLICY` | No published policy bundle exists for this action type |
+| `NO_MATCH` | No policy rule matched and `fail_mode` is `closed` |
+| `FROZEN` | The action falls inside an active freeze window |
+| `RATE_LIMIT_EXCEEDED` | A rate counter exceeded its configured maximum |
+| `INSUFFICIENT_APPROVALS` | The action requires more approvals than were supplied |
+| `RISK_ESCALATE` | The computed risk score met or exceeded the escalate threshold |
+| `AMBIGUOUS_POLICY` | Two or more rules share the same priority — the engine refused to choose |
+
+## Deploy gate codes
+
+These codes are emitted by the Deploy Gate policy, which runs as a pre-check on every `production.deploy` evaluation before the bundle rules engine.
+
+| Code | Meaning |
+|---|---|
+| `NO_ACTIVE_POLICY` | No published policy bundle for this action type |
+| `PILOT_MODE` | The org is in pilot mode; the action requires explicit approval |
+| `TTL_EXPIRED` | The permit TTL exceeded 900 seconds before verification |
+
+<Accordion title="DENY_POLICY — policy rule explicitly denied the action">
+  The active policy contains a rule that matched the request and returned `deny`. Check the `deny_reason` field for the rule ID and the matched condition. Review the policy in the console to determine whether the rule is correctly configured for this actor and context.
+</Accordion>
+
+<Accordion title="DENY_AUTHORITY — actor lacks authority">
+  The actor's role is not on the approved list for this action type. Verify `actorMetadata.role` in your request and confirm the actor has the correct role assigned in your identity system. If the role is correct, check whether the policy's approved role list needs updating.
+</Accordion>
+
+<Accordion title="DENY_ENVIRONMENT — environment mismatch">
+  The permit's `environment` field does not match `context.environment`, or `context.environment` is absent. Ensure the permit was issued for the environment you are actually deploying to and that `context.environment` is set in the evaluation request.
+</Accordion>
+
+<Accordion title="VERIFY_FAILED — permit verification failed">
+  No permit was provided, the permit is missing `permit_id`, or the permit's `verified` flag is not `true`. Call `POST /v1/permits/{id}/verify` with the permit token before submitting the evaluation, and pass the verified result back as `context.permit`.
+</Accordion>
+
+<Accordion title="ESCALATE_REQUIRED — human approval required">
+  An unknown or inconsistent state was detected — for example, a malformed timestamp or a missing `evaluation_confirmed` field. A human reviewer must inspect the context and authorize or deny before the action proceeds. This code is emitted even in pilot (shadow) mode because an inconsistent state means the evaluation itself cannot be trusted.
+</Accordion>
+
+<Accordion title="NO_ACTIVE_POLICY — no published bundle">
+  No active policy bundle exists for the `(org_id, action_type)` pair. Because `fail_mode` defaults to `closed`, Atlasent returns `deny`. Publish a policy bundle for this action type to allow evaluations to proceed.
+</Accordion>
+
+<Accordion title="FROZEN — action inside a freeze window">
+  The action was submitted during an active freeze window (for example, a quarter-end close period). The `deny_reason` names the window. Wait for the window to close or request an override if your policy permits one.
+</Accordion>
+
+<Accordion title="TTL_EXPIRED — permit exceeded 15-minute TTL">
+  The permit's `issued_at` timestamp is more than 900 seconds old. Re-issue a fresh permit by calling evaluate again. Do not reuse permit tokens across attempts.
+</Accordion>
+
+## Handling deny codes in your code
+
+### TypeScript
+
+```typescript
+try {
+  await client.protect({ ... }, async (permit) => { ... });
+} catch (err) {
+  if (err instanceof AtlaSentDeniedError) {
+    switch (err.denyCode) {
+      case 'ESCALATE_REQUIRED':
+        // Route to approval workflow
+        break;
+      case 'DENY_POLICY':
+        // Show policy violation to user
+        break;
+      case 'INSUFFICIENT_APPROVALS':
+        // Prompt user to collect additional approvals and resubmit
+        break;
+      case 'FROZEN':
+        // Surface "inside freeze window" message
+        break;
+      case 'TTL_EXPIRED':
+        // Re-evaluate to obtain a fresh permit
+        break;
+      default:
+        // Generic "denied — check audit trail" surface
+        break;
+    }
+  }
+}
+```
+
+### Python
+
+```python
+from atlasent import AtlaSentDeniedError
+
+try:
+    with client.with_permit(...):
+        deploy()
+except AtlaSentDeniedError as e:
+    if e.deny_code == 'ESCALATE_REQUIRED':
+        # Route to approval workflow
+        pass
+    elif e.deny_code == 'DENY_POLICY':
+        # Show policy violation to user
+        pass
+    elif e.deny_code == 'INSUFFICIENT_APPROVALS':
+        # Prompt user to collect additional approvals and resubmit
+        pass
+    elif e.deny_code == 'FROZEN':
+        # Surface "inside freeze window" message
+        pass
+    elif e.deny_code == 'TTL_EXPIRED':
+        # Re-evaluate to obtain a fresh permit
+        pass
+    else:
+        # Generic "denied — check audit trail" surface
+        pass
+```
+
+## Code stability
+
+All codes listed on this page are stable across v1. Atlasent may add new codes in future releases; existing codes are not renamed or removed without a deprecation notice published in the changelog.
+
+## Related
+
+- [Runtime Flow](/concepts/runtime-flow) — the fail-closed matrix showing when each error type is raised.
+- [Permit](/concepts/permit) — what an `allow` decision produces, and how `VERIFY_FAILED` and `TTL_EXPIRED` relate to the permit lifecycle.
+- [Audit Chain](/concepts/audit-chain) — deny codes appear in the `deny_code` field of every non-allow audit entry.
+- [Glossary](/concepts/glossary) — canonical definitions for Decision, Hold, Escalate, and Fail-Closed.

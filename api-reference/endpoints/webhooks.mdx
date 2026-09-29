@@ -1,0 +1,230 @@
+---
+title: "Webhooks API: create and manage event subscriptions"
+sidebarTitle: "Webhooks"
+description: "Subscribe to Atlasent enforcement events via webhook. Payloads are HMAC-SHA256 signed. Always verify signatures before processing to prevent replays."
+---
+
+Webhooks let you react to Atlasent enforcement events in real time without polling. When a relevant event occurs — a deny decision, a permit consumption, an escalation being resolved — Atlasent delivers a signed HTTP `POST` to your endpoint. Every delivery includes an HMAC-SHA256 signature computed over the raw request body; you must verify this signature before processing the payload. Atlasent delivers each event at least once and retries failed deliveries with exponential backoff across five attempts.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/webhooks` | Create a new event subscription |
+| `GET` | `/v1/webhooks` | List your subscriptions |
+| `GET` | `/v1/webhooks/{id}` | Get a specific subscription |
+| `DELETE` | `/v1/webhooks/{id}` | Delete a subscription |
+| `POST` | `/v1/webhooks/{id}/test` | Send a test event to your endpoint |
+
+---
+
+## POST /v1/webhooks
+
+Creates a new webhook subscription. The response includes a `signing_secret` that you use to verify incoming deliveries. **The secret is shown only once** — store it securely immediately.
+
+### Request body
+
+<ParamField body="url" type="string" required>
+  The HTTPS endpoint that will receive event deliveries. Must be publicly reachable and respond with a `2xx` status within 10 seconds.
+</ParamField>
+
+<ParamField body="events" type="array" required>
+  List of event types to subscribe to. See the [event types table](#event-types) below for all available values.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional human-readable label stored with the subscription.
+</ParamField>
+
+### Subscription object fields
+
+<ResponseField name="id" type="string">
+  Stable unique identifier for the subscription (prefix `wh_`).
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The delivery endpoint URL.
+</ResponseField>
+
+<ResponseField name="events" type="array">
+  The event types this subscription receives.
+</ResponseField>
+
+<ResponseField name="signing_secret" type="string">
+  HMAC-SHA256 signing secret (prefix `whsec_`). **Present only in the creation response.** Store this immediately — you cannot retrieve it again.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Subscription status — `active` or `inactive`.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when the subscription was created.
+</ResponseField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.atlasent.io/v1/webhooks \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-app.com/webhooks/atlasent",
+    "events": ["evaluation.denied", "permit.consumed", "escalation.created"]
+  }'
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "id": "wh_01j...",
+  "url": "https://your-app.com/webhooks/atlasent",
+  "events": ["evaluation.denied", "permit.consumed", "escalation.created"],
+  "signing_secret": "whsec_abc123...",
+  "status": "active",
+  "created_at": "2026-05-26T10:00:00Z"
+}
+```
+
+<Warning>
+  Save the `signing_secret` immediately — it is shown exactly once, at creation time. If you lose it, you must delete the subscription and create a new one. Never log or expose the secret in client-side code.
+</Warning>
+
+---
+
+## Event types
+
+Subscribe to any combination of the following event types.
+
+| Event type | Fired when |
+|---|---|
+| `evaluation.allow` | An evaluation returned `allow` and a permit was issued. |
+| `evaluation.denied` | An evaluation returned `deny`. |
+| `evaluation.hold` | An evaluation returned `hold`. |
+| `evaluation.escalate` | An evaluation returned `escalate`. |
+| `permit.consumed` | A permit was successfully consumed via `POST /v1/verify-permit`. |
+| `permit.expired` | A permit's 15-minute TTL elapsed before it was consumed. |
+| `permit.revoked` | A permit was revoked via `DELETE /v1/permits/{id}`. |
+| `escalation.created` | A new escalation was opened. |
+| `escalation.resolved` | An escalation reached a terminal status (approved, rejected, expired). |
+
+---
+
+## Payload format
+
+Each delivery is a `POST` request to your endpoint with the following headers:
+
+| Header | Description |
+|---|---|
+| `X-AtlaSent-Signature` | `sha256=<hmac-hex>` — HMAC-SHA256 of the raw request body, keyed with your `signing_secret`. |
+| `X-AtlaSent-Timestamp` | Unix timestamp of the delivery attempt. Use this to reject replayed deliveries outside your tolerance window. |
+| `Content-Type` | `application/json` |
+
+### Example payload
+
+```json
+{
+  "id": "evt_01xyz...",
+  "event_type": "evaluation.denied",
+  "org_id": "org_01abc...",
+  "data": {
+    "decision": "deny",
+    "decision_id": "dec_01j8x9y2k...",
+    "actor_id": "user_123",
+    "action_type": "production.deploy",
+    "deny_code": "DENY_POLICY",
+    "risk_score": 72,
+    "risk_level": "high"
+  },
+  "created_at": "2026-05-26T10:05:00Z"
+}
+```
+
+---
+
+## Verifying signatures
+
+You must verify the `X-AtlaSent-Signature` header on every incoming delivery before processing the payload. The signature is `sha256=` followed by the lowercase hex-encoded HMAC-SHA256 of the **raw request body bytes**, keyed with your `signing_secret`.
+
+<CodeGroup>
+```typescript TypeScript (SDK)
+import { verifyWebhookSignature } from '@atlasent/sdk';
+import express from 'express';
+
+app.post(
+  '/webhooks/atlasent',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const isValid = await verifyWebhookSignature(
+      req.body,                                          // raw Buffer — do not parse first
+      req.headers['x-atlasent-signature'] as string,
+      process.env.ATLASENT_WEBHOOK_SECRET!,
+    );
+
+    if (!isValid) {
+      return res.status(401).send('Invalid signature');
+    }
+
+    const event = JSON.parse(req.body.toString());
+    // handle event...
+    res.sendStatus(200);
+  },
+);
+```
+
+```typescript TypeScript (manual)
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+function verifySignature(
+  rawBody: Buffer,
+  signature: string,
+  secret: string,
+): boolean {
+  const expected =
+    'sha256=' + createHmac('sha256', secret).update(rawBody).digest('hex');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+</CodeGroup>
+
+<Warning>
+  Always use a timing-safe comparison when checking the signature. Standard string equality is vulnerable to timing attacks.
+</Warning>
+
+---
+
+## Delivery guarantees
+
+Atlasent delivers each event **at least once**. In rare cases your endpoint may receive duplicate deliveries for the same event — your handler should be idempotent, using the `id` field in the payload to deduplicate.
+
+Failed deliveries (non-`2xx` response or a timeout after 10 seconds) are retried with exponential backoff:
+
+| Attempt | Delay |
+|---|---|
+| 1 (initial) | Immediate |
+| 2 | 30 seconds |
+| 3 | 5 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+
+After five failed attempts, the delivery is marked `failed` and no further retries occur.
+
+<Tip>
+  Respond with `200 OK` as quickly as possible — before doing any heavy processing. Enqueue the event payload for asynchronous handling if your processing logic takes more than a few seconds, to avoid timeouts and unnecessary retries.
+</Tip>
+
+---
+
+## Error codes
+
+| HTTP status | Error code | Description |
+|---|---|---|
+| `400` | `invalid_body` | Missing or malformed fields in the request body. |
+| `401` | `unauthorized` | No valid credential provided. |
+| `409` | `duplicate_url` | A subscription for this URL already exists. |
+| `422` | `invalid_event_type` | One or more of the specified event types are not recognized. |

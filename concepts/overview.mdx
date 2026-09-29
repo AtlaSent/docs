@@ -1,0 +1,74 @@
+---
+title: "How Atlasent's execution-time authorization model works"
+sidebarTitle: "Overview"
+description: "A guide to Atlasent's six authorization primitives and the evaluate → permit → verify → execute → audit sequence that connects them."
+---
+
+Atlasent is an execution-time authorization platform: before any high-impact action runs, Atlasent evaluates the actor, the action, and the surrounding context against your policies, issues a single-use signed permit if the decision is `allow`, and writes a tamper-evident audit entry — regardless of the outcome. You get a complete, compliance-ready record of every decision your system makes.
+
+## The six primitives
+
+<CardGroup cols={2}>
+  <Card title="Policies" icon="scroll" href="/concepts/policy">
+    Versioned rule bundles that map action types to decisions. Every evaluation loads the active published bundle for your org and action type.
+  </Card>
+  <Card title="Permits" icon="ticket" href="/concepts/permit">
+    Single-use, Ed25519-signed tokens issued only when evaluation returns `allow`. A permit authorizes exactly one execution and expires after 15 minutes.
+  </Card>
+  <Card title="Audit Chain" icon="link" href="/concepts/audit-chain">
+    An append-only, SHA-256 hash-linked, Ed25519-signed record of every decision — allow or deny. Exportable and offline-verifiable for compliance evidence.
+  </Card>
+  <Card title="Deny Codes" icon="ban" href="/concepts/deny-codes">
+    Stable machine-readable codes that explain why Atlasent blocked an action. Safe to branch on in dashboards, alerting rules, and routing logic.
+  </Card>
+  <Card title="Runtime Flow" icon="arrow-right-arrow-left" href="/concepts/runtime-flow">
+    The four-hop lifecycle — evaluate, mint permit, verify, execute — including the fail-closed matrix and the trust boundary that separates Atlasent from your code.
+  </Card>
+  <Card title="Glossary" icon="book" href="/concepts/glossary">
+    Canonical definitions for every term Atlasent uses: Action Type, Actor, Bundle, Permit, Consume, Fail-Closed, and more.
+  </Card>
+</CardGroup>
+
+## The authorization sequence
+
+Every protected action follows the same five-step path:
+
+1. **Evaluate** — your code calls `protect()` (or `with_permit()`) with the actor, action type, and context. Atlasent runs the policy engine and reaches a decision.
+2. **Permit** — if the decision is `allow`, Atlasent mints a `pt_…` permit token, signs it with your org's Ed25519 key, and returns it to the SDK.
+3. **Verify** — the SDK immediately calls `POST /v1/verify-permit` to confirm the permit is still valid, unconsumed, and correctly signed. This step closes the window between mint and execute.
+4. **Execute** — control returns to your code. The action runs. You store the `permit_id` alongside your own record to keep the audit trail two-way navigable.
+5. **Audit** — every evaluation and every verification lands in the immutable audit chain before Atlasent returns a response. The record exists for allow *and* deny decisions.
+
+<Note>
+  The audit entry is written **before** Atlasent returns a response. You always have a record, even if the caller crashes after receiving the decision.
+</Note>
+
+## Two layers, kept separate
+
+When you read Atlasent code and docs you will encounter two distinct layers. They are not interchangeable.
+
+<CardGroup cols={2}>
+  <Card title="Execution-boundary authorization" icon="shield">
+    The contract that **no action runs without a verified permit**. Identical across languages, identical across surfaces, identical on the wire. Non-negotiable, non-bypassable, audit-bearing.
+
+    **Canonical surfaces:** `protect()`, `with_permit()` / `withPermit()`, `require_permit()` / `requirePermit()`.
+
+    Pin your security and compliance claims here.
+  </Card>
+  <Card title="SDK guard / helper ergonomics" icon="puzzle-piece">
+    Convenience layers on top — framework decorators, middleware, integration wrappers. They make the canonical surface ergonomic in a given runtime. They do **not** relax the contract.
+
+    **Examples:** `@atlasent_guard` (Flask / FastAPI), LangChain / LlamaIndex / MCP guards, browser guards.
+
+    Pin ergonomics claims here, not security claims.
+  </Card>
+</CardGroup>
+
+The permit is the canonical artifact across both layers. Any surface that claims to authorize an action without producing or verifying a permit is not an Atlasent execution-boundary call.
+
+## Where to go next
+
+- **Building:** Start with [Runtime Flow](/concepts/runtime-flow) to understand the full request lifecycle before writing code.
+- **Reasoning about decisions:** Read [Policy](/concepts/policy) to understand how rules evaluate, then [Permit](/concepts/permit) for the token lifecycle.
+- **Compliance and security review:** [Audit Chain](/concepts/audit-chain) covers tamper evidence and framework mapping.
+- **Debugging a denial:** [Deny Codes](/concepts/deny-codes) lists every code with handling examples in TypeScript and Python.

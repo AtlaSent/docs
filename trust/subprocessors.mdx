@@ -1,0 +1,74 @@
+---
+title: "Atlasent sub-processors: who handles your customer data"
+sidebarTitle: "Sub-processors"
+description: "Every Atlasent sub-processor, their role, data handled, and location. Atlasent gives 30-day advance notice before adding or replacing sub-processors."
+---
+
+A sub-processor is any third party that Atlasent engages to process Customer Personal Data in connection with the Atlasent service. Atlasent discloses every sub-processor that handles customer data, along with the categories of data each one processes, and the region where that processing occurs. This page is the public record. If you are a customer with active data-residency requirements, email [privacy@atlasent.io](mailto:privacy@atlasent.io) to confirm the specific region for each relevant sub-processor in writing.
+
+## Current sub-processors
+
+| Sub-processor | Role | Data | Location |
+|---|---|---|---|
+| Supabase | Database and auth infrastructure | All customer data | us-east-1 (default) |
+| Vercel | Console hosting | Session tokens | Global CDN |
+| Cloudflare | DNS, WAF, edge | Request metadata | Global |
+| Stripe | Payment processing | Billing data only | Global |
+| Sentry | Error monitoring | Anonymized stack traces | US |
+| Anthropic | LLM (opt-in only) | Evaluation context (opt-in) | US |
+| OpenAI | LLM (opt-in only) | Evaluation context (opt-in) | US |
+| GitHub | Source code and CI/CD | Code only | US |
+| Google Workspace | Internal email and identity | Internal correspondence only — no customer governance data | Multi-region |
+
+<Note>
+  Anthropic and OpenAI are used only for AI-assisted features within the Atlasent Console. These features are **opt-in** — if you do not enable them, no evaluation context is sent to either provider. Both providers operate under enterprise agreements with Atlasent that prohibit training on customer data. Atlasent targets zero data retention configuration on both providers; configuration status is verified at the annual LLM provider review.
+</Note>
+
+## LLM sub-processor handling
+
+When you enable AI-assisted features in the Console, Atlasent may send evaluation context to Anthropic or OpenAI to generate suggestions. The following restrictions apply:
+
+- Atlasent does not send credentials, signing keys, or data classified as Restricted to any LLM provider.
+- Enterprise agreements with both providers prohibit use of customer data for model training.
+- You can disable LLM-assisted features at any time from **Console → Settings → AI Features**.
+- Disabling LLM features removes both Anthropic and OpenAI from your data flow immediately.
+
+## Change notification
+
+Atlasent provides **at least 30 days' advance notice** before adding a new sub-processor or replacing an existing one that processes Customer Personal Data. Notice is sent to the email addresses you have registered for sub-processor notifications.
+
+If you object to a new sub-processor in good faith, you may terminate the affected service within the notice window without penalty for the unused portion of any pre-paid fees, per the DPA.
+
+### Subscribe to change notifications
+
+To receive sub-processor change notices, email [privacy@atlasent.io](mailto:privacy@atlasent.io) with the subject `Subscribe: sub-processor notices` and include the email address or addresses that should receive notices.
+
+<Tip>
+  Enterprise customers should subscribe at least one address from their privacy, security, or procurement function, not just a personal inbox, to ensure continuity of notification if personnel change.
+</Tip>
+
+## Data categories processed
+
+The table below summarizes the categories of Customer Personal Data that flow through Atlasent's systems and which sub-processors handle each category.
+
+| Data category | Sub-processors |
+|---|---|
+| Customer policies, evaluations, permits, audit entries | Supabase |
+| User account data (name, email, org membership) | Supabase, Vercel |
+| Session tokens | Vercel, Supabase |
+| Billing data | Stripe |
+| Error diagnostics (anonymized) | Sentry |
+| Evaluation context (opt-in AI features only) | Anthropic, OpenAI |
+| Request metadata (IP, headers for WAF) | Cloudflare |
+| Internal email and identity (staff only) | Google Workspace |
+
+## Related resources
+
+<CardGroup cols={2}>
+  <Card title="Trust Center" icon="shield-check" href="/trust">
+    Overview of all Trust Center sections, including quick links for enterprise buyers.
+  </Card>
+  <Card title="Contact" icon="envelope" href="/trust/contact">
+    Email [privacy@atlasent.io](mailto:privacy@atlasent.io) to subscribe to change notices, request the DPA, or raise a sub-processor objection.
+  </Card>
+</CardGroup>

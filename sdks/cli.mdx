@@ -1,0 +1,115 @@
+---
+title: "Atlasent CLI: validate, test, and deploy policy bundles"
+sidebarTitle: "CLI"
+description: "Use atlasent-policy to validate policy files, run offline test suites, compare versions with diff, and deploy bundles to the Atlasent runtime from CI."
+---
+
+The `atlasent-policy` CLI lets you treat your authorization bundles exactly like application code: stored in a repository, reviewed in pull requests, validated in CI, and deployed on merge. The `validate` and `test` commands run entirely offline against the same rule engine the Atlasent runtime uses, so a test that passes locally passes in production.
+
+## Installation
+
+Install the CLI globally or run it on demand with `npx`. Both the `atlasent` and `atlasent-policy` names resolve to the same binary.
+
+<CodeGroup>
+```bash npm
+npm install -g @atlasent/cli
+```
+```bash npx
+npx @atlasent/cli --help
+```
+</CodeGroup>
+
+## Commands
+
+### validate — syntax-check a policy file
+
+`validate` performs structural validation of a policy file without making any network calls. It catches malformed JSON, missing required fields, unknown action types, type mismatches between the context schema and rule predicates, and circular references in layered bundles.
+
+```bash
+atlasent-policy validate --file policy.json
+# Output: ✓ policy.json is valid (3 rules)
+```
+
+The command exits with code `0` on a clean result and code `1` with structured findings if any issue is detected.
+
+### test — run policy test cases offline
+
+`test` executes every test case in a test file against the specified policy file. Like `validate`, it runs entirely offline against the same rule engine the runtime uses — there is no class of "works locally but fails in production" policy evaluation bug.
+
+```bash
+atlasent-policy test --policy policy.json --tests tests.json
+# Output:
+# ✓ allow-normal-deploy (3ms)
+# ✓ deny-missing-reviews (2ms)
+# ✓ hold-friday-deploy (1ms)
+# 3 passed, 0 failed
+```
+
+Each test case in your test file specifies a named input and an expected decision:
+
+```json
+[
+  {
+    "name": "allow-normal-deploy",
+    "input": {
+      "actor": { "id": "user_123", "role": "engineer" },
+      "action": { "type": "production.deploy" },
+      "target": { "id": "service", "environment": "production" },
+      "context": { "review_count": 2, "branch": "main" }
+    },
+    "expected": { "decision": "allow" }
+  }
+]
+```
+
+The `name` field is used in test output and CI annotations. The `input` mirrors the shape of a `POST /v1/evaluate` request body. Set `expected.decision` to `allow`, `deny`, `hold`, or `escalate`.
+
+<Tip>
+  Add a `now` field to any test case to fix the evaluation clock for time-sensitive rules. This makes your test suite deterministic regardless of when it runs.
+</Tip>
+
+### diff — compare two policy versions
+
+`diff` compares two policy files and reports semantic differences — which rule vectors flip decisions, which gain or lose deny codes, and which produce different risk scores. Use it in pull request reviews to verify that a rule change actually produces the behavior the author intended.
+
+```bash
+atlasent-policy diff --from policy-v1.json --to policy-v2.json
+```
+
+Like `validate` and `test`, `diff` requires no network access.
+
+### deploy — push a policy bundle to Atlasent
+
+`deploy` is the only command that makes a network call. It publishes a validated, tested policy bundle to the Atlasent runtime. Requires an API key with the `bundles:publish` scope set in the `ATLASENT_API_KEY` environment variable or passed via `--api-key`.
+
+```bash
+atlasent-policy deploy \
+  --file policy.json \
+  --api-key $ATLASENT_API_KEY
+```
+
+Always run `validate` and `test` before `deploy`. The CLI does not enforce this order, but your CI pipeline should — see the example below.
+
+## CI integration
+
+Add `validate`, `test`, and `deploy` as a sequential step in your CI pipeline. The example below uses GitHub Actions and runs only when files inside the `policies/` directory change.
+
+```yaml
+- name: Validate and deploy policy
+  run: |
+    npx @atlasent/cli validate --file policy.json
+    npx @atlasent/cli test --policy policy.json --tests tests.json
+    npx @atlasent/cli deploy --file policy.json --api-key $ATLASENT_API_KEY
+  env:
+    ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+```
+
+<Note>
+  The `validate` and `test` commands exit with code `1` on any failure, which causes the CI step to fail before `deploy` runs. This prevents a broken policy bundle from ever reaching the Atlasent runtime.
+</Note>
+
+## What the CLI does not do
+
+- **Run the audit chain verifier.** Audit chain verification is a separate tool (`atlasent-audit-verify`) that operates on audit export artifacts, not policy bundles.
+- **Mutate runtime state without `deploy`.** The `validate`, `test`, and `diff` commands are fully read-only. Only `deploy` writes to the runtime.
+- **Make authorization decisions.** The runtime is always the source of truth. The CLI lets you verify that your policy says what you meant — the runtime decides what actually happens.

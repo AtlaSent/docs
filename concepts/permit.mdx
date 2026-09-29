@@ -1,0 +1,118 @@
+---
+title: "Permits: single-use tokens that authorize execution"
+sidebarTitle: "Permit"
+description: "How Atlasent permits work: single-use, Ed25519-signed tokens issued on allow decisions, with a 15-minute TTL and a five-step lifecycle."
+---
+
+A permit is the artifact Atlasent issues when an evaluation returns `allow`. It is a short-lived, single-use, Ed25519-signed token — identified by a `pt_…` ID — that says "this actor may take this action, exactly once, before this expiry." Your code receives the permit from the SDK, stores the `permit_id` alongside your own record, and uses that link to navigate the audit chain in both directions.
+
+A permit is **not** a decision cache. One permit authorizes exactly one execution. If your caller retries or the action fails after execution, you call `/v1/evaluate` again to obtain a fresh permit.
+
+## Permit state machine
+
+A permit moves through the following states after it is issued:
+
+```
+       evaluate ⇒ allow
+              │
+              ▼
+          ┌────────┐
+          │ ISSUED │
+          └────────┘
+               │
+    ┌──────────┼──────────┐
+    │          │          │
+    ▼          ▼          ▼
+┌──────────┐ ┌─────────┐ ┌─────────┐
+│ CONSUMED │ │ EXPIRED │ │ REVOKED │
+└──────────┘ └─────────┘ └─────────┘
+  (terminal)  (terminal)  (terminal)
+```
+
+| State | How you reach it | Can the permit authorize execution? |
+|---|---|---|
+| `ISSUED` | `evaluate` returned `allow` | Yes — call verify before executing |
+| `CONSUMED` | `verify` succeeded and execution completed | No — terminal state |
+| `EXPIRED` | 15-minute TTL elapsed before verify | No — terminal state |
+| `REVOKED` | Out-of-band operator revocation | No — terminal state |
+
+## The five-step lifecycle
+
+<Steps>
+
+<Step title="Issued — evaluation returns allow">
+  When evaluation returns `allow`, Atlasent mints a permit and returns it in the response:
+
+  ```json
+  {
+    "decision": "allow",
+    "evaluation_id": "eval_01j...",
+    "permit": {
+      "id": "pt_01j...",
+      "expires_at": "2026-05-06T10:15:00Z"
+    }
+  }
+  ```
+
+  The TTL is **15 minutes (900 seconds)**. Design your execution path so that verify and execute happen well inside that window. If your action might take longer, model it as a `hold` decision with a separate approval signal instead of relying on a long-lived permit.
+</Step>
+
+<Step title="Verified — your code calls verify-permit">
+  The SDK calls `/v1/permits/{id}/verify` immediately before execution. The server confirms:
+
+  - The Ed25519 signature is valid.
+  - The permit state is `ISSUED` — not expired, consumed, or revoked.
+  - The permit belongs to your org.
+
+  | Response | Meaning |
+  |---|---|
+  | `200` | Valid, unconsumed, unexpired, signature OK — proceed. |
+  | `404` | No permit with that ID in your org. |
+  | `410` | Expired or already consumed — do not proceed. |
+
+  This step is what closes the window between issue and execute. Policy could change, an operator could revoke the permit, or the TTL could elapse in the time between mint and verify — this call catches all three.
+</Step>
+
+<Step title="Executed — protected action runs inside the permit scope">
+  Control returns to your code. The action runs. You capture and store the `permit_id` next to your own record so the audit trail is two-way navigable:
+
+  ```typescript
+  const permit = await client.protect({ actor, action, context });
+  const record = await db.deployments.create({
+    ...deploymentPayload,
+    atlasent_permit_id: permit.permitId,  // the audit-chain link
+  });
+  ```
+</Step>
+
+<Step title="Consumed — permit is marked used; replay attempts fail">
+  After execution, the permit transitions to `CONSUMED`. Any subsequent attempt to verify or re-use the same `pt_…` token returns an error and the SDK raises. This is the replay-prevention guarantee: one permit, one execution, no exceptions.
+
+  <Warning>
+    If your code calls `protect()` or `with_permit()` a second time expecting to reuse the permit, it will fail. You must obtain a fresh permit by calling evaluate again.
+  </Warning>
+</Step>
+
+<Step title="Audited — both events are in the immutable audit chain">
+  The evaluate event and the verify event are each written to the immutable, hash-linked audit chain — before Atlasent returns a response for each call. You have a durable, tamper-evident record of the decision and the verification, linked by the `permit_id`, whether the action ultimately succeeded or not.
+</Step>
+
+</Steps>
+
+## Why permits are single-use
+
+Single-use enforcement solves two critical problems:
+
+1. **Non-repudiation.** A reused permit would make it ambiguous which execution it authorized. With single-use permits, there is exactly one execution per `pt_…` token — no ambiguity for auditors or incident investigators.
+2. **Revocability.** Between issue and consume, your policy could change, an actor's role could be updated, or an operator could flag an anomaly and revoke the permit. The verify step before execution means you can never act on stale authority — even if the permit was legitimately issued moments ago.
+
+## Why permits are signed
+
+The permit is the electronic authorization record for regulated environments. Atlasent's Ed25519-signed permit, paired with the per-org audit chain, satisfies the 21 CFR Part 11 §11.50 requirement that electronic records with electronic signatures must have the signature information linked to the record in a way that is not removable or editable — provided you store the `permit_id` alongside the action in your system of record.
+
+## Related
+
+- [Runtime Flow](/concepts/runtime-flow) — how the permit fits into the four-hop lifecycle.
+- [Audit Chain](/concepts/audit-chain) — how permit events are recorded and made tamper-evident.
+- [Deny Codes](/concepts/deny-codes) — codes returned when evaluation does not produce a permit.
+- [Glossary](/concepts/glossary) — canonical definitions for Permit, Verify, Consume, and Decision.

@@ -1,0 +1,259 @@
+---
+title: "Audit API: list events and export tamper-evident bundles"
+sidebarTitle: "Audit"
+description: "Query the Atlasent audit trail and export tamper-evident bundles. Every decision is written to the append-only hash chain before the API responds."
+---
+
+Atlasent records every significant platform event — evaluations, policy changes, permit issuances, permit consumptions, escalations — in a tamper-evident hash chain before returning a response to the caller. You cannot evaluate an action without producing an audit record. The audit API gives you programmatic access to that chain: you can query individual events, filter by actor or decision, and export cryptographically signed bundles that compliance teams can verify offline without any Atlasent service.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/audit/events` | List audit events with filtering and pagination |
+| `POST` | `/v1/audit/exports` | Generate a signed, portable export bundle |
+
+---
+
+## GET /v1/audit/events
+
+Returns a paginated, reverse-chronological list of audit events for your organization.
+
+### Query parameters
+
+<ParamField query="start" type="string">
+  ISO 8601 start timestamp (inclusive). Example: `2026-05-01T00:00:00Z`.
+</ParamField>
+
+<ParamField query="end" type="string">
+  ISO 8601 end timestamp (inclusive). Example: `2026-05-31T23:59:59Z`.
+</ParamField>
+
+<ParamField query="actor_id" type="string">
+  Filter events produced by a specific actor.
+</ParamField>
+
+<ParamField query="action_type" type="string">
+  Filter events by action type (e.g. `"production.deploy"`).
+</ParamField>
+
+<ParamField query="decision" type="string">
+  Filter by decision outcome — one of `allow`, `deny`, `hold`, or `escalate`.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum number of events to return. Default `100`, maximum `500`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Opaque pagination cursor from the previous response's `next_cursor` field. Pass this to retrieve the next page.
+</ParamField>
+
+### Audit event fields
+
+<ResponseField name="event_id" type="string">
+  Stable unique identifier for this event (prefix `evt_`).
+</ResponseField>
+
+<ResponseField name="event_type" type="string">
+  Dot-separated event category — for example `decision.allow`, `policy.updated`, `permit.consumed`, `audit.exported`.
+</ResponseField>
+
+<ResponseField name="actor_id" type="string">
+  Identity that triggered the event.
+</ResponseField>
+
+<ResponseField name="action_type" type="string">
+  The action type evaluated, if applicable.
+</ResponseField>
+
+<ResponseField name="decision" type="string">
+  The authorization outcome for evaluation events.
+</ResponseField>
+
+<ResponseField name="decision_id" type="string">
+  The decision ID associated with this event — links it to the originating evaluation.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp when this event was recorded.
+</ResponseField>
+
+<ResponseField name="chain_hash" type="string">
+  SHA-256 hash of this entry chained with the previous entry — `SHA256(previousHash || JSON.stringify(event_payload))`. Use this to verify chain integrity.
+</ResponseField>
+
+<ResponseField name="entry_hash" type="string">
+  SHA-256 hash of this event's payload in isolation.
+</ResponseField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL
+curl 'https://api.atlasent.io/v1/audit/events?start=2026-05-01T00:00:00Z&end=2026-05-31T23:59:59Z&decision=deny' \
+  -H "Authorization: Bearer $ATLASENT_API_KEY"
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "events": [
+    {
+      "event_id": "evt_01j8abc...",
+      "event_type": "decision.deny",
+      "actor_id": "user_123",
+      "action_type": "production.deploy",
+      "decision": "deny",
+      "decision_id": "dec_01j8x9y2k...",
+      "created_at": "2026-05-15T14:22:10Z",
+      "chain_hash": "sha256:a3f2c1d9...",
+      "entry_hash": "sha256:7b4e9f2a..."
+    }
+  ],
+  "next_cursor": "2026-05-15T14:22:09Z",
+  "total": 247
+}
+```
+
+---
+
+## POST /v1/audit/exports
+
+Generates a tamper-evident audit bundle for a given time range. The bundle includes a Merkle root hash that compliance teams can verify offline using the Atlasent CLI or their own tooling — no Atlasent service required. When Ed25519 signing is configured for your deployment, the bundle also includes a detached signature over the Merkle root; see the note below on signing availability.
+
+### Request body
+
+<ParamField body="time_range" type="object" required>
+  The time window to export.
+
+  <Expandable title="time_range fields">
+    <ParamField body="time_range.start" type="string" required>
+      ISO 8601 start timestamp (inclusive).
+    </ParamField>
+    <ParamField body="time_range.end" type="string" required>
+      ISO 8601 end timestamp (inclusive).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Export bundle response fields
+
+<ResponseField name="export_id" type="string">
+  Stable unique identifier for this export (prefix `exp_`).
+</ResponseField>
+
+<ResponseField name="org_id" type="string">
+  Organization whose events are included in this export.
+</ResponseField>
+
+<ResponseField name="generated_at" type="string">
+  ISO 8601 timestamp when the export was generated.
+</ResponseField>
+
+<ResponseField name="evaluation_count" type="integer">
+  Number of evaluation decisions included in this export.
+</ResponseField>
+
+<ResponseField name="chain_entries" type="integer">
+  Total number of audit chain entries included in the bundle.
+</ResponseField>
+
+<ResponseField name="proof" type="object">
+  Tamper-evident proof envelope. Verify the `root_hash` offline to confirm chain integrity.
+
+  <Expandable title="proof fields">
+    <ResponseField name="proof.root_hash" type="string">
+      Hex-encoded SHA-256 Merkle root computed over all entries in the export. This is the primary value your compliance team verifies.
+    </ResponseField>
+    <ResponseField name="proof.entry_count" type="integer">
+      Number of entries included in the Merkle tree.
+    </ResponseField>
+    <ResponseField name="proof.algorithm" type="string">
+      Hash algorithm used to construct the tree. Currently always `sha256`.
+    </ResponseField>
+    <ResponseField name="proof.signing_key_id" type="string">
+      ID of the Ed25519 key that signed the root hash. Present only when Ed25519 signing is active for your deployment.
+    </ResponseField>
+    <ResponseField name="proof.signature" type="string">
+      Base64url-encoded Ed25519 signature over the Merkle root. Present only when Ed25519 signing is active for your deployment. See the note below on signing availability.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="truncated" type="boolean">
+  `true` when the result set was capped by a server-side limit. Narrow your time window or filter by a specific `decision_id` to obtain a complete bundle.
+</ResponseField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL (save to file)
+curl -X POST https://api.atlasent.io/v1/audit/exports \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "time_range": {
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-05-31T23:59:59Z"
+    }
+  }' \
+  -o audit-export.ndjson
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "export_id": "exp_01j8abc...",
+  "org_id": "org_01xyz...",
+  "generated_at": "2026-06-01T00:00:05Z",
+  "evaluation_count": 4821,
+  "chain_entries": 5103,
+  "proof": {
+    "root_hash": "a3f2c1d9e8b74f6a2c0e1d5b9f3a7c4e2d8b6f1a9c3e7d5b2f0a4c8e6d9b3f7",
+    "entry_count": 5103,
+    "algorithm": "sha256",
+    "signing_key_id": null,
+    "signature": null
+  },
+  "truncated": false
+}
+```
+
+### Offline verification
+
+To verify an export bundle's hash-chain integrity without contacting Atlasent, use the CLI:
+
+```bash
+atlasent audit verify --file audit-export.ndjson
+```
+
+When your deployment has Ed25519 signing configured and a public key is available, you can also verify the detached signature:
+
+```bash
+atlasent audit verify --file audit-export.ndjson --pubkey atlasent-export-pubkey.pem
+```
+
+Or verify the signature manually with OpenSSL:
+
+```bash
+openssl pkeyutl -verify -pubin -inkey atlasent-export-pubkey.pem \
+  -sigfile <(echo "$SIGNATURE" | base64 -d) \
+  -in <(echo -n "$CANONICAL_PAYLOAD")
+```
+
+<Note>
+  **Ed25519 signing availability.** At V1 GA, the `proof.signature` and `proof.signing_key_id` fields are present in the schema but populated only when Ed25519 signing is actively configured for your deployment. Hash-chain integrity via `proof.root_hash` is available to all customers today without any additional configuration. Full Ed25519 mandatory signing ships in a later phase; check the [Security Overview](/trust/security-overview) for current status.
+</Note>
+
+<Note>
+  Every evaluation — regardless of whether the decision is `allow`, `deny`, `hold`, or `escalate` — is recorded in the audit chain **before** the API returns a response. It is architecturally impossible to receive an evaluation result without an audit record being written. A `500 audit_write_failed` error means the evaluation was aborted to preserve this guarantee.
+</Note>
+
+<Tip>
+  If an export is `truncated: true`, the result set exceeded the server-side limit. Narrow your `time_range` window or filter by a specific `decision_id` to retrieve a complete, non-truncated bundle.
+</Tip>

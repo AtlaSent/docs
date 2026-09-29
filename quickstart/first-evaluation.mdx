@@ -1,0 +1,134 @@
+---
+title: "Step 2: Make your first protected action evaluation"
+sidebarTitle: "First Evaluation"
+description: "Wire a protected action using the SDK's protect() and withPermit() helpers or raw curl, and learn what each response field means in detail."
+---
+
+Every protected action in Atlasent starts with an evaluation: you describe the actor, the action, and the target, and Atlasent's policy engine returns a decision along with a signed permit token you can act on. The SDK gives you two high-level helpers — `protect()` and `withPermit()` — that wrap the `evaluate → verify → execute` cycle in a single, fail-closed call. You can also drive the wire API directly with `curl` when you need full control or want to inspect the raw response shape.
+
+## Install the SDK
+
+<CodeGroup>
+
+```bash TypeScript / Node.js
+npm install @atlasent/sdk
+```
+
+```bash Python
+pip install atlasent
+```
+
+</CodeGroup>
+
+## Make the call
+
+The examples below use the canonical protected action `production.deploy`. Replace the `actor`, `target`, and `context` fields with values that match your own system.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { AtlaSentClient } from '@atlasent/sdk';
+
+const client = new AtlaSentClient({ apiKey: process.env.ATLASENT_API_KEY });
+
+const result = await client.protect(
+  {
+    actor: { id: 'user_123', role: 'engineer' },
+    action: { type: 'production.deploy' },
+    target: { id: 'service-api', environment: 'production' },
+    context: { git_sha: 'abc1234', branch: 'main' },
+  },
+  async (permit) => {
+    // Your deploy logic runs here — only if the action is permitted
+    await deployToProduction();
+  }
+);
+```
+
+```python Python
+import os
+from atlasent import AtlaSentClient
+
+client = AtlaSentClient(api_key=os.environ["ATLASENT_API_KEY"])
+
+with client.with_permit(
+    actor={"id": "user_123", "role": "engineer"},
+    action={"type": "production.deploy"},
+    target={"id": "service-api", "environment": "production"},
+    context={"git_sha": "abc1234", "branch": "main"},
+) as permit:
+    # Your deploy logic runs here — only if the action is permitted
+    deploy_to_production()
+```
+
+```bash curl
+curl -X POST https://api.atlasent.io/v1/evaluate \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "actor": { "id": "user_123", "role": "engineer" },
+    "action": { "type": "production.deploy" },
+    "target": { "id": "service-api", "environment": "production" },
+    "context": { "git_sha": "abc1234", "branch": "main" }
+  }'
+```
+
+</CodeGroup>
+
+<Warning>
+  Do not call `POST /v1/evaluate` directly and then branch on `decision === "allow"` in your own code. That pattern is bypassable and produces an incomplete audit chain. Use `protect()` or `withPermit()` — they handle evaluation, verification, and fail-closed error handling for you.
+</Warning>
+
+## Example response
+
+When you call the raw `POST /v1/evaluate` endpoint (or inspect the object returned by `protect()`), the response looks like this:
+
+```json
+{
+  "decision": "allow",
+  "decision_id": "dec_01j...",
+  "permit": {
+    "token": "pt_01j...",
+    "expires_at": "2026-05-26T10:15:00Z"
+  }
+}
+```
+
+## Response fields explained
+
+| Field | Type | Description |
+|---|---|---|
+| `decision` | string | The policy engine's verdict — one of `allow`, `deny`, `hold`, or `escalate`. |
+| `decision_id` | string | A stable identifier for this evaluation event, recorded in the audit chain. |
+| `permit.token` | string | A signed, single-use permit token (`pt_…`) you pass to the verify endpoint before executing. |
+| `permit.expires_at` | string | ISO 8601 timestamp after which the permit can no longer be verified. Default TTL is 15 minutes (900 seconds). |
+
+## The four decision values
+
+Atlasent's policy engine returns exactly one of four decisions on every evaluation:
+
+| Decision | Meaning | What to do |
+|---|---|---|
+| `allow` | The action is authorized. A permit token is issued. | Verify the permit and execute. |
+| `deny` | The action is explicitly blocked by policy. No permit is issued. | Surface the reason to the caller and halt. |
+| `hold` | The action is gated on an external condition (for example, a change-freeze window). No permit is issued yet. | Wait for the condition to clear or poll for a state change. |
+| `escalate` | The action requires human approval before it can proceed. | Route to your approval queue and wait for the webhook callback. |
+
+<Note>
+  The SDK's `protect()` and `withPermit()` helpers raise an `AtlaSentDeniedError` on `deny`, `hold`, and `escalate` outcomes — your action body never runs. If you need to inspect the specific decision value and route accordingly (for example, to show a different UI for `hold` vs. `escalate`), use the lower-level `client.evaluate()` method and handle each case explicitly, then call `verifyPermitById()` yourself before executing.
+</Note>
+
+## What happens under the hood
+
+When you call `protect()` or `withPermit()`, the SDK makes two sequential API calls on your behalf:
+
+1. **`POST /v1/evaluate`** — The policy engine evaluates your request and, on `allow`, issues a signed permit token with a short TTL.
+2. **`POST /v1/verify-permit`** — The SDK immediately verifies the token, confirming the signature is valid and the permit has not expired or been revoked. The verify call is recorded as a separate, linked entry in the audit chain.
+
+Only after both calls succeed does the SDK invoke your action body (or return the permit value to you). Both events appear in the audit chain and are included in every audit bundle export.
+
+## Next step
+
+Your permit has been issued and is ready to verify. Move on to step 3 to see what the explicit verify call looks like when you need it outside the SDK helpers.
+
+[Step 3: Verify a permit →](/quickstart/verify-permit)

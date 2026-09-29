@@ -1,0 +1,148 @@
+---
+title: "Runtime authorization flow: evaluate, permit, verify"
+sidebarTitle: "Runtime Flow"
+description: "A detailed walkthrough of Atlasent's four-hop request lifecycle, the fail-closed matrix, and the trust boundary between the platform and your code."
+---
+
+Atlasent's runtime model is a single execution boundary: no protected action runs without a verified permit returned by the server. Your code triggers the flow by calling `protect()` or `with_permit()`; the SDK handles the two wire calls (`/v1/evaluate` and `/v1/permits/{id}/verify`) and raises immediately if anything goes wrong. You control what runs inside the permit scope — Atlasent controls every step of the decision path that gets you there.
+
+## The trust boundary
+
+```
+                              ┌─── trust boundary ───┐
+                              │                      │
+  caller            SDK       │   /v1/evaluate        │   policy engine
+  ──────► intent ──► protect()├──── evaluate ────────►│──► decision: allow
+                              │                      │    mint permit (pt_…)
+                              │                      │    write audit entry
+                              │                      │
+                              │   /v1/permits/        │
+                              │   {id}/verify         │
+                    protect() ├──── verify ──────────►│──► check signature + TTL
+                              │                      │    check not consumed/revoked
+                              │                      │    bind into audit chain
+                              └──────────────────────┘
+                    permit (verified) ◄───────────────
+                    │
+                    ▼
+            action executes (your code)
+                    │
+                    ▼
+            store permit_id alongside your record
+```
+
+Nothing on the caller side authorizes the action. The boundary is server-issued: only a permit that the server has minted and verified lets execution proceed. The SDK is a thin orchestrator over the two wire calls — it is not a policy engine, not a decision cache, and not a verifier.
+
+## The four hops
+
+<Steps>
+
+<Step title="Intent → SDK">
+  You express intent by calling one of the canonical surfaces with `actor`, `action`, and `context`:
+
+  - **`protect()`** — returns the verified permit as a value.
+  - **`with_permit()` / `withPermit()`** — invokes the action body with the verified permit and returns the body's result.
+  - **`require_permit()` / `requirePermit()`** — same contract, using a `ProtectedAction` descriptor with `resource_id` and `environment`.
+
+  All three resolve to the same two wire calls. There is no caller-side policy evaluation and no caching of decisions.
+</Step>
+
+<Step title="Evaluate — mint permit">
+  The SDK posts to `/v1/evaluate`. The policy engine:
+
+  1. Resolves the action type and loads the active published bundle for your org.
+  2. Evaluates the bundle's rules against the actor, action, target, and context.
+  3. Returns one of `allow` / `deny` / `hold` / `escalate`.
+  4. On `allow`, mints a permit (`pt_…`) with a 15-minute TTL, signs it with the per-tenant Ed25519 key, and writes both the decision and the issued permit to the audit chain.
+
+  Anything other than `allow` raises an `AtlaSentDeniedError` at the SDK boundary. The action does not proceed, and you cannot bypass this — `protect()` has no `permitted=false` return path.
+</Step>
+
+<Step title="Verify — bind">
+  The SDK immediately posts the permit to `/v1/permits/{id}/verify`. The server:
+
+  1. Verifies the Ed25519 signature.
+  2. Confirms the permit is `ISSUED` — not `EXPIRED`, `CONSUMED`, or `REVOKED`.
+  3. Binds the verification into the audit chain.
+
+  This step closes the window between mint and execute. Between mint and verify, the policy could change, an operator could revoke the permit, or the TTL could elapse — verify catches all three. A verify failure also raises `AtlaSentDeniedError`; the action does not proceed.
+
+  <Warning>
+    Verify is **single-use at the server**. A second verify on the same permit returns `verified: false` and the SDK raises. This guarantees one permit authorizes one execution and nothing more.
+  </Warning>
+</Step>
+
+<Step title="Execute + audit linkage">
+  Control returns to your code with a verified permit. You execute the action and store the `permit_id` next to your own record:
+
+  ```python
+  permit = protect(actor="user_123", action="ehr.write", context={...})
+  record = db.patients.update(
+      "patient-42",
+      payload,
+      atlasent_permit_id=permit.permit_id,  # the two-way audit link
+  )
+  ```
+
+  The permit ID is the link that makes the audit chain two-way navigable. You can retrieve the Atlasent decision for any record in your system, and vice versa.
+</Step>
+
+</Steps>
+
+## Fail-closed matrix
+
+The execution-boundary contract is fail-closed by construction. There is no configuration that opens it.
+
+| Failure mode | What the SDK does | Does the action run? |
+|---|---|---|
+| Policy `deny` | Raises `AtlaSentDeniedError` | No |
+| Policy `hold` or `escalate` | Raises `AtlaSentDeniedError` | No |
+| Permit signature invalid | Raises `AtlaSentDeniedError` | No |
+| Permit `EXPIRED`, `CONSUMED`, or `REVOKED` at verify | Raises `AtlaSentDeniedError` | No |
+| API 5xx | Raises `AtlaSentError` | No |
+| Request timeout | Raises `AtlaSentError` | No |
+| Auth failure (invalid API key) | Raises `AtlaSentError` | No |
+| Network or DNS failure | Raises `AtlaSentError` | No |
+| Missing policy bundle (`fail_mode: closed`) | Raises `AtlaSentDeniedError` | No |
+
+The action runs only when `protect()` returns (or when `with_permit()` invokes its body). There is no "allow on error" fallback and no caller-side override. If you need a break-glass path, use a signed override — that also writes to the audit chain.
+
+## Key invariants
+
+These properties hold for every protected action in every Atlasent deployment:
+
+1. **Audit record is written before Atlasent returns a response** — you always have a record, even if the caller crashes immediately after receiving the decision.
+2. **Permit is single-use** — consumed once and never reusable. Replay attempts raise an error.
+3. **Network failure, timeout, or malformed response blocks execution** — uncertainty is never resolved in the caller's favor.
+4. **`fail_mode: closed`** — missing policy bundles default to deny. There is no implicit allow.
+5. **Permits expire after 15 minutes (900 seconds)** — plan your execution path to consume the permit well inside that window.
+
+## Execution-boundary authorization vs SDK guard ergonomics
+
+These are two distinct layers. Do not conflate them.
+
+| Layer | What it is | Examples |
+|---|---|---|
+| **Execution-boundary authorization** | The contract that no action runs without a verified permit. Identical across languages, identical across surfaces, identical on the wire. Non-negotiable, non-bypassable, audit-bearing. | `protect()`, `with_permit()` / `withPermit()`, `require_permit()` / `requirePermit()` |
+| **SDK guard / helper ergonomics** | Convenience surfaces layered on top — framework decorators, middleware, integration wrappers. Bypassable by removing the wrapper, so they must always delegate to the execution-boundary surface above. | `@atlasent_guard` (Flask / FastAPI), `withLangChainGuard`, browser guards, MCP server guards |
+
+Helpers exist to make the canonical surface ergonomic in a given framework. They do not relax the contract. Any helper that does not internally call one of the execution-boundary surfaces is not an Atlasent execution-boundary call.
+
+<Tip>
+  During a security review, pin all enforcement claims to the execution-boundary layer. Pin ergonomics claims to the helper layer.
+</Tip>
+
+## What lives outside this flow
+
+These operations exist for advanced use cases and are not part of the standard `protect()` / `with_permit()` flow:
+
+- **`evaluate()`** — the raw decision primitive. Returns the four-value decision without issuing or verifying a permit. Use this only when you need to inspect `hold` or `escalate` at the call site — for example, to route to an approval queue. If you use `evaluate()` directly, you must call `verify_permit_by_id()` / `verifyPermitById()` yourself before executing.
+- **`verify()`** — the explicit verify call. Use this when a permit has crossed a process boundary and the receiving side wants to re-confirm it before acting.
+- **`consume()`** — an operator-tier lifecycle action. Most callers never need it directly; the verify step in the audit chain is the binding record.
+
+## Related
+
+- [Permit](/concepts/permit) — the artifact: lifecycle, signing, single-use semantics.
+- [Policy](/concepts/policy) — how rules are evaluated and why bundles are immutable.
+- [Audit Chain](/concepts/audit-chain) — how decisions and verifications are recorded and made tamper-evident.
+- [Deny Codes](/concepts/deny-codes) — every code the engine can return, with handling examples.

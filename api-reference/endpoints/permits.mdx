@@ -1,0 +1,174 @@
+---
+title: "Permits API: retrieve, list, and revoke authorization tokens"
+sidebarTitle: "Permits"
+description: "The permits API lets you retrieve, list, and revoke single-use authorization tokens. Permits are issued automatically by POST /v1/evaluate on allow decisions."
+---
+
+Every `allow` decision from `POST /v1/evaluate` produces a single-use permit token that your system must consume before executing the protected action. Permits are the tamper-evident link between an authorization decision and the execution that follows. The permits API gives you visibility into all issued tokens — their current status, which actor they were issued to, and when they were consumed or expired — and lets you revoke permits that should no longer be honored before they are consumed.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/permits/{id}` | Retrieve and verify a permit by ID |
+| `GET` | `/v1/permits` | List permits with filtering |
+| `DELETE` | `/v1/permits/{id}` | Revoke a permit before consumption |
+
+---
+
+## Permit state machine
+
+A permit moves through the following states exactly once. Terminal states cannot be reversed.
+
+| Status | Description |
+|---|---|
+| `issued` | The permit was created by an `allow` decision and has not yet been consumed. |
+| `consumed` | The permit was successfully verified via `POST /v1/verify-permit` and execution proceeded. |
+| `expired` | The permit's 15-minute TTL elapsed before it was consumed. |
+| `revoked` | The permit was explicitly revoked via `DELETE /v1/permits/{id}` before consumption. |
+
+---
+
+## GET /v1/permits/{id}
+
+Retrieves a single permit by its ID and returns its current status, actor, action type, and all timing information.
+
+### Path parameters
+
+<ParamField path="id" type="string" required>
+  The permit ID (prefix `pt_`), as returned in `permit.token` from `POST /v1/evaluate`.
+</ParamField>
+
+### Permit object fields
+
+<ResponseField name="id" type="string">
+  Stable unique identifier for the permit (prefix `pt_`).
+</ResponseField>
+
+<ResponseField name="token" type="string">
+  The opaque permit token value. Present for programmatic use by downstream services.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current lifecycle status — `issued`, `consumed`, `expired`, or `revoked`.
+</ResponseField>
+
+<ResponseField name="actor_id" type="string">
+  The actor ID from the originating evaluation.
+</ResponseField>
+
+<ResponseField name="action_type" type="string">
+  The action type the permit authorizes.
+</ResponseField>
+
+<ResponseField name="decision_id" type="string">
+  The `decision_id` from the evaluation that produced this permit.
+</ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  ISO 8601 timestamp after which the permit can no longer be consumed.
+</ResponseField>
+
+<ResponseField name="consumed_at" type="string">
+  ISO 8601 timestamp when the permit was consumed. `null` if not yet consumed.
+</ResponseField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL
+curl https://api.atlasent.io/v1/permits/pt_01j8x9y2k... \
+  -H "Authorization: Bearer $ATLASENT_API_KEY"
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "id": "pt_01j8x9y2k...",
+  "token": "pt_01j8x9y2k...",
+  "status": "issued",
+  "actor_id": "user_123",
+  "action_type": "production.deploy",
+  "decision_id": "dec_01j8x9y2k...",
+  "expires_at": "2026-05-26T10:30:00Z",
+  "consumed_at": null
+}
+```
+
+---
+
+## GET /v1/permits
+
+Lists permits for your organization. Supports filtering by status, actor, and action type.
+
+### Query parameters
+
+<ParamField query="status" type="string">
+  Filter by lifecycle status — `issued`, `consumed`, `expired`, or `revoked`.
+</ParamField>
+
+<ParamField query="actor_id" type="string">
+  Filter by the actor the permit was issued to.
+</ParamField>
+
+<ParamField query="action_type" type="string">
+  Filter by action type.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum results to return. Default `50`, maximum `200`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Pagination cursor from a previous response.
+</ParamField>
+
+---
+
+## DELETE /v1/permits/{id}
+
+Revokes a permit before it is consumed. Only permits in `issued` status can be revoked — attempting to revoke a `consumed`, `expired`, or already `revoked` permit returns `409 conflict`.
+
+### Path parameters
+
+<ParamField path="id" type="string" required>
+  The permit ID to revoke (prefix `pt_`).
+</ParamField>
+
+### Request body
+
+<ParamField body="reason" type="string">
+  Human-readable explanation for the revocation. Stored in the audit trail and returned when the permit is subsequently retrieved.
+</ParamField>
+
+### Example request
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://api.atlasent.io/v1/permits/pt_01j8x9y2k... \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Deploy cancelled by operator"}'
+```
+</CodeGroup>
+
+### Example response
+
+```json
+{
+  "id": "pt_01j8x9y2k...",
+  "status": "revoked",
+  "revoked_at": "2026-05-26T10:12:00Z",
+  "revoke_reason": "Deploy cancelled by operator"
+}
+```
+
+<Note>
+  Permits expire automatically after 15 minutes if not consumed. You do not need to revoke them manually on expiry — Atlasent transitions them to `expired` status at their TTL boundary.
+</Note>
+
+<Warning>
+  Revoking a permit is permanent. Once a permit moves to `revoked` status, the actor must request a fresh evaluation to obtain a new permit before they can execute the protected action.
+</Warning>

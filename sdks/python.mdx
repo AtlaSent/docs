@@ -1,0 +1,139 @@
+---
+title: "Python SDK for Atlasent execution-time authorization"
+sidebarTitle: "Python"
+description: "Install the atlasent package, configure sync or async clients, and gate actions with protect() and with_permit(). Handle denial and unavailability errors."
+---
+
+The Atlasent Python SDK (`atlasent`) supports Python 3.9 and above, ships full type hints with a `py.typed` marker, and works in both synchronous and asynchronous applications. The sync client is a drop-in addition to any existing Python codebase; the async client integrates naturally with `asyncio`, FastAPI, and other async frameworks.
+
+## Installation
+
+```bash
+pip install atlasent
+```
+
+## Client setup
+
+Create an `AtlaSentClient` and pass your API key directly or set the `ATLASENT_API_KEY` environment variable and omit the argument.
+
+```python
+from atlasent import AtlaSentClient
+
+client = AtlaSentClient(api_key=os.environ["ATLASENT_API_KEY"])
+```
+
+## protect() — fail-closed gate
+
+`protect()` evaluates the request, verifies the resulting permit, and calls your function only if both steps succeed. There is no `permitted=False` return value — if `protect()` returns, the action is authorized end-to-end.
+
+```python
+client.protect(
+    actor={"id": "user_123", "role": "engineer"},
+    action={"type": "production.deploy"},
+    target={"id": "my-service", "environment": "production"},
+    context={"git_sha": os.environ["GITHUB_SHA"]},
+    fn=lambda permit: deploy(),
+)
+```
+
+## with_permit() — context manager form
+
+Use `with_permit()` when you want to scope the authorized action to a `with` block. The block body runs only after a verified permit is issued; the permit is automatically consumed when the block exits.
+
+```python
+with client.with_permit(
+    actor={"id": "user_123", "role": "engineer"},
+    action={"type": "production.deploy"},
+    target={"id": "my-service", "environment": "production"},
+    context={},
+) as permit:
+    deploy()
+```
+
+`protect()` and `with_permit()` produce identical wire calls and identical audit-chain entries. Pick the form that fits your call site.
+
+## require_permit() — descriptor form
+
+Use `require_permit()` for high-risk operations that carry structured metadata such as `resource_id` and `environment`. It accepts a `ProtectedAction` descriptor and calls your executor only if the full evaluate-and-verify cycle succeeds.
+
+```python
+from atlasent import require_permit, ProtectedAction
+
+await require_permit(
+    ProtectedAction(
+        action_type="database.table.drop",
+        actor_id="agent:code-agent",
+        resource_id="prod-db.users",
+        environment="production",
+        context={"reversibility": "irreversible"},
+    ),
+    lambda: db.raw_async("DROP TABLE users"),
+)
+```
+
+## Async client
+
+Import `AsyncClient` for applications built on `asyncio`. The async client exposes the same methods as the sync client but all methods are coroutines. Use it as an async context manager to ensure the underlying HTTP session is properly closed.
+
+```python
+from atlasent import AsyncClient
+
+async with AsyncClient(api_key=os.environ["ATLASENT_API_KEY"]) as client:
+    async with client.with_permit(
+        actor={"id": "user_123", "role": "engineer"},
+        action={"type": "production.deploy"},
+        target={"id": "my-service", "environment": "production"},
+        context={},
+    ) as permit:
+        await async_deploy()
+```
+
+## Error model
+
+Catch `AtlaSentDeniedError` for policy outcomes and `AtlaSentError` for network or service failures. `AtlaSentDeniedError` inherits from `AtlaSentError`, so catching `AtlaSentError` handles both if you want a single catch-all.
+
+```python
+from atlasent.exceptions import AtlaSentDeniedError, AtlaSentError
+
+try:
+    with client.with_permit(...):
+        deploy()
+except AtlaSentDeniedError as e:
+    print(f"Denied: {e.decision}, code: {e.deny_code}")
+    # Predicates: e.is_revoked, e.is_expired, e.is_consumed, e.is_not_found
+except AtlaSentError:
+    print("Authorization unavailable — action blocked")
+```
+
+<Warning>
+  When you catch `AtlaSentError` (transport or service failure), always treat it as a denial. Never fall back to permitting the action if the authorization service is unreachable — that defeats the fail-closed guarantee.
+</Warning>
+
+## Four-value decision with evaluate()
+
+`protect()` and `with_permit()` collapse `deny`, `hold`, and `escalate` into `AtlaSentDeniedError`. If you need to inspect the specific outcome — for example, to route a `hold` to an approval queue — use the raw `evaluate()` primitive instead.
+
+```python
+from atlasent import evaluate
+
+result = evaluate(
+    action_type="production.deploy",
+    actor_id="user_123",
+    context={"environment": "production"},
+)
+
+match result.decision:
+    case "allow":
+        # Call verify_permit_by_id(), then execute
+        pass
+    case "deny":
+        print("Denied:", result.deny_reason)
+    case "hold":
+        print("Action on hold — waiting for approval webhook")
+    case "escalate":
+        print("Routed to a human reviewer")
+```
+
+<Note>
+  `evaluate()` does not verify the permit for you. If you use `evaluate()` directly and the decision is `allow`, you must call `verify_permit_by_id()` before executing the action.
+</Note>

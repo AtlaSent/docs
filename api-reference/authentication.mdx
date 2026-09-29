@@ -1,0 +1,89 @@
+---
+title: "Authenticate Atlasent API requests with scoped API keys"
+sidebarTitle: "Authentication"
+description: "Authenticate Atlasent API requests with a Bearer token. Create scoped API keys in the Console, attach them to requests, and rotate them without downtime."
+---
+
+Every Atlasent API request must include an API key as a Bearer token. The API has no anonymous endpoints — if your request is missing a valid key, every endpoint returns `401` regardless of which resource you are trying to access. This is intentional: Atlasent is an authorization platform, and fail-closed behavior applies to the API itself.
+
+## API key format
+
+API keys are prefixed with `ak_live_` and are created in **Console → Settings → API Keys**. Atlasent stores only a SHA-256 hash of the plaintext key — if you lose the plaintext, you must rotate the key rather than recover it.
+
+```
+ak_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+## Sending the Authorization header
+
+Include your API key on every request using the standard HTTP `Authorization` header with the `Bearer` scheme:
+
+```bash
+curl https://api.atlasent.io/v1/evaluate \
+  -H "Authorization: Bearer ak_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+<Warning>
+  The `X-AtlaSent-Key` header is deprecated and will be removed in a future release. Migrate all service integrations to `Authorization: Bearer <api_key>` now.
+</Warning>
+
+## Scopes
+
+Each API key is assigned a set of scopes at creation time. Grant each service the narrowest scope it needs — a compromise of a narrow-scope key cannot affect endpoints outside that scope.
+
+| Scope | Endpoints |
+|---|---|
+| `evaluate` | POST /v1/evaluate |
+| `verify` | POST /v1/verify-permit |
+| `audit` | GET /v1/audit/events, POST /v1/audit/exports |
+| `resolve` | POST /v1/escalations/{id}/respond |
+
+<Note>
+  Your runtime agent needs only the `evaluate` and `verify` scopes. Create a separate key for audit exports and another for resolving escalations so a compromise of the runtime key cannot affect your audit records.
+</Note>
+
+## Fail-closed on insufficient scope
+
+If you send a valid API key that lacks the required scope for an endpoint, Atlasent returns `403` and the action does not proceed. The response body looks like this:
+
+```json
+{
+  "error": "forbidden",
+  "message": "API key lacks the 'audit' scope required for this endpoint",
+  "status": 403
+}
+```
+
+## Authentication failure response
+
+When the `Authorization` header is missing, malformed, or contains an invalid key, every endpoint returns:
+
+```json
+{
+  "error": "unauthenticated",
+  "message": "Missing or invalid API key",
+  "status": 401
+}
+```
+
+## Rotating keys
+
+To rotate an API key without service interruption:
+
+<Steps>
+  <Step title="Create a new key">
+    In **Console → Settings → API Keys**, create a new key with the same scopes as the key you are rotating.
+  </Step>
+  <Step title="Deploy the new key">
+    Update the `ATLASENT_API_KEY` environment variable in your deployment to the new key value and redeploy or restart the service.
+  </Step>
+  <Step title="Revoke the old key">
+    Once the new key is confirmed working, revoke the old key in the Console. Revocation is immediate.
+  </Step>
+</Steps>
+
+<Tip>
+  Store API keys in your cloud provider's secrets manager (AWS Secrets Manager, GCP Secret Manager, Azure Key Vault) rather than in environment files. Reference the secret by name in your deployment configuration to avoid the plaintext key appearing in logs or source control.
+</Tip>

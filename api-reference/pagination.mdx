@@ -1,0 +1,82 @@
+---
+title: "Paginate Atlasent API list responses with opaque cursors"
+sidebarTitle: "Pagination"
+description: "Atlasent list endpoints use cursor pagination. Pass limit and cursor as query params, read next_cursor from the response, and stop when has_more is false."
+---
+
+All Atlasent list endpoints — including `GET /v1/audit/events`, `GET /v1/policies`, `GET /v1/escalations`, and `GET /v1/webhooks` — use cursor-based pagination. Cursors are opaque strings; do not parse or construct them. Because cursors are position-based rather than offset-based, inserting new rows does not shift existing pages or cause duplicates between pages.
+
+## Request parameters
+
+Pass `limit` and `cursor` as URL query parameters. On the first request, omit `cursor`. On subsequent requests, pass the `next_cursor` value from the previous response.
+
+```bash
+curl 'https://api.atlasent.io/v1/audit/events?limit=50&cursor=eyJpZCI6...' \
+  -H "Authorization: Bearer ak_live_..."
+```
+
+<ParamField query="limit" type="integer" default="50">
+  Number of items to return per page. Maximum is 500.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Opaque pagination cursor from the `next_cursor` field of a previous response. Omit on the first request.
+</ParamField>
+
+## Response shape
+
+Every list response wraps the result set in a `data` array and includes `has_more` and `next_cursor` fields for pagination control.
+
+```json
+{
+  "data": ["...items..."],
+  "has_more": true,
+  "next_cursor": "eyJpZCI6..."
+}
+```
+
+<ResponseField name="data" type="array">
+  The items on the current page.
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  `true` if there are additional pages. `false` when you have reached the last page.
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string">
+  The cursor to pass in the next request. Only present when `has_more` is `true`.
+</ResponseField>
+
+When `has_more` is `false`, the iteration is complete. Do not send a further request — there is no `next_cursor` to pass.
+
+## Fetching all pages
+
+The SDKs handle cursor advancement automatically. If you call the API directly, use the following pattern to collect all pages.
+
+<CodeGroup>
+```python Python
+events = []
+cursor = None
+
+while True:
+    resp = client.audit.list_events(limit=100, cursor=cursor)
+    events.extend(resp.data)
+    if not resp.has_more:
+        break
+    cursor = resp.next_cursor
+```
+```typescript TypeScript
+const events = [];
+let cursor: string | undefined;
+
+do {
+  const resp = await client.audit.listEvents({ limit: 100, cursor });
+  events.push(...resp.data);
+  cursor = resp.next_cursor;
+} while (resp.has_more);
+```
+</CodeGroup>
+
+<Note>
+  For large audit exports, consider using `POST /v1/audit/exports` instead of paginating through `GET /v1/audit/events`. The export endpoint generates a signed bundle asynchronously and is better suited for compliance workflows that require all events over a long date range.
+</Note>

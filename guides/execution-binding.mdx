@@ -1,0 +1,114 @@
+---
+title: "Non-bypassable execution binding with Atlasent SDK"
+sidebarTitle: "Execution Binding"
+description: "Understand the 4 steps of bound execution, the 3 anti-patterns that break the binding contract, and the reviewer checklist for every protected call site."
+---
+
+Atlasent's core contract is simple: **no protected execution without a valid permit**. Execution binding is the set of rules that makes this contract non-bypassable in practice. It defines exactly how your code must wire a protected call site so that the governed action is structurally unable to run without a completed authorize-verify-permit round trip. This page gives you the binding model, shows you the anti-patterns that break it, and provides a reviewer checklist you can apply to every new call site before it ships.
+
+## What "bound" means
+
+A protected action is **bound** to an Atlasent decision when the following four steps occur in the code path that mutates state or invokes the external effect:
+
+<Steps>
+  <Step title="Evaluate">
+    Call `POST /v1/evaluate` for this specific action, actor, resource, and context. You receive a decision and, if the decision is `allow`, a `permit_token`.
+  </Step>
+  <Step title="Permit">
+    Receive and store the permit token returned by the `allow` decision. A `deny`, `hold`, or `escalate` response does not return a permit — there is nothing to store, and the action must not proceed.
+  </Step>
+  <Step title="Verify">
+    Call `POST /v1/verify-permit` for the permit token immediately before the mutation. The server marks the permit as consumed and returns `verified: true`. Verify must happen at the call site — not at the start of a long-running job.
+  </Step>
+  <Step title="Execute">
+    Run the protected action **inside the permit scope**, after verification succeeds. The audit or log record produced by the action must reference both the evaluation ID and the permit ID.
+  </Step>
+</Steps>
+
+If any of these four steps is skipped, fails, or is satisfied by a different request than the one being executed, the action is not bound and must not run.
+
+## The correct pattern
+
+Use `client.protect()` (TypeScript) or `client.protect()` (Python) to wrap your protected action. The SDK performs the evaluate-verify round trip internally and only calls your function if the result is `allow` with a verified permit.
+
+```typescript
+// ✅ Correct: action only runs inside the permit scope
+await client.protect(
+  { actor, action, target, context },
+  async (permit) => {
+    await deployToProduction(); // Protected action here
+  }
+);
+```
+
+The callback shape is the key design choice. Your protected action is **inside** the call — if `protect()` does not complete the full evaluate-verify round trip successfully, your function never executes. There is no return value to ignore, no flag to check, no way to fall through.
+
+## Anti-patterns that break binding
+
+The following patterns all fail the binding contract. Each represents a real mistake that code reviewers should catch before merge.
+
+```typescript
+// ❌ Anti-pattern 1: calling action before permit
+await deployToProduction(); // [!code --]
+const permit = await client.evaluate({ ... }); // [!code --]
+```
+
+```typescript
+// ❌ Anti-pattern 2: ignoring permit verification
+const result = await client.evaluate({ ... });
+if (result.decision === 'allow') {
+  await deployToProduction(); // [!code --] // Permit never consumed
+}
+```
+
+```typescript
+// ❌ Anti-pattern 3: running action on non-allow decision
+const result = await client.evaluate({ ... });
+await deployToProduction(); // [!code --] // No decision check
+```
+
+### Why each one fails
+
+**Anti-pattern 1** runs the action before any authorization occurs. The `evaluate` call after the fact is a no-op from a binding perspective — the mutation has already happened.
+
+**Anti-pattern 2** checks the decision but never calls `verify`. An `allow` from `evaluate` is a statement that the policy *could* permit this action at that moment — it does not commit the permit, and it does not prove the permit has not since been revoked, consumed by another process, or expired. The permit must be consumed via `verify` at the call site.
+
+**Anti-pattern 3** skips the decision check entirely. Even if `evaluate` returns `deny`, `hold`, or `escalate`, the action runs anyway. This is the most dangerous anti-pattern — it renders Atlasent enforcement completely ineffective.
+
+## Important notes on verify timing
+
+**Verify must run immediately before the mutation.** Calling `verify` at the start of a long-running job and then executing the mutation minutes later leaves an interval where policy state can change — a permit can be revoked, the approver can rescind approval, or a change window can close. A practical rule: verify should be the last step before the syscall or HTTP request to the system of record.
+
+**Verify failure blocks execution without exception.** Any verify response other than `verified: true` — including `permit_expired`, `permit_consumed`, `permit_revoked`, and `permit_not_found` — must block the action. The SDK normalizes all of these to `AtlaSentDeniedError`.
+
+## Reconciler-side enforcement
+
+Binding is not only a runtime contract — it is also a reconciler contract. The downstream system of record (deploy log, AP ledger, export manifest, certification record, agent tool-call log) must carry the evaluation ID and permit ID on every row representing a protected action. The post-event reconciler rejects any row that:
+
+- Has no permit ID
+- Has a permit ID with no matching `verify.verified=true` event in the Atlasent audit log
+- Has a permit ID whose action, actor, or resource does not match the row
+
+This closes the loop: an attacker who bypasses Atlasent at runtime leaves no permit on the row, and the reconciler raises an alert. An attacker who reuses a stale permit fails the resource/actor cross-check at the reconciler.
+
+## Reviewer checklist
+
+Apply this checklist to every new protected call site before it ships to production.
+
+1. Protected action only runs inside `withPermit`/`with_permit` callback — never after a bare `evaluate()` call
+2. No direct calls to `evaluate()` followed by action execution without `verifyPermitById`
+3. Error paths throw or return — they never silently proceed to the protected action
+4. `AtlaSentDeniedError` is caught and handled explicitly in every call site
+
+<CardGroup cols={2}>
+  <Card title="Also check" icon="shield-check">
+    The actor identity passed to `evaluate` and `verify` is the same identity authenticated by the surrounding service — never a hardcoded string or service account substituted at the call site.
+  </Card>
+  <Card title="Also check" icon="link">
+    The resource identifier passed to `evaluate` matches the identifier acted on by the mutation, byte-for-byte. A mismatch causes the reconciler to reject the row even if the permit is valid.
+  </Card>
+</CardGroup>
+
+<Warning>
+  There must be no feature flag, environment variable, or configuration flag that bypasses the Atlasent decision. Runtime authorization is not a feature you toggle off in staging — use `ask_test_*` API keys in non-production environments instead. See [Policy Authoring](/guides/policy-authoring) for how to configure a permissive test policy.
+</Warning>

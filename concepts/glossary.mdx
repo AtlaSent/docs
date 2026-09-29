@@ -1,0 +1,100 @@
+---
+title: "Atlasent glossary: canonical terms and definitions"
+sidebarTitle: "Glossary"
+description: "Canonical definitions for every term Atlasent uses: Action Type, Actor, Policy, Bundle, Permit, Decision, Evaluate, Verify, Consume, and more."
+---
+
+These are the terms you will encounter throughout Atlasent's console, API, SDKs, and documentation. When you see a synonym in older code or earlier docs, treat the form below as the canonical spelling. The API field names in `openapi.yaml` are the wire-format source of truth; definitions here align with them.
+
+<Accordion title="Action Type">
+  The string identifier for a protected action, expressed as a lowercase, dot-separated slug — for example, `production.deploy`, `ehr.write`, or `journal_entry.approve`. On the wire this is `action.type`; in the database it is stored as `action_class.slug`. It is the primary key for policy lookup.
+
+  Do not confuse with `action.id`, which is a per-instance identifier for a specific execution (such as a deploy job ID).
+</Accordion>
+
+<Accordion title="Actor">
+  The entity proposing an action. An actor carries an `id`, a `type` (`user` | `agent` | `service`), an `org_id`, and optional `roles` and `attributes`. The actor's identity and role are evaluated against the active policy bundle to reach a decision.
+</Accordion>
+
+<Accordion title="Policy">
+  A versioned set of rules associated with an action type and an org. Policies are immutable once published — updates ship as a new `bundle_version`. Every evaluation loads the currently active, published bundle for the relevant `(org_id, action_type)` pair. Avoid calling a policy a "ruleset" or "rule" at the top level.
+</Accordion>
+
+<Accordion title="Bundle">
+  A versioned, published snapshot of the policy rules that govern evaluation for a given action type and org. Each evaluation decision records the `bundle_id` and `bundle_version` that produced it, creating a policy-version-bound audit trail. Bundles are immutable once published; updates create new bundle versions.
+</Accordion>
+
+<Accordion title="Permit">
+  A short-lived (15-minute TTL), single-use, Ed25519-signed token issued only when the evaluation decision is `allow`. Identified by a `pt_…` ID. One permit authorizes exactly one execution. Avoid calling a permit a "token," "grant," or "approval" — those are separate concepts in Atlasent's model.
+</Accordion>
+
+<Accordion title="Decision">
+  The outcome of an Evaluate call. Exactly one of four values:
+
+  - `allow` — action is authorized; a permit is issued.
+  - `deny` — action is blocked; carries `deny_code` and `deny_reason`. No permit.
+  - `hold` — decision deferred pending an external signal (for example, an approval webhook). No permit.
+  - `escalate` — routed to a human reviewer queue. No permit until the reviewer resolves it.
+
+  There is no `require_approval` value. Older docs that referenced it were incorrect — `hold` or `escalate` is the right term depending on the context.
+</Accordion>
+
+<Accordion title="Evaluate">
+  The decision call. The engine evaluates a proposed action against the active policy bundle and returns a Decision. The audit entry for the decision is written *before* the response returns. Avoid using "check," "assess," or "authorize" in user-facing copy when you mean the Evaluate operation specifically.
+</Accordion>
+
+<Accordion title="Verify">
+  The operation that confirms a permit is unconsumed, unexpired, and signed by a trusted key. You (or the SDK) call verify immediately before state-changing execution. Returns `200` when valid, `410` when expired or consumed. Verify is single-use: a second verify on the same permit fails. Avoid using "validate" for this operation.
+</Accordion>
+
+<Accordion title="Consume">
+  The operation that marks a permit as used and binds the executed payload's `payload_hash` into the linked proof row. A second consume on the same permit returns `409`. A `payload_hash` mismatch returns `409 payload_binding_mismatch`. Consuming a permit is a terminal, irreversible operation.
+</Accordion>
+
+<Accordion title="Hold">
+  A non-terminal Decision state in which the engine has deferred the outcome until an external signal arrives — for example, a time-window check passing or an async approval webhook firing. No permit is issued; the action cannot proceed until the hold resolves. Integrations that handle `hold` should poll or configure a webhook to detect resolution.
+</Accordion>
+
+<Accordion title="Escalate">
+  A non-terminal Decision state in which the engine has routed the action to a human reviewer queue. The reviewer's resolution releases the decision into `allow` or `deny`. No permit is issued until the reviewer approves. From the SDK's perspective, `escalate` raises the same `AtlaSentDeniedError` as `deny` — the semantic difference is that you should route escalated requests to a review workflow rather than surfacing a hard rejection.
+</Accordion>
+
+<Accordion title="Fail-Closed">
+  The system's default safety posture: when authorization is uncertain — no published bundle, network error, timeout, or malformed response — the action does not execute. Atlasent never resolves uncertainty in the caller's favor. Controlled by `fail_mode: closed` on each action class. The opposite (`fail_mode: open`) exists but requires explicit risk acceptance.
+</Accordion>
+
+<Accordion title="Audit Chain">
+  The per-org, append-only, SHA-256 hash-linked sequence of audit events. Every evaluation — allow or deny — produces one entry, written before Atlasent returns a response. Entries are Ed25519-signed and exportable as a self-contained bundle that any auditor can verify offline. Avoid calling it a "log," "trail," or "history" in formal contexts — "Audit" or "Audit Chain" is the canonical term.
+</Accordion>
+
+<Accordion title="Proof">
+  A single row in the audit chain. Carries the canonical decision object, the chain hash link, and the signature. Multiple proof rows are exported together as a **proof bundle** for compliance evidence. The `permit_id` in a proof row is the link back to your system of record.
+</Accordion>
+
+<Accordion title="Rule Engine">
+  The deterministic, stateless function that evaluates a request against a bundle's rule set and returns a Decision. It runs first-match evaluation from top to bottom; if no rule matches, it returns `deny` by default. The rule engine is identical across the TypeScript and Python SDKs and the server-side implementation — the same canonical source is used in all three.
+</Accordion>
+
+<Accordion title="Wire Surface">
+  The set of HTTP endpoints, request schemas, and response shapes that external callers depend on. Atlasent's public wire surface is versioned under `/v1/*` and documented in `openapi.yaml`. Breaking changes require a deprecation cycle. When the SDK calls `protect()`, it is orchestrating calls to the wire surface — the SDK is a thin convenience layer, not an alternative to it.
+</Accordion>
+
+## Terms to avoid
+
+| Don't say | Say instead |
+|---|---|
+| Guarded action, intent, gated action | **Protected Action** |
+| Check, assess, gate (in UI copy) | **Evaluate** |
+| Token, grant, approval (for the issued artifact) | **Permit** |
+| Validate (for permit liveness) | **Verify** |
+| Log, trail, history | **Audit** or **Audit Chain** |
+| `require_approval` | **`hold`** or **`escalate`** (whichever applies) |
+| Ruleset, rule (top-level) | **Policy** |
+| Condition (informally) | **Constraint** |
+
+## Related
+
+- [Runtime Flow](/concepts/runtime-flow) — how these primitives connect in the four-hop lifecycle.
+- [Policy](/concepts/policy) — bundles, rule evaluation order, and immutability.
+- [Permit](/concepts/permit) — the state machine and lifecycle in detail.
+- [Audit Chain](/concepts/audit-chain) — how proof rows are structured and verified.

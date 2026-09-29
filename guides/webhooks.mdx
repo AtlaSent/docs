@@ -1,0 +1,199 @@
+---
+title: "Enforcement webhooks: real-time event notifications"
+sidebarTitle: "Webhooks"
+description: "Subscribe to Atlasent enforcement events, build a verified receiver in TypeScript or Python, handle delivery retries, and test your integration end to end."
+---
+
+Atlasent enforcement webhooks deliver real-time HTTP notifications to your endpoint whenever a policy-relevant event occurs — a deploy blocked, a permit consumed, an escalation opened. You use webhooks to alert on-call engineers, feed SIEM systems, trigger incident workflows, and close the loop on downstream approvals without polling the API. Every request is signed with HMAC-SHA256 so you can verify it genuinely came from Atlasent before acting on its contents.
+
+## Setup overview
+
+<Steps>
+  <Step title="Create a webhook subscription">
+    Register your endpoint URL and the event types you want to receive. Atlasent returns a `signing_secret` — save it immediately.
+  </Step>
+  <Step title="Build a verified receiver">
+    Implement an HTTP endpoint that verifies the HMAC-SHA256 signature before processing any event.
+  </Step>
+  <Step title="Test the integration">
+    Send a test ping from the Console or API to confirm delivery and signature verification work end to end.
+  </Step>
+</Steps>
+
+---
+
+## Step 1 — Create a subscription
+
+Register your webhook from the Console at **Settings → Webhooks → Add Webhook**, or via the API:
+
+```bash
+curl -X POST https://api.atlasent.io/v1/webhooks \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://your-app.com/webhooks/atlasent",
+    "events": ["evaluation.denied", "permit.consumed", "escalation.created"]
+  }'
+```
+
+The response includes a `signing_secret`. **Save it immediately** — it is not retrievable after the creation response.
+
+```json
+{
+  "id": "wh_01j...",
+  "url": "https://your-app.com/webhooks/atlasent",
+  "events": ["evaluation.denied", "permit.consumed", "escalation.created"],
+  "signing_secret": "whsec_abc123..."
+}
+```
+
+Store the secret as `ATLASENT_WEBHOOK_SECRET` in your secrets manager or environment. Never commit it to source control.
+
+## Event types
+
+| Event | When it fires |
+|---|---|
+| `evaluation.allow` | Action was evaluated and permitted |
+| `evaluation.denied` | Action was evaluated and denied |
+| `evaluation.hold` | Action was placed on hold |
+| `evaluation.escalate` | Action requires human approval |
+| `permit.consumed` | A permit was successfully consumed |
+| `permit.expired` | A permit expired before consumption |
+| `escalation.created` | A new approval request was created |
+| `escalation.resolved` | An approval request was approved or rejected |
+
+---
+
+## Step 2 — Build a verified receiver
+
+Your endpoint must:
+- Accept `POST` requests
+- Read the **raw request body before any JSON parsing** — parsing normalizes whitespace and breaks HMAC verification
+- Verify the signature before processing any event payload
+- Return a `2xx` status within 10 seconds
+
+<CodeGroup>
+  ```typescript TypeScript (Express)
+  import { verifyWebhook } from '@atlasent/sdk';
+
+  app.post('/webhooks/atlasent', express.raw({ type: 'application/json' }), (req, res) => {
+    const signature = req.headers['x-atlasent-signature'] as string;
+
+    const isValid = verifyWebhook({
+      rawBody: req.body,
+      signature,
+      secret: process.env.ATLASENT_WEBHOOK_SECRET!,
+    });
+
+    if (!isValid) {
+      return res.status(401).send('Invalid signature');
+    }
+
+    const event = JSON.parse(req.body.toString());
+    // Handle event...
+    res.status(200).send('OK');
+  });
+  ```
+
+  ```python Python (Flask)
+  from atlasent import verify_webhook, WebhookVerificationError
+
+  @app.route('/webhooks/atlasent', methods=['POST'])
+  def handle_webhook():
+      try:
+          verify_webhook(
+              raw_body=request.get_data(),
+              signature=request.headers.get('x-atlasent-signature', ''),
+              secret=os.environ['ATLASENT_WEBHOOK_SECRET'],
+          )
+      except WebhookVerificationError:
+          return 'Invalid signature', 401
+
+      event = request.get_json(force=True)
+      # Handle event...
+      return 'OK', 200
+  ```
+</CodeGroup>
+
+### Event payload shape
+
+Every webhook payload includes a stable `event_id` you can use for idempotency deduplication:
+
+```json
+{
+  "event_id": "evt_01j...",
+  "event_type": "evaluation.denied",
+  "created_at": "2026-05-01T12:34:56Z",
+  "org_id": "org_01j...",
+  "data": {
+    "decision_id": "dec_01j...",
+    "action_type": "production.deploy",
+    "actor_id": "user:alice",
+    "deny_code": "DENY_POLICY",
+    "message": "At least 2 reviews required before deploying to production"
+  }
+}
+```
+
+<Warning>
+  Always use `express.raw({ type: 'application/json' })` — not `express.json()` — on your webhook route. Using `express.json()` parses the body before you can read the raw bytes, which means the HMAC computation will fail even for legitimate Atlasent events.
+</Warning>
+
+### Respond quickly; process asynchronously
+
+Return `200 OK` as fast as possible. If your handler does slow work (database writes, downstream API calls), acknowledge the request immediately and process the event asynchronously:
+
+```typescript
+app.post('/webhooks/atlasent', express.raw({ type: 'application/json' }), (req, res) => {
+  // Verify first
+  const isValid = verifyWebhook({ ... });
+  if (!isValid) return res.status(401).send('Invalid signature');
+
+  // Acknowledge immediately
+  res.status(200).send('OK');
+
+  // Process asynchronously after acknowledging
+  const event = JSON.parse(req.body.toString());
+  processEventAsync(event).catch(console.error);
+});
+```
+
+---
+
+## Step 3 — Test the integration
+
+Send a test ping from the Console at **Settings → Webhooks → your endpoint → Send Test**, or via the API:
+
+```bash
+curl -X POST https://api.atlasent.io/v1/webhooks/wh_01j.../test \
+  -H "Authorization: Bearer $ATLASENT_API_KEY"
+```
+
+This delivers a synthetic `evaluation.denied` event to your endpoint. Check the **Deliveries** tab in the Console to see the response status and body returned by your server.
+
+---
+
+## Delivery retries
+
+Atlasent retries failed deliveries (non-2xx responses or timeouts) on the following schedule:
+
+| Attempt | Delay |
+|---|---|
+| 1 | Immediate |
+| 2 | 1 minute |
+| 3 | 10 minutes |
+| 4 | 1 hour |
+| 5 | 12 hours |
+
+After five consecutive failures, Atlasent marks the delivery as `failed`. You can view all delivery attempts and response bodies under **Settings → Webhooks → Deliveries**.
+
+<Tip>
+  Use the `event_id` field for deduplication. Atlasent may deliver the same event more than once under retry. Check the `event_id` against a short-lived cache (e.g. a Redis key with a 10-minute TTL) before acting on the event to make your handler idempotent.
+</Tip>
+
+## Security best practices
+
+- **Always verify the signature.** Never trust a payload without confirming the HMAC-SHA256 digest. Any party that knows your webhook URL can POST arbitrary JSON to it.
+- **Use timing-safe comparison.** The `verifyWebhook` SDK helper uses constant-time comparison internally. If you implement verification manually, use `crypto.timingSafeEqual` (Node.js) or `hmac.compare_digest` (Python) — never `===` or `==`.
+- **Rotate the signing secret periodically.** Delete and recreate the webhook subscription to get a new secret. Old and new deliveries can overlap briefly during rotation.
+- **Keep the secret out of source control.** Treat `ATLASENT_WEBHOOK_SECRET` the same as an API key — store it in your secrets manager, not in `.env` files committed to your repository.

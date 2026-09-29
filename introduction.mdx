@@ -1,0 +1,76 @@
+---
+title: "Atlasent: Execution-Time Authorization"
+sidebarTitle: "Introduction"
+description: "Atlasent gates production deploys, financial transactions, AI agent tool calls, and regulated data operations with policy evaluation before execution."
+---
+
+Atlasent is execution-time authorization infrastructure. Before any consequential action runs — a production deploy, a vendor payment, an AI agent tool call, a batch data export — Atlasent evaluates whether it is permitted under your active policies, issues a cryptographically signed permit token, and writes a tamper-evident audit record. Every step is fail-closed: if authorization is uncertain, the action does not execute.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart/overview">
+    Wire your first protected action end to end in five minutes
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/overview">
+    Understand the evaluate → permit → verify → audit flow
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/introduction">
+    Full reference for all public endpoints
+  </Card>
+  <Card title="SDKs" icon="box" href="/sdks/overview">
+    TypeScript, Python, and Go client libraries
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations/overview">
+    GitHub Actions, MCP server, LangChain, LlamaIndex, Slack
+  </Card>
+  <Card title="Compliance" icon="shield-check" href="/compliance/overview">
+    21 CFR Part 11, EU Annex 11, ICH E6, GxP, SOC 2
+  </Card>
+</CardGroup>
+
+## How Atlasent works
+
+Every protected action follows the same five-step sequence:
+
+<Steps>
+  <Step title="Evaluate">
+    Your code calls `POST /v1/evaluate` (or uses the SDK's `protect()` helper) with the actor, action type, target, and context. Atlasent runs the request through your active policy bundle and returns a decision: `allow`, `deny`, `hold`, or `escalate`.
+  </Step>
+  <Step title="Permit">
+    On `allow`, Atlasent issues a single-use, cryptographically signed permit token. The token is time-bounded (15 minutes by default) and bound to the exact evaluation decision.
+  </Step>
+  <Step title="Verify">
+    Before the protected action executes, your code calls `POST /v1/verify-permit` to consume the token. Replay attempts and expired tokens are rejected. This step is what makes execution non-bypassable.
+  </Step>
+  <Step title="Execute">
+    The action runs only after a valid permit is consumed. The SDK's `withPermit()` / `with_permit()` helpers enforce this lexically — you cannot call the action outside the permit scope.
+  </Step>
+  <Step title="Audit">
+    An immutable, hash-linked audit record is written before Atlasent returns a response. Every evaluation — allowed or denied — produces a permanent, verifiable entry in the audit chain.
+  </Step>
+</Steps>
+
+## What Atlasent protects
+
+Atlasent ships five canonical protected-action types, each with pre-built policy rules:
+
+| Action type | What it gates |
+|---|---|
+| `production.deploy` | Code deployments to production via CI/CD |
+| `vendor.payment.release` | Vendor payment disbursements |
+| `customer.data.export` | Bulk export of customer or PII data |
+| `reconciliation.certify` | Financial-close certifications |
+| `model.agent.execute_tool` | LLM agent tool calls at runtime |
+
+You can also define custom action types for any consequential operation in your system.
+
+## Key guarantees
+
+- **Fail-closed** — network errors, timeouts, and missing policies block execution by default
+- **Single-use permits** — replay attacks return an error; permits cannot be reused
+- **Tamper-evident audit chain** — every record is hash-linked and Ed25519-signed; tampering is detectable offline
+- **Policy version provenance** — every decision records which policy bundle version produced it
+- **Offline verification** — export a signed audit bundle and verify it with no runtime dependency
+
+<Tip>
+  Start with the [Quick Start](/quickstart/overview) to wire your first protected action in under five minutes.
+</Tip>

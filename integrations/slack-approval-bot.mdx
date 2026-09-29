@@ -1,0 +1,119 @@
+---
+title: "Slack Approval Bot: resolve Atlasent escalations in Slack"
+sidebarTitle: "Slack Bot"
+description: "Set up the Atlasent Slack bot to route hold and escalate decisions to a Slack channel, where reviewers approve or deny with one click."
+---
+
+The Atlasent Slack Approval Bot turns `hold` and `escalate` policy decisions into interactive Slack messages. When your policy puts an agent action on hold, Atlasent posts a Block Kit message to your designated channel. A reviewer clicks **Approve** or **Deny** directly in Slack — no Console login required — and Atlasent resolves the pending evaluation and unblocks the waiting agent. The reviewer's Slack identity, their decision, and the timestamp are all recorded in the Atlasent audit chain.
+
+## Setup
+
+<Steps>
+
+### Create a Slack app
+
+Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App → From scratch**. Name the app (for example, `Atlasent Approvals`) and select your workspace.
+
+### Add OAuth scopes
+
+In the app settings, navigate to **OAuth & Permissions → Scopes → Bot Token Scopes** and add these scopes:
+
+| Scope | Purpose |
+|---|---|
+| `chat:write` | Post messages to channels the bot is a member of |
+| `chat:write.public` | Post messages to public channels without joining |
+
+Click **Install to Workspace** and authorize the app. Copy the **Bot User OAuth Token** (`xoxb-…`) — you will need it in step 5.
+
+### Enable interactivity
+
+In the app settings, go to **Interactivity & Shortcuts** and toggle **Interactivity** to **On**. Set the **Request URL** to:
+
+```
+https://api.atlasent.io/v1/integrations/slack/interactions
+```
+
+Click **Save Changes**.
+
+### Copy the signing secret
+
+In the app settings, go to **Basic Information → App Credentials** and copy the **Signing Secret**. Atlasent uses this to verify that every interactive callback originates from Slack.
+
+### Configure in the Atlasent Console
+
+In the Atlasent Console, go to **Settings → Integrations → Slack**. Enter:
+
+- **Bot Token** — the `xoxb-…` token from step 2
+- **Signing Secret** — the signing secret from step 4
+- **Channel** — the Slack channel where approval requests should be posted (for example, `#atlasent-approvals`)
+
+Click **Save**. Invite the bot to the channel in Slack with `/invite @Atlasent Approvals` if you have not already.
+
+### Send a test escalation
+
+Click **Test Connection** in the Atlasent Console. Atlasent posts a test message to the configured channel:
+
+```
+🔔 Atlasent connection test — this is not a real approval request.
+```
+
+If the message appears, the bot is configured and ready to receive real escalations.
+
+</Steps>
+
+## Approval message format
+
+When a `hold` or `escalate` decision occurs, Atlasent posts a Block Kit message to your configured channel. The message shows all the context a reviewer needs to make an informed decision:
+
+```
+🔴 Approval required
+
+Agent:        agent-001
+Action:       production.deploy
+Target:       my-service (production)
+Policy:       Deployment Gate v2
+Decision:     hold
+Requested at: 2026-05-25 14:03 UTC
+Expires:      2026-05-25 14:33 UTC (30 min)
+
+[ Approve ]  [ Deny ]
+```
+
+The request expires after the timeout configured in the policy that triggered the hold (default: 30 minutes). After expiry, the buttons are disabled and the original evaluation returns `timeout` to the caller.
+
+## Resolving a request
+
+When a reviewer clicks **Approve** or **Deny**, Atlasent:
+
+1. Verifies the HMAC-SHA256 signature on the Slack callback (see [Security](#security))
+2. Records the reviewer's Slack user ID and display name in the audit chain entry
+3. Resolves the pending evaluation to `approved` or `denied`
+4. Updates the Slack message to show the outcome and the reviewer's name
+
+## Security
+
+### HMAC-SHA256 signature verification
+
+Atlasent verifies every interactive callback from Slack before processing it:
+
+1. Read the `X-Slack-Request-Timestamp` and `X-Slack-Signature` headers from the incoming request.
+2. Construct the signing base string: `v0:<timestamp>:<raw request body>`.
+3. Compute `HMAC-SHA256(signing_secret, base_string)` and compare it with the value in `X-Slack-Signature`.
+4. Reject the request with `403` if the signatures do not match.
+
+### Replay protection
+
+Atlasent rejects any callback where `X-Slack-Request-Timestamp` is more than **5 minutes** in the past. This prevents an attacker from capturing a valid approval callback and replaying it after the fact.
+
+### Token storage
+
+Atlasent stores the Bot Token and Signing Secret encrypted at rest using AES-256-GCM. Neither value is returned in plaintext after the initial save. To rotate either credential, click **Edit** in the Slack integration settings and enter the new value.
+
+## Troubleshooting
+
+| Issue | Fix |
+|---|---|
+| Bot not posting messages | Check `chat:write` scope and invite the bot to the channel with `/invite @Atlasent Approvals` |
+| Signature verification fails | Re-copy the Signing Secret from **Basic Information → App Credentials** and update it in the Atlasent Console |
+| Buttons not working | Verify the Interactivity Request URL is set to `https://api.atlasent.io/v1/integrations/slack/interactions` |
+| Approval not reflected | Check that the API key stored in the Atlasent Console has `resolve` scope |

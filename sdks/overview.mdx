@@ -1,0 +1,48 @@
+---
+title: "Atlasent SDKs: client libraries for every language"
+sidebarTitle: "Overview"
+description: "Atlasent provides SDKs for TypeScript, Python, and Go. Each wraps the same REST API with typed models, automatic retries, and fail-closed error helpers."
+---
+
+Atlasent provides official client libraries for TypeScript, Python, and Go. All three SDKs target the same underlying REST API and share identical authorization semantics — if you understand how `protect()` works in Python, you already understand how it works in TypeScript. The only differences are idiomatic naming conventions and language-specific packaging.
+
+<CardGroup cols={3}>
+  <Card title="TypeScript" icon="js" href="/sdks/typescript">
+    Node.js 18+, Bun, Deno, and edge runtimes. `@atlasent/sdk` — not yet on npm; contact support for early access.
+  </Card>
+  <Card title="Python" icon="python" href="/sdks/python">
+    Python 3.9+, sync and async. Install with `pip install atlasent`.
+  </Card>
+  <Card title="Go" icon="golang" href="/sdks/go">
+    Go 1.21+. Install with `go get github.com/atlasent-systems-inc/atlasent-sdk-go`. Currently in Beta.
+  </Card>
+</CardGroup>
+
+## Method name consistency
+
+All three SDKs expose the same logical operations. The table below shows the method name for each operation per language so you can navigate the reference without surprises.
+
+| Action | TypeScript | Python | Go |
+|---|---|---|---|
+| Fail-closed gate | `protect()` | `protect()` | `WithGate()` |
+| Scoped permit | `withPermit()` | `with_permit()` | — |
+| Explicit permit consume | `requirePermit()` | `require_permit()` | — |
+| Raw evaluation | `evaluate()` | `evaluate()` | `Evaluate()` |
+| Verify by ID | `verifyPermitById()` | `verify_permit_by_id()` | — |
+
+<Note>
+  The Go SDK uses `WithGate()` in place of `protect()` and `withPermit()`. A future release will add `Protect` and `WithPermit` aliases to bring Go into full naming parity with the TypeScript and Python SDKs. The authorization contract is identical today.
+</Note>
+
+## What SDKs do for you
+
+- **Wrap the HTTP API.** Every SDK handles request serialization, response deserialization, and typed models generated from the Atlasent OpenAPI spec.
+- **Enforce permit consumption.** The fail-closed primitives (`protect()`, `withPermit()`, `WithGate()`) evaluate and verify a permit atomically — you cannot accidentally skip the verify step.
+- **Propagate errors as typed exceptions.** Denial, expiry, rate limiting, and transport failures each surface as a distinct, catch-able error type so you can handle them precisely.
+- **Retry transient failures.** All SDKs respect the `Retry-After` header and apply exponential backoff on transient errors.
+
+## What SDKs do not do
+
+- **Change the authorization decision.** The Atlasent runtime is the single source of truth. The SDK cannot make a denied action permitted.
+- **Make network calls before you call them.** No background polling, no pre-fetching, no startup handshake — the first network call happens exactly when your code calls an SDK method.
+- **Store permits across requests.** One permit is valid for exactly one action. The SDKs never cache or reuse permits; doing so would break the audit chain.

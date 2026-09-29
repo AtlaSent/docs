@@ -1,0 +1,113 @@
+---
+title: "Atlasent API error codes and how to handle each one"
+sidebarTitle: "Errors"
+description: "Every Atlasent API error uses the same JSON envelope. Reference each error code, its HTTP status, its meaning, and SDK patterns for each failure type."
+---
+
+Every Atlasent API error response uses a consistent JSON envelope with three fields: a machine-readable `error` code, a human-readable `message`, and the HTTP `status` code mirrored in the body for convenience. Your error handling should branch on the `error` field, not on the `message` text — message text may be refined over time, but error codes are stable.
+
+## Error envelope
+
+```json
+{
+  "error": "policy_not_found",
+  "message": "No active policy bundle found for action type 'production.deploy'",
+  "status": 404
+}
+```
+
+Rate-limited responses (`429`) extend the envelope with a `retry_after_ms` field that gives millisecond-precision backoff guidance:
+
+```json
+{
+  "error": "rate_limited",
+  "message": "Too many requests",
+  "status": 429,
+  "retry_after_ms": 5000
+}
+```
+
+The `Retry-After` response header is also set on every `429`, in seconds, for compatibility with standard HTTP client libraries.
+
+## Error code reference
+
+| Status | Error code | Meaning |
+|---|---|---|
+| 400 | `bad_request` | Malformed request body |
+| 401 | `unauthenticated` | Missing or invalid API key |
+| 403 | `forbidden` | API key lacks required scope |
+| 404 | `not_found` | Resource not found |
+| 404 | `policy_not_found` | No active policy for this action type |
+| 409 | `permit_consumed` | Permit already consumed |
+| 409 | `permit_expired` | Permit has expired (15-min TTL) |
+| 409 | `permit_revoked` | Permit was explicitly revoked |
+| 422 | `invalid_action_type` | Action type format is invalid |
+| 429 | `rate_limited` | Request rate exceeded |
+| 500 | `internal_error` | Unexpected server error |
+| 503 | `unavailable` | Service temporarily unavailable (fail-closed) |
+
+## deny_reason closed enum
+
+When `POST /v1/evaluate` returns a non-`allow` decision, the response includes a `deny_reason` field. This field is a **closed enum** — your code should switch on exact string equality, not substring matching, because the human-readable `message` field may be refined without notice.
+
+| `deny_reason` value | Meaning |
+|---|---|
+| `unauthenticated` | The request credential is missing or cannot be validated |
+| `unauthorized` | The credential is valid but the caller lacks permission for this action |
+| `policy` | An explicit policy rule denied the action |
+| `precondition` | A required precondition (e.g. approval count, change window) was not met |
+| `replay` | The permit token has already been consumed (replay attempt) |
+| `unavailable` | The authorization service is temporarily unable to evaluate |
+| `clock_skew` | The request timestamp is too far from server time |
+| `unknown_action` | The action type is not registered in any active policy bundle |
+| `internal_error` | An unexpected error occurred server-side |
+
+<Note>
+  `deny_reason` values are stable across API releases. The `message` field that accompanies each `deny_reason` is human-readable and may be refined over time — do not parse or match on `message` text.
+</Note>
+
+## Fail-closed rule
+
+If you receive a `5xx` response or a network error from `POST /v1/evaluate`, treat the call as a denial — never as a default allow. This is the fail-closed contract that makes Atlasent safe for regulated deployments.
+
+<Warning>
+  A `503 unavailable` response means the authorization service is temporarily down. Your agent must halt the action, not proceed. Surface a clear error to the operator and retry with exponential backoff. For sustained `503` responses, contact support.
+</Warning>
+
+## SDK error handling
+
+The Atlasent SDKs map each error code to a typed exception so you can catch specific failure modes without parsing the `error` string yourself.
+
+<CodeGroup>
+```typescript TypeScript
+import { AtlaSentDeniedError, AtlaSentError } from '@atlasent/sdk';
+
+try {
+  await client.protect({ ... }, async () => { ... });
+} catch (err) {
+  if (err instanceof AtlaSentDeniedError) {
+    console.error('Denied:', err.decision, err.denyCode);
+    // Outcomes: err.isRevoked, err.isExpired, err.isConsumed, err.isNotFound
+  } else if (err instanceof AtlaSentError) {
+    // Fail-closed: network error or timeout
+    console.error('Authorization unavailable — action blocked');
+  }
+}
+```
+```python Python
+from atlasent.exceptions import AtlaSentDeniedError, AtlaSentError
+
+try:
+    with client.with_permit(...):
+        deploy()
+except AtlaSentDeniedError as e:
+    print(f"Denied: {e.decision}, code: {e.deny_code}")
+    # Predicates: e.is_revoked, e.is_expired, e.is_consumed, e.is_not_found
+except AtlaSentError:
+    print("Authorization unavailable — action blocked")
+```
+</CodeGroup>
+
+<Note>
+  The `permit_consumed`, `permit_expired`, and `permit_revoked` error codes map to the `isConsumed`, `isExpired`, and `isRevoked` predicates on `AtlaSentDeniedError`. Use these predicates to decide whether to re-evaluate (for expiry) or surface a permanent denial (for revocation).
+</Note>
