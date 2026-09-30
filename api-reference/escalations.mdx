@@ -1,0 +1,214 @@
+---
+title: "HITL Escalations"
+description: "Human-in-the-loop escalation endpoints: create, list, inspect, and respond to escalations."
+---
+{/* Generated from the Atlasent docs source (site/api-reference/escalations.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Warning>
+  **Self-hosted control plane only.** These endpoints are served by the AtlaSent control-plane API that ships in the self-hosted Helm deployment, which is not yet released (see [Enterprise overview](/enterprise)). They are not served by the SaaS runtime at `api.atlasent.io`.
+</Warning>
+
+HITL escalations pause agent execution and route a decision to one or more human approvers. This page documents the four escalation endpoints. For the full orchestration model — quorum tiers, SLA timeouts, audit emission, and SDK usage — see the HITL Orchestration guide.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/v1/escalations` | Create a HITL escalation |
+| `GET` | `/v1/escalations` | List escalations for the org |
+| `GET` | `/v1/escalations/:id` | Get escalation status, quorum progress, and approval records |
+| `POST` | `/v1/escalations/:id/respond` | Cast an approve or reject vote |
+
+## Authentication
+
+All four endpoints require a valid Bearer token or API key. Creating escalations requires any authenticated actor. Responding to an escalation (casting a vote) additionally requires the `hitl:approve` or `admin` role — see [Roles](/api-reference/roles).
+
+---
+
+## POST /v1/escalations
+
+Create a new HITL escalation. The escalation starts in `pending` status and awaits votes from approvers.
+
+### Request body
+
+```json
+{
+  "agentId": "agent_01abc",
+  "escalationReason": "Proposed action exceeds risk threshold",
+  "proposedAction": { "type": "send_wire", "amount": 250000 },
+  "riskScore": 0.87,
+  "quorumConfig": {
+    "quorumRequired": "two_thirds",
+    "approverPoolSize": 3,
+    "fallbackDecision": "reject"
+  },
+  "timeoutMs": 3600000
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `agentId` | string | Yes | ID of the agent requesting the escalation. |
+| `escalationReason` | string | Yes | Human-readable description of why the action is being escalated. |
+| `proposedAction` | object | No | Arbitrary payload describing the action awaiting approval. Stored for audit purposes. |
+| `riskScore` | number | No | Float between `0.0` and `1.0` indicating computed risk. |
+| `quorumConfig` | object | No | Quorum policy for this escalation. If absent, defaults to `single_approver`. |
+| `quorumConfig.quorumRequired` | string | No | One of `single_approver`, `simple_majority`, `two_thirds`, `unanimous`. Default: `single_approver`. |
+| `quorumConfig.minApprovers` | integer | No | Advisory minimum approver count (metadata; does not override quorum calculation). |
+| `quorumConfig.approverPoolSize` | integer | No | Total number of eligible approvers. Required for `simple_majority`, `two_thirds`, and `unanimous` tiers. |
+| `quorumConfig.fallbackDecision` | string | No | Decision applied on timeout or chain exhaustion: `approve` or `reject`. Default: `reject`. |
+| `timeoutMs` | integer | No | Milliseconds until the escalation times out and applies `fallbackDecision`. |
+| `metadata` | object | No | Arbitrary key-value pairs forwarded to audit records. |
+
+### Response
+
+**Status:** `200 OK`
+
+```json
+{
+  "id": "esc_01xyzABC",
+  "status": "pending",
+  "orgId": "org_01abc",
+  "agentId": "agent_01abc",
+  "escalationReason": "Proposed action exceeds risk threshold",
+  "quorumRequired": "two_thirds",
+  "approverPoolSize": 3,
+  "fallbackDecision": "reject",
+  "timeoutAt": "2026-05-17T19:00:00.000Z",
+  "createdAt": "2026-05-17T18:00:00.000Z"
+}
+```
+
+---
+
+## GET /v1/escalations
+
+List all escalations for the caller's org. Results are scoped to the org derived from the credential.
+
+### Query parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `status` | string | Filter by status: `pending`, `approved`, `rejected`, `timed_out`, `escalated`, or `auto_approved`. |
+
+### Response
+
+**Status:** `200 OK` — returns an array of escalation objects.
+
+---
+
+## GET /v1/escalations/:id
+
+Fetch a single escalation with its complete approval record history and current quorum progress.
+
+### Path parameters
+
+| Parameter | Description |
+|---|---|
+| `id` | Escalation ID returned by `POST /v1/escalations`. |
+
+### Response
+
+**Status:** `200 OK`
+
+```json
+{
+  "escalation": {
+    "id": "esc_01xyzABC",
+    "status": "pending",
+    "quorumRequired": "two_thirds",
+    "approverPoolSize": 3,
+    "createdAt": "2026-05-17T18:00:00.000Z",
+    "timeoutAt": "2026-05-17T19:00:00.000Z"
+  },
+  "approvalRecords": [
+    {
+      "id": "apr_01defGHI",
+      "escalationId": "esc_01xyzABC",
+      "userId": "user_01abc",
+      "decision": "approve",
+      "note": "Verified change-window alignment",
+      "createdAt": "2026-05-17T18:05:00.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## POST /v1/escalations/:id/respond
+
+Cast an approve or reject vote on a pending escalation. Requires the `hitl:approve` or `admin` role.
+
+The escalation transitions to a terminal status when quorum is reached:
+
+| Quorum tier | Transition rule |
+|---|---|
+| `single_approver` | First vote wins immediately. |
+| `simple_majority` | Approve when `approves >= floor(N/2) + 1`; reject when `rejects >= floor(N/2) + 1`. |
+| `two_thirds` | Approve when `approves >= ceil(2N/3)`; reject when `rejects >= ceil(2N/3)`. |
+| `unanimous` | Approve when all N votes are approve; any single reject terminates with rejected. |
+
+If all votes are cast but neither threshold is crossed, `fallbackDecision` is applied.
+
+### Path parameters
+
+| Parameter | Description |
+|---|---|
+| `id` | Escalation ID. |
+
+### Request body
+
+```json
+{
+  "decision": "approve",
+  "note": "Reviewed and verified within policy limits"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `decision` | string | Yes | `approve` or `reject`. |
+| `note` | string | No | Optional human-readable rationale, stored in the approval record. |
+
+### Response
+
+**Status:** `200 OK`
+
+```json
+{
+  "escalation": {
+    "id": "esc_01xyzABC",
+    "status": "pending",
+    "quorumRequired": "two_thirds",
+    "approverPoolSize": 3
+  },
+  "record": {
+    "id": "apr_01defGHI",
+    "decision": "approve",
+    "userId": "user_01abc",
+    "createdAt": "2026-05-17T18:05:00.000Z"
+  }
+}
+```
+
+When the response vote reaches quorum, `escalation.status` will be `approved` or `rejected` in the response. While quorum has not yet been reached, `status` remains `pending`.
+
+## State machine
+
+```
+pending → approved
+pending → rejected
+pending → timed_out
+```
+
+All three terminal states are final — a terminal escalation cannot be re-opened. A `409` is returned if a vote is cast against an escalation that is already in a terminal state.
+
+## Error codes
+
+| HTTP Status | Error code | Description |
+|---|---|---|
+| `401` | `unauthorized` | No valid credential provided. |
+| `403` | `forbidden` | Credential does not have `hitl:approve` or `admin` role (respond endpoint only). |
+| `404` | `not_found` | Escalation ID not found or does not belong to the caller's org. |
+| `409` | `conflict` | Escalation is already in a terminal status. |

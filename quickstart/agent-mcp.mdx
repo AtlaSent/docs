@@ -1,0 +1,47 @@
+---
+title: "AI agent / MCP quickstart"
+description: "Put AtlaSent between an agent tool request and a consequential effect while keeping identity, delegation, authorization, and execution distinct."
+---
+{/* Generated from the Atlasent docs source (site/quickstart/agent-mcp.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## 1. Keep the actors distinct
+
+AtlaSent distinguishes the organization, initiating human where applicable, agent/workload identity, and downstream executor. A human login does not silently become the agent's identity or authority.
+
+## 2. Technical access is not organizational authority
+
+An MCP server or tool catalog can make a tool technically callable. That does **not** establish authority to perform a consequential action.
+
+## 3. Evaluate before the tool effect
+
+For a consequential tool call, submit the protected action and current context to the canonical AtlaSent evaluation path before invoking the effectful operation.
+
+Use a sandbox/non-consequential target for the first integration.
+
+## 4. Apply bounded delegation only where it exists
+
+If the organization has explicitly delegated authority to the agent/workload, include the applicable authority context. Never infer delegation from the user's session, tool availability, or prior successful action.
+
+## 5. Verify the execution artifact
+
+Where the protected action requires a Permit, verify it at the gate immediately before the effect. Material changes to the authorized request require fresh authorization.
+
+## 6. Preserve attribution and evidence
+
+The evidence chain should make it possible to distinguish:
+
+- initiating human/organization provenance
+- agent/workload identity
+- exact protected action
+- authority/delegation inputs
+- authorization decision
+- Permit issuance/verification
+- execution/effect evidence, when actually established
+
+## Negative case
+
+Give the agent technical access to a safe test tool while withholding the required AtlaSent organizational authority. The action should fail closed at the authorization boundary rather than relying on the tool's own availability as permission.
+
+<Card title="MCP server integration" icon="plug" href="/integrations/mcp-server">
+Continue with the existing AtlaSent MCP integration reference.
+</Card>

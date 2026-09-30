@@ -1,66 +1,44 @@
 ---
-title: "Step 1: Create and configure your Atlasent API key"
-sidebarTitle: "API Key"
-description: "Create a scoped API key in the Atlasent Console, understand what each scope allows, and store the key securely as an environment variable."
+title: "1. Create an API key"
+description: "Generate a scoped API key in the AtlaSent Console."
 ---
+{/* Generated from the Atlasent docs source (site/quickstart/api-key.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-API keys are the primary credential your service uses to authenticate with Atlasent. You create them in the Atlasent Console at [app.atlasent.io](https://app.atlasent.io), assign one or more scopes at creation time, and receive the plaintext value exactly once — Atlasent stores only a SHA-256 hash server-side and can never show you the raw key again.
+API keys are the primary auth for service-to-service calls (your AI agent → AtlaSent). Keys are **scoped by role at creation time** and stored server-side as SHA-256 hashes — the plaintext is never persisted.
 
 ## Create the key
 
 <Steps>
   <Step title="Log in to the Console">
-    Open [app.atlasent.io](https://app.atlasent.io) and sign in to your organization.
+    Open [console.atlasent.io](https://console.atlasent.io) and sign in.
   </Step>
   <Step title="Open Settings → API Keys">
-    In the left-hand navigation, click **Settings**, then **API Keys**. Click **Generate New Key**.
+    Choose **API Keys** in the sidebar (`/api-keys`; organization admins land on **Settings → API Keys**), then click **New Key**.
   </Step>
-  <Step title="Choose a name and scope">
-    Give the key a descriptive name (for example, `ci-deploy-bot-prod`). For this quickstart, select the **`evaluate`** and **`verify`** scopes. You can create additional keys with narrower scopes — such as `audit`-only for your SIEM integration — later.
+  <Step title="Pick a scope preset">
+    For the quickstart, pick the **Evaluate only** preset. It grants `evaluate:write`, `verify:execute`, `audit:read`, and `policy:read`. Scopes always take the `resource:action` form. You can create an **Audit read-only** key (`audit:read`) or choose **Custom** scopes later.
   </Step>
-  <Step title="Copy the plaintext key immediately">
-    The key is shown **once**. Copy it now and store it in your password manager or secrets store. If you lose it, you must rotate and replace it.
+  <Step title="Copy the plaintext key">
+    It's shown **once**. Store it in a password manager or a secrets store. Lost keys must be rotated.
   </Step>
 </Steps>
 
-## Key prefixes
-
-Keys follow a naming convention that signals their environment:
-
-| Prefix | Environment |
-|---|---|
-| `ak_live_…` | Production — calls count against your live quota and appear in the production audit chain. |
-| `ak_test_…` | Non-production — safe to use in CI, staging, and local development without affecting production records. |
-
-## Store the key as an environment variable
-
-Set the key in your shell or your platform's secret manager before running any SDK or `curl` examples:
+## Put the key in your environment
 
 ```bash
-export ATLASENT_API_KEY="ak_live_..."
+export ATLASENT_API_KEY="ask_live_..."   # test-environment keys start with ask_test_
+export ATLASENT_API_URL="https://api.atlasent.io/functions/v1"
 ```
 
+The base URL includes the `/functions/v1` path. Endpoints are hyphenated
+function names appended directly to it — `$ATLASENT_API_URL/v1-evaluate`
+(i.e. `https://api.atlasent.io/functions/v1/v1-evaluate`), not
+`$ATLASENT_API_URL/v1/evaluate`. The next two pages use this convention.
+
 <Warning>
-  Never check API keys into source control. Use your platform's secret manager — GitHub Actions secrets, AWS Secrets Manager, HashiCorp Vault, Vercel environment variables, and so on. Atlasent monitors public GitHub repositories and alerts you if a live key appears in a commit.
+  Do not check API keys into source control. Use your platform's secret manager (GitHub Actions secrets, AWS Secrets Manager, Vercel env, etc.).
 </Warning>
 
-<Tip>
-  Set `ATLASENT_API_KEY` in your CI environment once, at the org or repository level, and all jobs will pick it up automatically. Both the TypeScript and Python SDKs read this variable by default — you do not need to pass it explicitly to the client constructor.
-</Tip>
+## Next
 
-## Key scopes
-
-Assign only the scopes a given key actually needs. A key used solely by your audit pipeline does not need the `evaluate` or `resolve` scopes.
-
-| Scope | What it allows |
-|---|---|
-| `evaluate` | Call `POST /v1/evaluate` to request an authorization decision and receive a permit token. |
-| `verify` | Call `POST /v1/verify-permit` to confirm a permit is still valid before execution. |
-| `audit` | Call audit export and list endpoints to download signed audit bundles. |
-| `resolve` | Approve or reject escalations routed to a human reviewer. |
-
-## Next step
-
-With your key exported, move on to making your first protected action evaluation.
-
-[Step 2: Make your first evaluation →](/quickstart/first-evaluation)
+Now [make your first evaluation →](/quickstart/first-evaluation)

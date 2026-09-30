@@ -1,0 +1,47 @@
+---
+title: "Enterprise operator quickstart"
+description: "Take one protected action from organization setup through a truthful rehearsal and production-readiness review."
+---
+{/* Generated from the Atlasent docs source (site/quickstart/enterprise-operator.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## 1. Start with one protected action
+
+Choose one consequential action with a clear execution boundary. Define the actor, target/resource, environment, approval inputs, and decision-material fields that must not change after authorization.
+
+## 2. Confirm the organization boundary
+
+Use the authoritative AtlaSent organization/tenant. The selected organization determines customer scoping; it does not itself grant authority for the protected action.
+
+## 3. Connect the minimum evidence
+
+Connect or inspect the systems needed for the first action. Product state must be explicit: **connected**, **setup required**, or **unavailable**. Do not treat a placeholder integration as connected.
+
+## 4. Run a rehearsal
+
+Use the supported rehearsal/shadow path. A rehearsal may make a real evaluation call, but it must not fabricate a Permit or consequential downstream effect.
+
+Interpret outcomes separately:
+
+- `allow` — authorization decision only
+- `deny` — request refused
+- `hold` — additional required input/approval is unresolved
+- `escalate` — route to the applicable escalation process
+
+## 5. Review evidence
+
+Confirm the decision, authority/approval inputs, policy/version references, and Permit/verification evidence that actually exists. Do not infer execution from an earlier lifecycle stage.
+
+## 6. Check readiness before production
+
+Production activation is separate from signup and rehearsal. Before activation confirm:
+
+- you are working in the correct organization
+- your primary user can sign in
+- your plan includes the capabilities you intend to use
+- each integration you rely on shows as connected, not setup required
+- you know how to reach support
+- any setup step that AtlaSent performs on your behalf is listed in your implementation plan
+
+<Card title="Trust Center" icon="shield-check" href="/trust/index">
+Review security, legal, data handling, compliance posture, and procurement materials before production acceptance.
+</Card>

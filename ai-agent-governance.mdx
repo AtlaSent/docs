@@ -1,0 +1,235 @@
+---
+title: "AI Action Protection"
+description: "An AI agent's tool access is not permission to act. AtlaSent gates an agent's consequential actions before they run and keeps proof of what was decided."
+sidebarTitle: "AI Action Protection"
+---
+{/* Generated from the Atlasent docs source (site/ai-agent-governance.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# AI Action Protection
+
+**An agent's tool access is not permission to act.** AtlaSent puts an enforceable gate between an AI agent and the consequential actions it can reach, so the organization, not the agent's access, decides what runs.
+
+AI agents can now deploy code, run database migrations, and change infrastructure. AtlaSent sits between the agent and those actions:
+
+1. **Connect AtlaSent** to your agent through the MCP server or SDK.
+2. **Risky actions wait** for a person to approve them. The agent can't approve itself.
+3. **Every decision gets a signed record**, including who approved it when the decision relied on an approval.
+
+AI Action Protection is offered to Enterprise customers through a design partner program; what is protected for your agents is confirmed in the engagement. To get started, [schedule an Enterprise call](https://cal.com/atlasent/discovery). Developers can try the same gate locally with the [MCP server and SDKs](/quickstart/overview).
+
+## For engineers
+
+AI agents can be authenticated, delegated tools, and still lack **organizational
+Authority** to perform a particular consequential action.
+
+AtlaSent addresses that gap with **execution-time authorization**: a per-request
+determination, made before the governed effect, of whether this exact Action is
+authorized by the organization under the Authority, Policy, approvals,
+Assertions, Resource state, environment, and other facts in force now.
+
+> **A plausible agent request is not organizational authority.**
+
+The same model applies to humans, services, workflows, and agents. AI is an actor
+type, not a separate authorization system.
+
+## The execution boundary
+
+```text
+Agent proposes a consequential tool action
+             │
+             ▼
+        AtlaSent Evaluation
+ Authority + Policy + Context + Assertions
+             │
+       Decision: allow / deny / hold / escalate
+             │ allow
+             ▼
+            Permit
+             │
+             ▼
+      Gate verifies Permit
+             │ verified
+             ▼
+       native tool action
+             │
+             ▼
+       Evidence / Proof
+```
+
+The critical ordering is:
+
+**Permit → Verification → Execution → Evidence**
+
+An `allow` Decision alone is not the execution Gate. A Permit must be verified
+for the execution attempt before the governed side effect occurs.
+
+## What makes an agent action consequential?
+
+A consequential computational action can materially change organizational
+state, for example:
+
+- deploy code to production;
+- write or delete business data;
+- release or disclose protected data;
+- send an external communication;
+- grant access or change privileges;
+- initiate a payment or other financial operation;
+- alter a control, workflow, integration, or production configuration.
+
+AtlaSent governs the **Action**, not the prose the model generated before it.
+This is different from content filtering or model-output moderation.
+
+## Use canonical Action Types
+
+New Action identities are Canon-controlled. Do not create an ad hoc taxonomy just
+because an agent framework accepts arbitrary tool names.
+
+For agent tool execution, use the applicable Canon-backed Action Type (for
+example **`agent.tool.invoke`**) and put tool-specific facts in the Target /
+Resource and Context according to the integration contract.
+
+The organization-specific **Action Class** then configures governance for that
+Action Type. Action Type and Action Class are not synonyms.
+
+## Preferred SDK pattern
+
+Use a helper that performs Evaluation and successful Permit Verification before
+invoking the protected callback.
+
+```ts
+import { configure, withPermit } from '@atlasent/sdk';
+
+configure({ apiKey: process.env.ATLASENT_API_KEY! });
+
+await withPermit(
+  {
+    actor: {
+      id: 'agent:research-bot',
+      type: 'agent',
+    },
+    action: {
+      id: 'tool-call-123',
+      type: 'agent.tool.invoke',
+    },
+    target: {
+      id: 'tool:database-delete',
+      type: 'tool',
+      environment: 'production',
+    },
+    context: {
+      table: 'users',
+      record_id: userId,
+      delegated_by: 'user:operator-17',
+    },
+  },
+  async () => {
+    // Reached only after the permit-gated SDK path succeeds.
+    await db.delete('users', { id: userId });
+  },
+);
+```
+
+For a customer integration, verify the exact SDK version and helper contract in
+the current SDK documentation. The invariant is more important than the helper
+name: **the native side effect must not run before required Permit Verification.**
+
+## Direct wire pattern
+
+If you integrate at the HTTP boundary instead of using a guarded SDK helper, the
+shape is:
+
+```text
+POST /v1/evaluate
+  → decision
+  → permit_token on allow
+
+POST /v1-verify-permit
+  → verify / consume the bounded Permit for this execution attempt
+
+only then
+  → invoke the native tool
+```
+
+The current server-authoritative OpenAPI/handler is the source of truth for the
+exact request/response fields. Do not copy an old nested-Permit example from
+historical docs.
+
+## LangChain, MCP, and other agent frameworks
+
+Framework wrappers are **ergonomics**, not the source of Authorization.
+
+- LangChain/LlamaIndex guards should delegate to the same AtlaSent execution boundary.
+- MCP integrations can expose evaluation and Permit-verification tools, but a prompt instruction alone is not a non-bypassable Gate.
+- A framework callback, middleware hook, or decorator only supports an enforcement claim when the actual protected path cannot reach the native effect without the required AtlaSent verification.
+
+Security claims should be pinned to the execution boundary, not to the presence
+of a wrapper.
+
+## Human review
+
+Human Approval can be required by Policy, but it is an **input** to
+Authorization—not the final authorization result and not organizational
+Authority by itself.
+
+A typical held/escalated path is:
+
+```text
+Action proposed
+  → Evaluation says hold / escalate
+  → required Approval or other evidence collected
+  → fresh/relevant Evaluation under current state
+  → allow may produce Permit
+  → Permit Verification
+  → Execution
+```
+
+See [Approval flows](/concepts/approval).
+
+## Fail-closed versus shadow/advisory
+
+Do not make one universal statement about every integration.
+
+- **Enforced, fail-closed, permit-gated path:** if required authorization or Permit Verification fails, the governed native action does not execute through that path.
+- **Shadow/advisory path:** AtlaSent evaluates and records what would happen, but does not claim to block the native effect.
+
+Rollout status must match the actual customer topology and acceptance evidence.
+
+## Evidence for agent actions
+
+Authorization and execution are different states. Good agent-governance evidence
+connects:
+
+- Actor / execution principal;
+- canonical Action Type and Action Instance;
+- Resource / Target and Context;
+- organizational Authority basis;
+- Policy version and required approvals/Assertions;
+- Decision;
+- Permit issuance and Verification;
+- native execution result / effect evidence;
+- replay, expiry, revocation, or mismatch refusal where applicable.
+
+AtlaSent uses tamper-evident evidence structures and supports cryptographically
+verifiable Proof where the applicable export/verifier path provides it.
+
+## The category boundary
+
+AtlaSent is not primarily:
+
+- an agent framework;
+- an identity provider;
+- a content safety classifier;
+- a generic approval queue;
+- post-hoc agent observability.
+
+It is **authorization for consequential computational actions**, applied here to
+AI-agent tool execution.
+
+## Next steps
+
+- [Authorization for AI agents](/authorization-for-ai-agents) — implementation pattern
+- [Execution-time authorization](/concepts/execution-time-authorization)
+- [Organizational authority](/concepts/organizational-authority)
+- [Authority vs. Authorization vs. Approval vs. Access](/concepts/authority-vs-authorization)
+- [Permit](/concepts/permit)
+- [Runtime flow](/concepts/runtime-flow)

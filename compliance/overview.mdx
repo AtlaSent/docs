@@ -1,61 +1,34 @@
 ---
-title: "Compliance frameworks and certifications in Atlasent"
-sidebarTitle: "Overview"
-description: "Atlasent supports 21 CFR Part 11, EU Annex 11, ICH E6 GCP, and GxP Change Control with direct product primitives for every mapped requirement."
+title: "Compliance"
+description: "Which regulatory frameworks AtlaSent aligns with, and where to verify each claim."
 ---
+{/* Generated from the Atlasent docs source (site/compliance/overview.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Atlasent is purpose-built for regulated industries where every authorization decision must be traceable, immutable, and auditable. Rather than requiring you to bolt compliance onto a general-purpose authorization tool, Atlasent ships with framework-specific policy presets, an append-only hash-linked audit chain, and verifiable permit tokens that satisfy the evidence requirements of FDA, EMA, and ICH regulations out of the box. Every claim in this section points to a concrete product primitive — no hand-waving, no aspirational language.
+AtlaSent is designed for GxP-regulated environments. The compliance docs are organized around one rule: **every claim points to a product primitive that satisfies the requirement**. No hand-waving.
 
-## Supported frameworks
+## Start here
+
+<Card title="Compliance status" icon="shield-check" href="/trust/compliance-status">
+  What AtlaSent is aligned with, partially aligned with, and explicitly not aligned with.
+</Card>
+
+## Framework deep-dives
 
 <CardGroup cols={2}>
-  <Card title="21 CFR Part 11 (FDA)" icon="flask" href="/compliance/21-cfr-part-11">
-    Map Atlasent's audit chain, permit tokens, and policy rules to FDA electronic records and electronic signature requirements. Includes starter policy and implementation checklist.
-  </Card>
-  <Card title="EU GMP Annex 11 (EMA)" icon="syringe" href="/compliance/eu-annex-11">
-    Map Atlasent primitives to EMA computerized-system validation requirements for pharmaceutical manufacturing. Includes VQP evidence package.
-  </Card>
-  <Card title="ICH E6 GCP" icon="flask-vial" href="/compliance/ich-e6-gcp">
-    Satisfy ALCOA+ requirements for AI agents in clinical trials. Every audit entry is attributable, contemporaneous, and enduring by design.
-  </Card>
-  <Card title="GxP Change Control" icon="code-branch" href="/compliance/gxp-change-control">
-    Enforce ICH Q10, EU Annex 11/15, 21 CFR Part 211, and GAMP 5 change-control gates with Atlasent policy templates. Includes ISO 27001 A.12.1.2 crosswalk.
-  </Card>
+  <Card title="21 CFR Part 11 (FDA)"    icon="flask"    href="/compliance/21-cfr-part-11" />
+  <Card title="EU Annex 11 (EMA)"       icon="syringe"  href="/compliance/eu-annex-11" />
+  <Card title="ALCOA+"                  icon="list-check" href="/compliance/alcoa-plus" />
+  <Card title="ICH E6 GCP"              icon="flask-vial" href="/compliance/ich-e6-gcp" />
+  <Card title="GxP change control"      icon="code-branch" href="/compliance/gxp-change-control" />
 </CardGroup>
 
-## Claims status
+## Not-yet-available
 
-The table below is the single source of truth for Atlasent compliance claims. Every landing page, README, and sales communication links here. If a claim exists elsewhere that is not reflected in this table, the other copy is wrong and should be corrected.
+AtlaSent is honest about gaps. The [compliance status](/trust/compliance-status) page explicitly lists:
 
-| Framework | Status | What Atlasent provides |
-|---|---|---|
-| 21 CFR Part 11 | **Supported** | Electronic records and audit trail mapping |
-| EU Annex 11 | **Supported** | Computerized system validation evidence |
-| ICH E6 GCP | **Supported** | ALCOA+ compliant audit trail |
-| SOC 2 Type I | **Readiness in flight** (target Q3 2026) | TSC-mapped controls; not yet attested |
-| HIPAA (BAA) | **On roadmap** | Contact sales |
-| GDPR / UK GDPR | **Active** (DPA available) | Data processing agreement |
-| ISO 27001 | **Not in V1 scope** | — |
+- **SOC 2 Type II** — not yet started; see [Compliance status](/trust/compliance-status).
+- **HIPAA BAA** — not yet available; contact sales.
+- **FDA 510(k)** — N/A; AtlaSent is not a medical device.
+- **EU AI Act** — in evaluation; pre-review mapping available on request.
 
-<Note>
-  **How to read this table.** "Supported" means a product primitive satisfies the requirement with published documentation. "On roadmap" means the framework is recognized but the full artifact is not yet available — contact [sales@atlasent.io](mailto:sales@atlasent.io) if you need it sooner. "Active" means the legal instrument exists and is in effect today.
-</Note>
-
-## How Atlasent handles compliance
-
-Atlasent enforces authorization at execution time, which means consequential actions — writing a record, releasing a batch, deploying to production — cannot run without a valid, unexpired permit that is bound into the audit chain before the API responds. This architectural choice makes compliance evidence a natural by-product of normal system operation rather than something you reconstruct after the fact.
-
-<Tip>
-  Request the **Vendor Qualification Package (VQP)** if your Quality team needs a structured mapping of Atlasent controls to GxP framework requirements. Email [compliance@atlasent.io](mailto:compliance@atlasent.io) to request a copy.
-</Tip>
-
-## What Atlasent deliberately does not claim
-
-Atlasent is transparent about gaps. The following are not available today:
-
-- **SOC 2 Type II** — audit observation window is on the roadmap for Q4 2026.
-- **HIPAA BAA** — not yet available for general availability; contact sales for pilot arrangements.
-- **ISO 27001 certification** — not in V1 scope; controls are mapped in the GxP Change Control crosswalk.
-- **FDA 510(k) / medical device** — Atlasent is not a medical device; use with medical-device software requires a separate IEC 62304 assessment.
-
-If you need a claim that is not listed here, ask before assuming. Email [compliance@atlasent.io](mailto:compliance@atlasent.io) with the framework and section — Atlasent will respond in writing.
+If you need a claim that isn't here, ask before assuming.

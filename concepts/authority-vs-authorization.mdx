@@ -1,0 +1,157 @@
+---
+title: "Identity vs. Authority vs. Authorization vs. Approval vs. Access"
+description: "Identity, authority, authorization, approval, and access answer different questions. Keeping them separate is central to AtlaSent's organizational-authority model."
+---
+{/* Generated from the Atlasent docs source (site/concepts/authority-vs-authorization.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**Identity, authority, authorization, approval, and access are not synonyms.** They answer different questions at different points in the control lifecycle.
+
+AtlaSent keeps them separate because collapsing them creates a common failure mode: a technically possible, authenticated, or plausibly approved request is treated as if the organization has authorized the exact action.
+
+> **Verified identity establishes who the actor is. It does not establish what the organization authorizes that actor to do.**
+
+## The core concepts
+
+| Concept | Question answered | Typical lifetime | What it does not prove |
+|---|---|---|---|
+| **Identity** | Who or what is this principal, as established from an authoritative identity source? | Credential/assertion/session/workload-proof dependent | Organizational Authority or Authorization |
+| **Access / capability** | What can this identity technically reach or invoke? | Session, credential, role, entitlement, or platform-dependent | That the organization authorizes every reachable action |
+| **Authority** | Does this principal have the organizational right to cause or approve this class of change? | Standing but scoped, revocable, delegable, and/or expiring | That this exact request satisfies current conditions |
+| **Approval** | Did an eligible approver satisfy this required condition? | Bound to an approval/action context | Standing Authority, final Authorization, or Execution |
+| **Authorization** | May this exact Action proceed now? | Per request | That Execution actually occurred |
+
+A positive authorization may produce a bounded execution artifact:
+
+| Concept | Question answered |
+|---|---|
+| **Permit** | What bounded, machine-verifiable artifact carries this positive Authorization to the execution boundary? |
+
+And the execution/proof path adds:
+
+| Concept | Question answered |
+|---|---|
+| **Verification** | Is the Permit authentic, current, correctly bound, unexpired/unrevoked, and unreplayed for this execution attempt? |
+| **Execution** | Did the native execution system actually attempt the Action? |
+| **Effect** | Did the intended provider/native state change actually occur? |
+| **Evidence** | What durable facts were recorded about the decision, Permit, verification, execution, and effect? |
+| **Verified Proof** | Which of those facts have passed the applicable independent integrity/verification checks? |
+
+## Example
+
+Suppose an engineer can technically deploy to production.
+
+**Identity** may be established from GitHub OIDC or an enterprise IdP. That establishes who/what is acting; it does not make the principal an authorized production deployer.
+
+**Access** may be true because the engineer or workload has credentials or a platform role.
+
+**Authority** may be narrower: the principal is empowered to deploy only certain services, environments, or change classes.
+
+**Approval** may also be required: an eligible control owner reviews a particular change and signs off.
+
+**Authorization** is still a separate determination: immediately before the governed deployment proceeds, does this exact actor/action/target/revision/payload satisfy the current organizational Authority, Policy, approval, separation-of-duties, time, state, safeguard, and other required conditions?
+
+If the answer is `allow`, a bounded **Permit** can be issued when the exercised path requires one. That Permit is then **verified at the Gate**. Only after the gate's verification requirement succeeds may the configured native execution path proceed. Execution and effect remain separate facts that require their own evidence.
+
+## Verified actor identity is not "the authorizing actor"
+
+AtlaSent may verify a human or workload identity through a technical identity-broker path. Publicly, the customer outcome is **Verified Actor Identity** or **identity verified from an authoritative source**.
+
+The verified principal is the **Actor whose authority is evaluated**. Identity verification does not grant organizational authority and the identity service does not authorize the protected action. The AtlaSent runtime makes the fresh Authorization determination under the organization's governing authority and policy.
+
+## Participant roles stay separate
+
+A single principal may occupy more than one role only when the governing policy permits it. Do not collapse these roles merely because identifiers happen to match:
+
+- **Initiator** — starts the console/workflow interaction;
+- **Caller** — presents the request at the system boundary;
+- **Actor** — resolved principal whose authority is evaluated;
+- **Requester** — asks that the consequential action occur;
+- **Approver / Reviewer** — supplies eligible verified approval input;
+- **Executor / Execution Principal** — attempts the native effect;
+- **Observer** — establishes what actually happened.
+
+## Why approval alone is insufficient
+
+Approval can become stale or mismatched.
+
+After approval:
+
+- the payload can change;
+- the target environment can change;
+- the requester or actor can change;
+- the approver's authority can expire;
+- Policy can change;
+- a required assertion can become stale;
+- separation-of-duties conditions can fail;
+- the execution window can close.
+
+That is why AtlaSent treats Approval as evidence/input to a fresh per-request Authorization determination rather than equating `approved` with `authorized`.
+
+## Why access alone is insufficient
+
+Technical platforms must grant enough capability for work to happen. But broad capability often exceeds the organization's authority for any particular action.
+
+Examples:
+
+- an administrator can technically change many permissions but is authorized to change only a subset;
+- a finance user can access a ledger but lacks authority to approve their own material entry;
+- an AI agent can invoke a tool but is not authorized to invoke it against every target or with every argument;
+- a deployment service can reach production but should execute only a particular authorized change.
+
+IAM and platform permissions remain important. AtlaSent consumes verified identity/access context rather than pretending that technical access itself is organizational Authority.
+
+## The controlled sequence
+
+```text
+Verified Identity / Access
+      ↓ establishes principal + technical capability, not authority
+Organizational Authority
+      +
+Policy + Assertions + required Approval + current Context
+      ↓
+Evaluation
+      ↓
+Authorization Decision
+      ↓ allow only, when Permit required
+Permit Issued
+      ↓
+Permit Verification at Gate
+      ↓
+Native Execution
+      ↓
+Observed Effect
+      ↓
+Evidence
+      ↓
+Verified Proof (only where verification establishes it)
+```
+
+## Language rule
+
+When describing AtlaSent:
+
+- do not say verified identity **grants authority**;
+- do not call a verified workload the **authorizing actor** merely because its identity is trusted;
+- do not say an approval **grants authority** unless the underlying authority model actually says so;
+- do not call a Permit a durable permission or standing Authority;
+- do not say an `allow` Decision proves Execution;
+- do not say Permit Verification proves Execution or Effect;
+- do not describe technical access as organizational authorization;
+- do not call generic evidence **verified proof** unless the applicable verifier actually established the claimed property;
+- do not collapse Authority and Authorization into one noun.
+
+<CardGroup cols={2}>
+  <Card title="Organizational authority" icon="building-shield" href="/concepts/organizational-authority">
+    The standing organizational right to cause or approve a class of change.
+  </Card>
+  <Card title="Execution-time authorization" icon="shield-check" href="/concepts/execution-time-authorization">
+    The fresh per-request determination made at the execution boundary.
+  </Card>
+</CardGroup>
+
+## Related concepts
+
+- [Consequential computational actions](/concepts/consequential-computational-actions)
+- [Permit](/concepts/permit)
+- [Runtime flow](/concepts/runtime-flow)
+- [Approval](/concepts/approval)

@@ -1,100 +1,259 @@
 ---
-title: "Atlasent glossary: canonical terms and definitions"
-sidebarTitle: "Glossary"
-description: "Canonical definitions for every term Atlasent uses: Action Type, Actor, Policy, Bundle, Permit, Decision, Evaluate, Verify, Consume, and more."
+title: "Glossary"
+description: "Controlled AtlaSent vocabulary for organizational authority, execution-time authorization, protected actions, permits, gates, and evidence."
 ---
+{/* Generated from the Atlasent docs source (site/concepts/glossary.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-These are the terms you will encounter throughout Atlasent's console, API, SDKs, and documentation. When you see a synonym in older code or earlier docs, treat the form below as the canonical spelling. The API field names in `openapi.yaml` are the wire-format source of truth; definitions here align with them.
+{/* Derived customer-language projection. */}
 
-<Accordion title="Action Type">
-  The string identifier for a protected action, expressed as a lowercase, dot-separated slug — for example, `production.deploy`, `ehr.write`, or `journal_entry.approve`. On the wire this is `action.type`; in the database it is stored as `action_class.slug`. It is the primary key for policy lookup.
+## Category language
 
-  Do not confuse with `action.id`, which is a per-instance identifier for a specific execution (such as a deploy job ID).
-</Accordion>
+<ResponseField name="Authorization for consequential computational actions" type="category">
+  AtlaSent's canonical category statement. The product determines whether a
+  specific consequential computational action is organizationally authorized
+  under current conditions before the governed effect occurs.
+</ResponseField>
 
-<Accordion title="Actor">
-  The entity proposing an action. An actor carries an `id`, a `type` (`user` | `agent` | `service`), an `org_id`, and optional `roles` and `attributes`. The actor's identity and role are evaluated against the active policy bundle to reach a decision.
-</Accordion>
+<ResponseField name="Execution-time authorization" type="mechanism">
+  A per-request Authorization determination made at the execution boundary,
+  before a consequential computational action is allowed to produce its native
+  effect.
+</ResponseField>
 
-<Accordion title="Policy">
-  A versioned set of rules associated with an action type and an org. Policies are immutable once published — updates ship as a new `bundle_version`. Every evaluation loads the currently active, published bundle for the relevant `(org_id, action_type)` pair. Avoid calling a policy a "ruleset" or "rule" at the top level.
-</Accordion>
+<ResponseField name="Consequential computational action" type="concept">
+  A computational action capable of producing a material organizational effect
+  such that the organization may require explicit authority, policy conditions,
+  evidence, or enforcement before execution.
+</ResponseField>
 
-<Accordion title="Bundle">
-  A versioned, published snapshot of the policy rules that govern evaluation for a given action type and org. Each evaluation decision records the `bundle_id` and `bundle_version` that produced it, creating a policy-version-bound audit trail. Bundles are immutable once published; updates create new bundle versions.
-</Accordion>
+<ResponseField name="Organizational Authority" type="concept">
+  The standing, scoped organizational right to cause a class of change.
+  Authority may be delegated, constrained, revoked, or expire. It is distinct
+  from technical capability, Approval, per-request Authorization, Decision,
+  Permit, and Evidence.
+</ResponseField>
 
-<Accordion title="Permit">
-  A short-lived (15-minute TTL), single-use, Ed25519-signed token issued only when the evaluation decision is `allow`. Identified by a `pt_…` ID. One permit authorizes exactly one execution. Avoid calling a permit a "token," "grant," or "approval" — those are separate concepts in Atlasent's model.
-</Accordion>
+## Identity and action
 
-<Accordion title="Decision">
-  The outcome of an Evaluate call. Exactly one of four values:
+<ResponseField name="Caller" type="identity">
+  The entity presenting a request at the system boundary, before runtime
+  identity resolution.
+</ResponseField>
 
-  - `allow` — action is authorized; a permit is issued.
-  - `deny` — action is blocked; carries `deny_code` and `deny_reason`. No permit.
-  - `hold` — decision deferred pending an external signal (for example, an approval webhook). No permit.
-  - `escalate` — routed to a human reviewer queue. No permit until the reviewer resolves it.
+<ResponseField name="Actor" type="identity">
+  The resolved runtime identity evaluated by Policy. Caller and Actor are
+  related but are not synonyms.
+</ResponseField>
 
-  There is no `require_approval` value. Older docs that referenced it were incorrect — `hold` or `escalate` is the right term depending on the context.
-</Accordion>
+<ResponseField name="Execution Principal" type="identity">
+  The workload, service, process, device, or runtime actually attempting the
+  native effect. It is not automatically the requester or approver.
+</ResponseField>
 
-<Accordion title="Evaluate">
-  The decision call. The engine evaluates a proposed action against the active policy bundle and returns a Decision. The audit entry for the decision is written *before* the response returns. Avoid using "check," "assess," or "authorize" in user-facing copy when you mean the Evaluate operation specifically.
-</Accordion>
+<ResponseField name="Action" type="primitive">
+  The consequential operation being attempted.
+</ResponseField>
 
-<Accordion title="Verify">
-  The operation that confirms a permit is unconsumed, unexpired, and signed by a trusted key. You (or the SDK) call verify immediately before state-changing execution. Returns `200` when valid, `410` when expired or consumed. Verify is single-use: a second verify on the same permit fails. Avoid using "validate" for this operation.
-</Accordion>
+<ResponseField name="Action Type" type="identifier">
+  The categorical identity of an Action, represented by the canonical dotted
+  slug. On the public request surface this maps to `action.type` / `action_type`.
+</ResponseField>
 
-<Accordion title="Consume">
-  The operation that marks a permit as used and binds the executed payload's `payload_hash` into the linked proof row. A second consume on the same permit returns `409`. A `payload_hash` mismatch returns `409 payload_binding_mismatch`. Consuming a permit is a terminal, irreversible operation.
-</Accordion>
+<ResponseField name="Action Instance" type="identifier">
+  This specific occurrence of an Action. It is distinct from Action Type.
+</ResponseField>
 
-<Accordion title="Hold">
-  A non-terminal Decision state in which the engine has deferred the outcome until an external signal arrives — for example, a time-window check passing or an async approval webhook firing. No permit is issued; the action cannot proceed until the hold resolves. Integrations that handle `hold` should poll or configure a webhook to detect resolution.
-</Accordion>
+<ResponseField name="Action Class" type="configuration">
+  The organization-specific runtime governance/configuration object for an
+  Action Type. Action Class and Action Type are related but are not the same
+  concept.
+</ResponseField>
 
-<Accordion title="Escalate">
-  A non-terminal Decision state in which the engine has routed the action to a human reviewer queue. The reviewer's resolution releases the decision into `allow` or `deny`. No permit is issued until the reviewer approves. From the SDK's perspective, `escalate` raises the same `AtlaSentDeniedError` as `deny` — the semantic difference is that you should route escalated requests to a review workflow rather than surfacing a hard rejection.
-</Accordion>
+<ResponseField name="Protected Action" type="concept">
+  An Action subject to AtlaSent governance or enforcement. A Protected Action
+  is not a synonym for Action Class.
+</ResponseField>
 
-<Accordion title="Fail-Closed">
-  The system's default safety posture: when authorization is uncertain — no published bundle, network error, timeout, or malformed response — the action does not execute. Atlasent never resolves uncertainty in the caller's favor. Controlled by `fail_mode: closed` on each action class. The opposite (`fail_mode: open`) exists but requires explicit risk acceptance.
-</Accordion>
+<ResponseField name="Protected Class" type="metadata">
+  Binary enforcement-classification metadata. It is not Action Type identity
+  and is not an Action Class.
+</ResponseField>
 
-<Accordion title="Audit Chain">
-  The per-org, append-only, SHA-256 hash-linked sequence of audit events. Every evaluation — allow or deny — produces one entry, written before Atlasent returns a response. Entries are Ed25519-signed and exportable as a self-contained bundle that any auditor can verify offline. Avoid calling it a "log," "trail," or "history" in formal contexts — "Audit" or "Audit Chain" is the canonical term.
-</Accordion>
+<ResponseField name="Resource / Target" type="primitive">
+  The governed object whose state may be affected. Public request surfaces
+  commonly use **Target**; normalized internal representations may use
+  **Resource**.
+</ResponseField>
 
-<Accordion title="Proof">
-  A single row in the audit chain. Carries the canonical decision object, the chain hash link, and the signature. Multiple proof rows are exported together as a **proof bundle** for compliance evidence. The `permit_id` in a proof row is the link back to your system of record.
-</Accordion>
+<ResponseField name="Context" type="primitive">
+  Current request or state inputs that are not themselves Authority or Policy,
+  such as environment, resource state, transaction facts, timing, or other
+  evaluated conditions.
+</ResponseField>
 
-<Accordion title="Rule Engine">
-  The deterministic, stateless function that evaluates a request against a bundle's rule set and returns a Decision. It runs first-match evaluation from top to bottom; if no rule matches, it returns `deny` by default. The rule engine is identical across the TypeScript and Python SDKs and the server-side implementation — the same canonical source is used in all three.
-</Accordion>
+## Authority and decision
 
-<Accordion title="Wire Surface">
-  The set of HTTP endpoints, request schemas, and response shapes that external callers depend on. Atlasent's public wire surface is versioned under `/v1/*` and documented in `openapi.yaml`. Breaking changes require a deprecation cycle. When the SDK calls `protect()`, it is orchestrating calls to the wire surface — the SDK is a thin convenience layer, not an alternative to it.
-</Accordion>
+<ResponseField name="Authority" type="primitive">
+  Standing organizational right to cause a class of change.
+</ResponseField>
 
-## Terms to avoid
+<ResponseField name="Authorization" type="primitive">
+  The per-request determination of whether this exact Action may proceed now.
+</ResponseField>
 
-| Don't say | Say instead |
+<ResponseField name="Approval" type="evidence">
+  Verified approver input satisfying a required condition. Approval is an input
+  to Authorization; it is not itself standing Authority, the final
+  Authorization determination, or proof that Execution occurred.
+</ResponseField>
+
+<ResponseField name="Delegation" type="primitive">
+  A scoped transfer of Authority subject to applicable constraints such as
+  role, time, resource, Action Type/Class, threshold, or Policy.
+</ResponseField>
+
+<ResponseField name="Assertion" type="evidence">
+  A verified governance fact consumed by Evaluation. A caller-supplied claim
+  does not become a trusted Assertion merely because it was supplied.
+</ResponseField>
+
+<ResponseField name="Evaluation" type="operation">
+  The deterministic operation that evaluates the request against current
+  Authority, Policy, required Assertions/approvals, Resource, Context, and other
+  applicable conditions.
+</ResponseField>
+
+<ResponseField name="Decision" type="primitive">
+  The runtime outcome of Evaluation: `allow`, `deny`, `hold`, or `escalate`.
+  A Decision is not Approval. An `allow` Decision does not prove that Execution
+  occurred.
+</ResponseField>
+
+<ResponseField name="allow" type="decision">
+  The request satisfies the evaluated Authorization conditions. A Permit may be
+  issued for the bounded execution context.
+</ResponseField>
+
+<ResponseField name="deny" type="decision">
+  The request is not authorized under the applicable evaluated conditions. No
+  Permit authorizes execution on that Decision.
+</ResponseField>
+
+<ResponseField name="hold" type="decision">
+  The request is not yet authorized because a required condition, state, or
+  evidence item remains outstanding.
+</ResponseField>
+
+<ResponseField name="escalate" type="decision">
+  Additional authority, review, or evidence is required before the request can
+  become authorized.
+</ResponseField>
+
+## Policy and enforcement
+
+<ResponseField name="Policy" type="primitive">
+  Versioned rules defining conditions under which Authority may permit an
+  Action. Policy is not itself Authority.
+</ResponseField>
+
+<ResponseField name="Policy Bundle" type="primitive">
+  A published runtime snapshot of Policy rules used for Evaluation.
+</ResponseField>
+
+<ResponseField name="Instrument" type="concept">
+  The conceptual portable artifact embodying a positive Authorization. The
+  current runtime/wire implementation uses **Permit** as the concrete species.
+</ResponseField>
+
+<ResponseField name="Permit" type="primitive">
+  The current runtime/wire artifact implementing a positive Authorization for a
+  bounded execution context. A Permit is verified immediately before execution.
+  It is not standing Authority and is not the durable Evidence record.
+</ResponseField>
+
+<ResponseField name="Gate" type="primitive">
+  The enforcement point with practical ability to withhold or constrain the
+  native effect until required authorization conditions are satisfied. A Gate
+  is not a Policy engine.
+</ResponseField>
+
+<ResponseField name="Verification" type="operation">
+  The point-in-time check that a Permit is authentic, current, appropriately
+  bound, unexpired, unrevoked, and unreplayed for the execution attempt. The
+  current public operation is `POST /v1-verify-permit`.
+</ResponseField>
+
+<ResponseField name="Fail-closed" type="posture">
+  An enforcement posture in which a governed action does not proceed through
+  the protected path when required authorization or verification cannot be
+  obtained. Apply this claim only to paths actually configured and tested for
+  fail-closed enforcement.
+</ResponseField>
+
+## Execution and evidence
+
+<ResponseField name="Execution" type="operation">
+  The native system's attempt to perform the Action. Execution is a separate
+  state from Authorization.
+</ResponseField>
+
+<ResponseField name="Native Effect" type="primitive">
+  The actual state change or side effect produced by the native execution
+  system. A Decision or Permit issuance alone does not prove the Native Effect
+  occurred.
+</ResponseField>
+
+<ResponseField name="Evidence" type="primitive">
+  The durable record connecting determination, Permit lifecycle, Verification,
+  Execution, and execution conformance/outcome.
+</ResponseField>
+
+<ResponseField name="Proof" type="primitive">
+  Cryptographically verifiable Evidence suitable for independent verification.
+  Proof is not a synonym for a Decision, Approval, Permit, or generic log line.
+</ResponseField>
+
+<ResponseField name="Audit chain" type="primitive">
+  The tamper-evident, hash-linked evidence history used to preserve integrity
+  and ordering. Prefer **tamper-evident** over **immutable** unless a stronger
+  storage claim is independently supported.
+</ResponseField>
+
+## Product packaging
+
+<ResponseField name="Safeguard" type="product">
+  Customer/product packaging around one or more Protected Actions. A Safeguard
+  can include Action Class configuration, Policy, gate requirements, authority
+  mapping, connectors/assertions, rollout/readiness material, and evidence. It
+  is not another authorization engine or a second action taxonomy.
+</ResponseField>
+
+<ResponseField name="Safeguard Pack" type="product">
+  A versioned mapping/reference package for a Safeguard, including Protected
+  Actions, gates, assertions/connectors, authority/onboarding, and
+  readiness/evidence material.
+</ResponseField>
+
+## Controlled distinctions
+
+| Do not collapse | Reason |
 |---|---|
-| Guarded action, intent, gated action | **Protected Action** |
-| Check, assess, gate (in UI copy) | **Evaluate** |
-| Token, grant, approval (for the issued artifact) | **Permit** |
-| Validate (for permit liveness) | **Verify** |
-| Log, trail, history | **Audit** or **Audit Chain** |
-| `require_approval` | **`hold`** or **`escalate`** (whichever applies) |
-| Ruleset, rule (top-level) | **Policy** |
-| Condition (informally) | **Constraint** |
+| Authority / Authorization | Authority is standing and scoped; Authorization is per request. |
+| Authority / Approval | Approval can satisfy a condition; it does not automatically create standing Authority. |
+| Approval / Decision | Approval is an input; Decision is the evaluator's runtime outcome. |
+| Decision / Permit | Decision is the outcome; Permit is the bounded artifact issued on positive Authorization. |
+| Permit / Evidence | Permit is used for execution; Evidence is durable proof material. |
+| `allow` / Execution | `allow` does not prove the native effect occurred. |
+| Action Type / Action Class | Action Type is identity; Action Class is configuration. |
+| Action Class / Protected Class | One is configuration; the other is classification metadata. |
+| Gate / Policy | Policy defines conditions; Gate enforces at the execution point. |
+| Proof / log | Proof is cryptographically verifiable Evidence, not arbitrary logging. |
 
 ## Related
 
-- [Runtime Flow](/concepts/runtime-flow) — how these primitives connect in the four-hop lifecycle.
-- [Policy](/concepts/policy) — bundles, rule evaluation order, and immutability.
-- [Permit](/concepts/permit) — the state machine and lifecycle in detail.
-- [Audit Chain](/concepts/audit-chain) — how proof rows are structured and verified.
+- [Execution-time authorization](/concepts/execution-time-authorization)
+- [Organizational authority](/concepts/organizational-authority)
+- [Consequential computational actions](/concepts/consequential-computational-actions)
+- [Authority vs. authorization vs. approval vs. access](/concepts/authority-vs-authorization)
+- [Permit](/concepts/permit)
+- [Runtime flow](/concepts/runtime-flow)

@@ -1,0 +1,216 @@
+---
+title: "Proof verification"
+description: "How AtlaSent makes audit trails tamper-evident, and how to verify a proof bundle offline using only the bundle, a public key, and the algorithm on this page."
+---
+{/* Generated from the Atlasent docs source (site/concepts/proof-verification.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+This page is the canonical reference for operators, auditors, and
+pilot customers who need to confirm — without trusting AtlaSent at
+the moment of verification — that a stored decision was issued, in
+the order claimed, and has not been altered.
+
+<Note>
+  This page covers the **proof chain** exported by `GET /v1/proofs/export`
+  (bundle schema `atlasent.proof-bundle.v1`). It is a separate chain from the
+  **audit-chain export**, which uses a different hash construction (a
+  zero-hash genesis rather than the `GENESIS` sentinel below) and is verified
+  with the `atlasent-audit-verify` CLI. For that export, see
+  How to verify your audit chain. Do not apply one chain's
+  algorithm to the other's export.
+</Note>
+
+## What a proof is
+
+Every call to `/v1/evaluate` produces a row
+in the per-org `proofs` chain. Each row is signed and linked to the
+previous row. The row carries the fields needed to reconstruct what
+was decided and why.
+
+| Field | Meaning |
+|---|---|
+| `proof_id` | `prf_…` identifier for this row |
+| `org_id` | Organization the proof belongs to |
+| `decision_id` | Stable ID of the underlying decision |
+| `permit_id` | Permit issued by the decision (nullable) |
+| `decision` | `allow` \| `deny` \| `hold` \| `escalate` |
+| `policy_id`, `policy_version` | Policy that produced the decision |
+| `risk_score`, `risk_level` | Risk classification at evaluation time |
+| `payload_hash` | `sha256:…` over the canonical request payload |
+| `previous_audit_hash` | Chain link to the prior proof in this org |
+| `audit_hash` | This row's chain hash |
+| `signature` | Ed25519 signature over the canonical envelope |
+| `signing_key_id` | Key ID hint for signature verification |
+| `evaluated_at`, `created_at` | Timestamps |
+
+The chain is **per-org**: each organization has its own independent
+sequence, serialized by an advisory lock at insert time.
+
+## Algorithms
+
+| Property | Value |
+|---|---|
+| Hash | SHA-256, hex-encoded, lowercase, 64 chars |
+| Canonicalization | RFC 8785 JCS-compatible — sorted keys, no whitespace, `undefined` → `null` |
+| Signature | Ed25519 (RFC 8037 / IANA `EdDSA`) |
+| Signature encoding | base64url, no padding |
+| Genesis sentinel | `previous_audit_hash = "GENESIS"` for the first row in an org |
+
+## Chain hash
+
+For each new proof:
+
+```
+canonical_payload = JCS(envelope_without_signature)
+audit_hash        = SHA256( previous_audit_hash || "|" || canonical_payload )
+```
+
+`previous_audit_hash` is the prior row's `audit_hash` for the same
+org, or the literal `GENESIS` for the first row. The `|` byte is
+included as a domain separator.
+
+The envelope hashed is the full proof minus `signature` and
+`signing_key_id`:
+
+```
+{ proof_id, org_id, permit_id, payload_hash,
+  decision_id, actor, intent, action, resource, context,
+  decision, risk_score, risk_level,
+  policy_id, policy_version, evaluated_at }
+```
+
+## Signature
+
+The same canonical envelope above is signed with an Ed25519 key. The
+operator-visible artifact is `signature` (base64url) plus a
+`signing_key_id` to disambiguate during key rotation.
+
+Public keys are bundled with every proof export under `signing_keys[]`
+as PEM, with `created_at` and `retired_at` for rotation history.
+
+When verifying, try keys in order; a single match is sufficient.
+Retired keys remain valid for proofs issued before their `retired_at`.
+
+## Proof bundles
+
+`GET /v1/proofs/export` returns a self-contained bundle:
+
+```json
+{
+  "manifest": {
+    "schema": "atlasent.proof-bundle.v1",
+    "org_id": "org_…",
+    "generated_at": "2026-05-06T12:00:00Z",
+    "count": 1234,
+    "algorithms": { "hash": "sha256", "signature": "ed25519" }
+  },
+  "signing_keys": [
+    {
+      "key_id": "sk_…",
+      "algorithm": "ed25519",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\n…\n-----END PUBLIC KEY-----",
+      "created_at": "…",
+      "retired_at": null
+    }
+  ],
+  "proofs": [ /* the rows described above */ ]
+}
+```
+
+A bundle is durable: an auditor can archive the JSON today and
+re-verify it years later using only the embedded public key(s) and
+the algorithm in this document. No call back to AtlaSent is required.
+
+## Verification recipe
+
+For each proof in order of `created_at`:
+
+1. **Re-canonicalize the envelope** — the proof minus `signature` and
+   `signing_key_id` — using JCS sorted-key JSON.
+2. **Recompute the chain hash**:
+   `expected = SHA256(previous_audit_hash || "|" || canonical)`.
+   The first proof uses `previous_audit_hash = "GENESIS"`. Compare to
+   the stored `audit_hash`.
+3. **Check the link**: this proof's `previous_audit_hash` must equal
+   the prior proof's `audit_hash`.
+4. **Verify the signature**: Ed25519-verify `signature` against
+   `canonical` using the public key matching `signing_key_id` from
+   `signing_keys[]`. Try other keys if the hint misses (rotation).
+5. **Sanity-check the payload**: `payload_hash` must match
+   `^sha256:[0-9a-f]{64}$`; `policy_version` must be non-empty.
+
+A bundle is `valid` only if every proof passes every step.
+
+## Server-side `verifyProof` response
+
+When the engine runs the same checks via `POST /v1/proofs/{id}/verify`,
+the response uses the canonical verification envelope shared by
+`/v1/permits/{id}/verify` and `/v1/audit/verify`. Pin to `valid` and
+`evidence.*` for new code; the legacy `proof_id` / `status` / `checks`
+/ `failure_reasons` fields are preserved at the top level for
+backward compatibility.
+
+```json
+{
+  "valid": true,
+  "verification_type": "proof",
+  "reason": null,
+  "verified_at": "2026-05-07T01:00:00.000Z",
+  "evidence": {
+    "proof_id": "prf_…",
+    "checks": {
+      "signature": true,
+      "auditChain": true,
+      "payloadBinding": true,
+      "permitMatch": true
+    },
+    "failure_reasons": []
+  },
+  /* legacy fields preserved at top level */
+  "proof_id": "prf_…",
+  "status": "valid",
+  "checks": { /* … */ },
+  "failure_reasons": []
+}
+```
+
+## Reference verifier
+
+You can implement the recipe above in any language with an Ed25519
+library and a JCS canonicalizer. The server-side
+`POST /v1/proofs/{id}/verify` endpoint runs the same checks and is useful
+for cross-checking your own implementation.
+
+## Known limits
+
+These are documented openly so pilot customers can plan around them:
+
+<Warning>
+  **`execution_hash` is not yet populated.** The field exists in the
+  schema for the eventual binding of *what was actually executed* to
+  the issuing permit, but the binding happens outside the proof chain
+  today. The integrity of the *decision* is unaffected.
+</Warning>
+
+- **v2 proof schema is in flight.** Field ordering for v2 envelopes
+  will be locked at the v2-stable cut. v1 proofs and the algorithm
+  on this page are stable.
+- **Genesis sentinel is a literal string.** `"GENESIS"`, not a zero
+  hash. Verifiers must special-case it.
+
+## Threat model in one paragraph
+
+A reader who holds a proof bundle and any historical public key from
+`signing_keys[]` can detect: any modification to a decision after the
+fact (signature break), any reordering or deletion of decisions
+(chain-link break), any forgery without the private key (signature
+break), and any drift in the policy version that produced a decision
+(envelope break). The reader does not need to trust the AtlaSent API
+or database at the moment of verification.
+
+## Related
+
+- [Audit chain](/concepts/audit-chain) — the append-only model.
+- [Quickstart → Export the audit bundle](/quickstart/audit-export) —
+  the operator command.
+- [Governed close operations](/runbooks/governed-close-operations) —
+  end-to-end pilot workflow that uses this proof.

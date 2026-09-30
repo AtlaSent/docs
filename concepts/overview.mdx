@@ -1,74 +1,109 @@
 ---
-title: "How Atlasent's execution-time authorization model works"
-sidebarTitle: "Overview"
-description: "A guide to Atlasent's six authorization primitives and the evaluate → permit → verify → execute → audit sequence that connects them."
+title: "Core Concepts"
+description: "The controlled concepts behind AtlaSent: verified identity, organizational authority, execution-time authorization, permits, gates, execution, effect, and proof."
 ---
+{/* Generated from the Atlasent docs source (site/concepts/overview.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Atlasent is an execution-time authorization platform: before any high-impact action runs, Atlasent evaluates the actor, the action, and the surrounding context against your policies, issues a single-use signed permit if the decision is `allow`, and writes a tamper-evident audit entry — regardless of the outcome. You get a complete, compliance-ready record of every decision your system makes.
+AtlaSent provides **authorization for consequential computational actions**.
+Its core mechanism is **execution-time authorization**: determining whether an
+exact consequential action is organizationally authorized under current
+conditions before the governed effect occurs.
 
-## The six primitives
+The distinction to keep in mind throughout these docs is:
+
+> **Verified identity tells AtlaSent who or what is acting. It does not tell AtlaSent what the organization authorizes that Actor to do.**
 
 <CardGroup cols={2}>
-  <Card title="Policies" icon="scroll" href="/concepts/policy">
-    Versioned rule bundles that map action types to decisions. Every evaluation loads the active published bundle for your org and action type.
+  <Card title="Verified Actor Identity" icon="fingerprint" href="/concepts/verified-actor-identity">
+    How AtlaSent establishes the Actor from an authoritative identity source without treating identity as authority.
   </Card>
-  <Card title="Permits" icon="ticket" href="/concepts/permit">
-    Single-use, Ed25519-signed tokens issued only when evaluation returns `allow`. A permit authorizes exactly one execution and expires after 15 minutes.
+  <Card title="Execution-time authorization" icon="shield-check" href="/concepts/execution-time-authorization">
+    The fresh per-request authorization determination made at the execution boundary.
   </Card>
-  <Card title="Audit Chain" icon="link" href="/concepts/audit-chain">
-    An append-only, SHA-256 hash-linked, Ed25519-signed record of every decision — allow or deny. Exportable and offline-verifiable for compliance evidence.
+  <Card title="Organizational authority" icon="building-shield" href="/concepts/organizational-authority">
+    The standing, scoped organizational right to cause or approve a class of change.
   </Card>
-  <Card title="Deny Codes" icon="ban" href="/concepts/deny-codes">
-    Stable machine-readable codes that explain why Atlasent blocked an action. Safe to branch on in dashboards, alerting rules, and routing logic.
+  <Card title="Consequential computational actions" icon="bolt" href="/concepts/consequential-computational-actions">
+    The actions whose effects may require explicit authority, policy, evidence, or enforcement.
   </Card>
-  <Card title="Runtime Flow" icon="arrow-right-arrow-left" href="/concepts/runtime-flow">
-    The four-hop lifecycle — evaluate, mint permit, verify, execute — including the fail-closed matrix and the trust boundary that separates Atlasent from your code.
-  </Card>
-  <Card title="Glossary" icon="book" href="/concepts/glossary">
-    Canonical definitions for every term Atlasent uses: Action Type, Actor, Bundle, Permit, Consume, Fail-Closed, and more.
+  <Card title="Identity, authority, authorization, approval, and access" icon="scale-balanced" href="/concepts/authority-vs-authorization">
+    Why these concepts — plus Permit, Execution, Effect, and Proof — must not be collapsed.
   </Card>
 </CardGroup>
 
-## The authorization sequence
+## The controlled lifecycle
 
-Every protected action follows the same five-step path:
+```text
+Verified Actor Identity
+        ↓
+Organizational Authority
+        +
+Policy + Assertions + required Approval + current Context
+        ↓
+Evaluation → Authorization Decision
+        ↓ allow only, when Permit required
+Permit Issued
+        ↓
+Permit Verification at Gate
+        ↓
+Native Execution
+        ↓
+Observed Effect
+        ↓
+Evidence
+        ↓
+Verified Proof (only where verification establishes it)
+```
 
-1. **Evaluate** — your code calls `protect()` (or `with_permit()`) with the actor, action type, and context. Atlasent runs the policy engine and reaches a decision.
-2. **Permit** — if the decision is `allow`, Atlasent mints a `pt_…` permit token, signs it with your org's Ed25519 key, and returns it to the SDK.
-3. **Verify** — the SDK immediately calls `POST /v1/verify-permit` to confirm the permit is still valid, unconsumed, and correctly signed. This step closes the window between mint and execute.
-4. **Execute** — control returns to your code. The action runs. You store the `permit_id` alongside your own record to keep the audit trail two-way navigable.
-5. **Audit** — every evaluation and every verification lands in the immutable audit chain before Atlasent returns a response. The record exists for allow *and* deny decisions.
+This is a semantic ladder, not a claim that every integration exercises every rung. Each stage must remain explicit: `allow` is not a Permit; a Permit is not Verification; Verification is not Execution; Execution is not Effect; Evidence is not automatically Verified Proof.
 
-<Note>
-  The audit entry is written **before** Atlasent returns a response. You always have a record, even if the caller crashes after receiving the decision.
-</Note>
-
-## Two layers, kept separate
-
-When you read Atlasent code and docs you will encounter two distinct layers. They are not interchangeable.
+## Product/runtime nouns
 
 <CardGroup cols={2}>
-  <Card title="Execution-boundary authorization" icon="shield">
-    The contract that **no action runs without a verified permit**. Identical across languages, identical across surfaces, identical on the wire. Non-negotiable, non-bypassable, audit-bearing.
-
-    **Canonical surfaces:** `protect()`, `with_permit()` / `withPermit()`, `require_permit()` / `requirePermit()`.
-
-    Pin your security and compliance claims here.
+  <Card title="Action class" icon="list-tree" href="/concepts/action-class">
+    The organization-specific runtime governance/configuration object for an Action Type.
   </Card>
-  <Card title="SDK guard / helper ergonomics" icon="puzzle-piece">
-    Convenience layers on top — framework decorators, middleware, integration wrappers. They make the canonical surface ergonomic in a given runtime. They do **not** relax the contract.
-
-    **Examples:** `@atlasent_guard` (Flask / FastAPI), LangChain / LlamaIndex / MCP guards, browser guards.
-
-    Pin ergonomics claims here, not security claims.
+  <Card title="Policy" icon="scroll" href="/concepts/policy">
+    Versioned rules defining conditions under which Authority may permit an Action.
+  </Card>
+  <Card title="Permit" icon="ticket" href="/concepts/permit">
+    The bounded runtime artifact carrying a positive Authorization to an execution boundary.
+  </Card>
+  <Card title="Runtime flow" icon="route" href="/concepts/runtime-flow">
+    How Evaluation, Permit verification, execution, observed effect, and evidence connect end to end.
+  </Card>
+  <Card title="Proof verification" icon="file-shield" href="/concepts/proof-verification">
+    How Evidence becomes independently verifiable Proof for the properties actually checked.
+  </Card>
+  <Card title="Approval" icon="user-check" href="/concepts/approval">
+    Verified approver input that may satisfy a required condition; not itself final Authorization.
   </Card>
 </CardGroup>
 
-The permit is the canonical artifact across both layers. Any surface that claims to authorize an action without producing or verifying a permit is not an Atlasent execution-boundary call.
+## Distinctions that must remain intact
+
+- **Identity ≠ Authority**
+- **Authority ≠ Authorization**
+- **Authority ≠ Approval**
+- **Approval ≠ Decision**
+- **Decision ≠ Permit**
+- **Permit ≠ Verification**
+- **Verification ≠ Execution**
+- **Execution ≠ Effect**
+- **Evidence ≠ Verified Proof**
+- **`allow` ≠ Execution**
+- **Action Type ≠ Action Class**
+- **Action Class ≠ Protected Class**
+- **Gate ≠ Policy**
+- **Proof ≠ generic log**
+
+For the complete controlled vocabulary, see the [Glossary](/concepts/glossary).
 
 ## Where to go next
 
-- **Building:** Start with [Runtime Flow](/concepts/runtime-flow) to understand the full request lifecycle before writing code.
-- **Reasoning about decisions:** Read [Policy](/concepts/policy) to understand how rules evaluate, then [Permit](/concepts/permit) for the token lifecycle.
-- **Compliance and security review:** [Audit Chain](/concepts/audit-chain) covers tamper evidence and framework mapping.
-- **Debugging a denial:** [Deny Codes](/concepts/deny-codes) lists every code with handling examples in TypeScript and Python.
+- **Understand identity:** [Verified Actor Identity](/concepts/verified-actor-identity).
+- **Understand the category:** [Execution-time authorization](/concepts/execution-time-authorization) → [Organizational authority](/concepts/organizational-authority).
+- **Understand the governed object:** [Consequential computational actions](/concepts/consequential-computational-actions).
+- **Understand the distinctions:** [Identity vs. authority vs. authorization vs. approval vs. access](/concepts/authority-vs-authorization).
+- **Build:** [Quickstart — your first protected action](/quickstart/first-evaluation).
+- **Trace the runtime:** [Runtime flow](/concepts/runtime-flow) → [Permit](/concepts/permit) → [Proof verification](/concepts/proof-verification).

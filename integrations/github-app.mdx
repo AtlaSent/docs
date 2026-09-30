@@ -1,0 +1,98 @@
+---
+title: "GitHub App"
+description: "Install the AtlaSent GitHub App to get Check Run status checks on pull requests — not just webhook event delivery."
+---
+{/* Generated from the Atlasent docs source (site/integrations/github-app.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+The AtlaSent GitHub App provides richer GitHub integration than webhook-only delivery. Installing the App allows AtlaSent to create **Check Runs** directly on pull requests, giving your team a merge gate that shows pass/fail status inline in the GitHub PR UI.
+
+---
+
+## GitHub App vs. webhook-only
+
+| Capability | Webhook-only | GitHub App |
+|---|---|---|
+| Receive push / PR events | Yes | Yes |
+| Create Check Runs on PRs | No | **Yes** |
+| Block merge until check passes | No | **Yes** (via branch protection rules) |
+| Per-repository install granularity | No | **Yes** |
+| OAuth installation flow | No | **Yes** |
+
+If you only need to receive events from GitHub (for example, to trigger an evaluation when code is pushed), the webhook approach is sufficient. If you want AtlaSent to **show a status check on each PR** and optionally block merge until the check passes, install the GitHub App.
+
+---
+
+## How Check Runs work
+
+| PR event | Check Run state |
+|---|---|
+| PR opened or a commit is pushed to an open PR | `queued` — the evaluation is in progress. |
+| Evaluation completes with `allow` | `success` — the check passes. |
+| Evaluation completes with `deny` | `failure` — the check fails. |
+| Evaluation returns `hold` or `escalate` | `action_required` — waiting for human approval. |
+
+Check Runs appear in the **Checks** tab of the PR and in the merge status section at the bottom of the Conversation tab.
+
+---
+
+## Installing the GitHub App
+
+### Step 1: Open the GitHub integration page
+
+In the AtlaSent Console, navigate to **Integrations → GitHub** (`/integrations/github`).
+
+### Step 2: Click "Install GitHub App"
+
+Click the **Install GitHub App** button. You are redirected to GitHub to authorize the installation.
+
+### Step 3: Select repositories
+
+On the GitHub authorization page, choose:
+- **All repositories** in the selected organization, or
+- **Only select repositories** — pick the specific repos where AtlaSent should create Check Runs.
+
+Click **Install & Authorize**.
+
+### Step 4: OAuth callback completes automatically
+
+GitHub redirects back to the AtlaSent Console, which completes the installation and associates it with your org. You should see a confirmation message and the connected GitHub organization listed on the integrations page.
+
+No further configuration is required. AtlaSent begins creating Check Runs on new PRs immediately.
+
+---
+
+## Blocking merge via branch protection
+
+To require the AtlaSent check before merge:
+
+1. In GitHub, go to the repository → **Settings → Branches → Branch protection rules**.
+2. Add or edit the rule for your target branch (e.g., `main`).
+3. Enable **Require status checks to pass before merging**.
+4. In the search box, type `AtlaSent` and select the AtlaSent check (named `AtlaSent: <action class name>`).
+5. Save the rule.
+
+---
+
+## Uninstalling the GitHub App
+
+1. In the AtlaSent Console, navigate to **Integrations → GitHub**.
+2. Click **…** → **Uninstall** next to the connected organization.
+3. Confirm the dialog.
+
+AtlaSent stops creating Check Runs immediately. Existing Check Runs on open PRs remain visible in GitHub history but will not be updated.
+
+To complete the uninstall on GitHub's side, go to **GitHub → Settings → Applications → Installed GitHub Apps** and uninstall the AtlaSent app from there.
+
+---
+
+## Troubleshooting
+
+| Symptom | Likely cause | Resolution |
+|---|---|---|
+| Check Run not appearing on new PRs | App not installed on the repository | Check **Integrations → GitHub** and verify the repo is in scope |
+| Check Run stuck in `queued` | Evaluation is waiting for approval | Check the Approvals queue; the Check Run updates when the decision is resolved |
+| `action_required` but no Slack message | Slack approval bot not configured | Set up the [Slack Approval Bot](/integrations/slack-approval-bot) to route hold decisions |
+| OAuth callback fails | Popup blocked or session expired | Retry from **Integrations → GitHub → Install GitHub App** |
+| AtlaSent does not have permission to create checks | App not installed with correct permissions | Uninstall and reinstall the app, granting `Checks: Read & write` permission |
+
+For persistent issues, contact [support@atlasent.io](mailto:support@atlasent.io) with your org ID and the GitHub organization name.

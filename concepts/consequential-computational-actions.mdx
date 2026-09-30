@@ -1,0 +1,117 @@
+---
+title: "What Is a Consequential Computational Action?"
+description: "A consequential computational action can produce a material organizational effect and may require explicit authority, policy conditions, evidence, or enforcement before execution."
+---
+{/* Generated from the Atlasent docs source (site/concepts/consequential-computational-actions.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+A **consequential computational action** is a computational action capable of
+producing a material organizational effect such that the organization may
+require explicit authority, policy conditions, evidence, or enforcement before
+execution.
+
+AtlaSent focuses on the **action**, not on whether the actor happens to be human
+or AI.
+
+A human administrator, service, workflow, integration, or AI agent can all
+attempt the same consequential action. The authorization question should follow
+the action and its effect.
+
+## What can make an action consequential?
+
+An action can be consequential because it changes or affects, for example:
+
+- production systems or infrastructure;
+- privileged access or identity configuration;
+- money or financial records;
+- regulated or sensitive data;
+- clinical or quality-system state;
+- customer-facing configuration;
+- integrations or credentials;
+- legal, compliance, or control-relevant records;
+- a system's ability to perform further actions.
+
+Consequence is contextual. The same operation can be routine in one environment
+and consequential in another because the resource, payload, amount, environment,
+actor, timing, or policy is different.
+
+## Consequential Action vs. Protected Action
+
+**Consequential computational action** is category and explanatory language.
+
+A **Protected Action** is an Action that has actually been placed under AtlaSent
+governance or enforcement in a product/runtime configuration.
+
+```text
+possible Action
+    ↓
+identified as consequential for the organization/use case
+    ↓
+canonical Action Type
+    ↓
+organization-specific Action Class configuration
+    ↓
+Protected Action under AtlaSent governance/enforcement
+```
+
+Do not use **Protected Action**, **Action Type**, and **Action Class** as
+synonyms:
+
+- **Action Type** identifies what kind of action is being attempted.
+- **Action Class** is the configured governance object for that Action Type.
+- **Protected Action** is an Action subject to AtlaSent governance/enforcement.
+
+## Examples
+
+Illustrative consequential-action families include:
+
+| Family | Example question |
+|---|---|
+| Production change | Is this actor authorized to deploy this exact change to production now? |
+| Access change | Is this principal authorized to grant this privilege to this target now? |
+| Data release | Is this actor authorized to export this dataset to this destination under current policy? |
+| Financial operation | Is this actor authorized to release this payment or post this material entry now? |
+| Clinical operation | Is this actor authorized to perform this controlled trial or unblinding action under the applicable conditions? |
+| Agent tool action | Is this AI-triggered tool invocation organizationally authorized for this resource and context? |
+
+These examples describe the category. A specific integration or enforcement path
+should only be described as implemented, validated, or production-enforced when
+there is evidence supporting that status.
+
+## Why action-level authorization matters
+
+Subject-level permissions are often too coarse for consequential operations.
+
+A role such as `admin`, `developer`, or `finance` may cover many technically
+possible actions. Organizational authority can be narrower:
+
+- only certain resources;
+- only particular environments;
+- only below a threshold;
+- only during an approved window;
+- only with separation of duties;
+- only when required evidence is current;
+- only for a specific payload or planned change.
+
+Execution-time authorization evaluates the **exact Action Instance** rather than
+assuming every action reachable by a role is organizationally authorized.
+
+## The language to remember
+
+> **AtlaSent provides authorization for consequential computational actions.**
+
+When you decide what to protect, ask two questions about each action:
+
+1. **Is this action consequential?**
+2. **If it is, what organizational authority and current conditions are required
+   before it executes?**
+
+<Card title="What is execution-time authorization?" icon="shield-check" href="/concepts/execution-time-authorization">
+  See how AtlaSent makes the per-request determination at the execution boundary.
+</Card>
+
+## Related concepts
+
+- [Organizational authority](/concepts/organizational-authority)
+- [Authority vs. authorization vs. approval vs. access](/concepts/authority-vs-authorization)
+- [What can AtlaSent authorize?](/concepts/what-can-atlasent-authorize)
+- [Runtime flow](/concepts/runtime-flow)

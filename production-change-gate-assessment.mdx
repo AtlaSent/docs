@@ -1,0 +1,113 @@
+---
+title: "Get Started with Deploy Gate"
+description: "The directive checklist for trying, connecting, proving, and activating AtlaSent Deploy Gate."
+sidebarTitle: "Get Started"
+---
+{/* Generated from the Atlasent docs source (site/production-change-gate-assessment.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# Get started with Deploy Gate
+
+Use this page as the handoff checklist. Start at Step 1 and do not skip the four-scenario proof.
+
+## Step 1 — Try the product
+
+[Create a free account](https://console.atlasent.io/auth/sign-up), then open **Sandbox** in the console.
+
+Run the guided authorization tour:
+
+1. Submit a protected action for evaluation.
+2. Observe the decision.
+3. Inspect the permit when the request is allowed.
+4. Verify the permit.
+5. Review the audit record.
+
+**Expected result:** you understand the request → decision → permit → verification → evidence loop.
+
+<Note>
+Sandbox never executes a customer system. It proves the AtlaSent authorization loop, not the readiness of your production topology.
+</Note>
+
+## Step 2 — Choose the implementation path
+
+Choose one path for the first production boundary:
+
+| Your change path | Select |
+|---|---|
+| GitHub Actions performs the deployment | **GitHub Actions** |
+| Gearset deploys to Salesforce | **Gearset → Salesforce** (by arrangement; not yet generally available) |
+| Salto changes or releases NetSuite configuration | **Salto → NetSuite** (by arrangement; not yet generally available) |
+
+Name one production owner and one technical owner. The production owner decides when enforcement may be activated. The technical owner controls the repository, workflow, target, secrets, and rollback procedure.
+
+## Step 3 — Connect
+
+Open [Connect Production Change](https://console.atlasent.io/production-change/connect?pack=production.deploy).
+
+Complete the guided steps:
+
+1. Create the org-scoped `production.deploy` protected action.
+2. Set the approver and organizational-authority requirements.
+3. Connect GitHub and bind the selected repository.
+4. Record the rollback plan and required evidence.
+5. Run the fail-closed rehearsal.
+
+**Expected result:** the Console reports the protected action as configured and shows only server-reported connector state.
+
+Do not send passwords, API keys, permit tokens, private keys, or production credentials by email or in a support request.
+
+## Step 4 — Configure the exact boundary
+
+Confirm these facts before acceptance testing:
+
+- requester and executor identities;
+- required approver roles and separation-of-duties rule;
+- repository and workflow;
+- target system, tenant/account, resource, and environment;
+- immutable artifact, revision, or payload identifiers;
+- change window and emergency rule;
+- rollback owner and rollback trigger;
+- evidence source for the execution result and observed effect.
+
+If any value can change between evaluation and execution, bind it in the permit context or refuse the execution until it is re-authorized.
+
+## Step 5 — Prove all four outcomes
+
+Run these cases on the selected non-production or customer-approved rehearsal boundary:
+
+| Scenario | Required result |
+|---|---|
+| Unauthorized request | Refused; no permit; no native mutation |
+| Missing required approval | Refused until the exact requirement is satisfied |
+| Exact authorized change | One verified permit authorizes one matching execution |
+| Changed or replayed work | Refused; re-authorization required |
+
+Review Verification History and the Audit Trail after every run. Record the decision ID, permit-verification outcome, execution result, and observed-effect evidence where available.
+
+**Stop if:** the native system changes on a refused request, the permit can be reused, changed context is accepted, evidence cannot be correlated, or the authorization path fails open.
+
+## Step 6 — Activate
+
+The production owner activates enforcement only after:
+
+- all four proof scenarios pass;
+- rollback has been rehearsed;
+- monitoring and support owners are named;
+- the exact target topology is documented;
+- the customer accepts the evidence; and
+- the selected subscription provides the required production capacity.
+
+After activation, use the Deploy Gate product home to operate the path:
+
+- **Decisions** — what AtlaSent decided and why
+- **Permits** — what exact execution was authorized
+- **Verification History** — whether the execution boundary accepted or refused the permit
+- **Audit Trail** — the reviewable history
+- **Readiness** — independently reported setup states
+
+## If the proof does not pass
+
+Keep the path in Sandbox, shadow, or the customer-approved rehearsal boundary. Fix the failed control and rerun only the affected case plus the exact-authorized and changed/replayed cases.
+
+Do not describe the path as production accepted until the customer-controlled evidence supports that claim.
+
+Return to Deploy Gate: product and plans for plans, product boundaries, and supported paths.

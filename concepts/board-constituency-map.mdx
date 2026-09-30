@@ -1,0 +1,195 @@
+---
+title: "The Board Constituency Map"
+sidebarTitle: "Board constituency map"
+description: "Boards ask how to create value from AI while protecting customers, employees, intellectual property, and shareholder interests. That question has a concrete answer: the inventory of consequential actions that cannot execute without authorization, grouped by who each one protects."
+mode: "wide"
+---
+{/* Generated from the Atlasent docs source (site/concepts/board-constituency-map.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## Boards stopped asking how much AI you are deploying.
+
+The question now put to executives is different:
+
+> How do we create enterprise value from AI while protecting customers,
+> employees, intellectual property, and shareholder interests?
+
+That question has a concrete answer, and it is not a maturity score. It is an
+inventory: **the consequential actions your organization will not let anything
+execute without authorization**, grouped by who each action protects.
+
+## The constraint is governance capacity, not model capability
+
+Organizations cap what they delegate to autonomous systems because the blast
+radius of a wrong action is unbounded — not because the models cannot do the
+work. Every action on this page is one you would otherwise have to keep a human
+in front of, and often not for the judgement. For the accountability.
+
+[Authorization at the execution boundary](/concepts/what-can-atlasent-authorize)
+raises that cap. The organization delegates the work and keeps the authority.
+For a board, that reframes the whole conversation: protection is not the tax on
+velocity, it is the precondition for it.
+
+## The four constituencies
+
+Every action below is a [canonical action](/protected-actions) carrying its own
+risk posture and AI-risk rating. Several protect more than one constituency;
+those carry an explicit note.
+
+<Tabs>
+  <Tab title="Customers (24)">
+    Can an autonomous system reach a customer, their data, their treatment, or their physical safety — and act — without the organization having authorized that exact consequence?
+
+    **24 protected actions.** AI-risk mix: 5 extreme, 18 high, 1 medium.
+
+    | Canon | Action | What it governs | Posture | AI risk |
+    |---|---|---|---|---|
+    | `ACT-0005` | `data.modify` | Data Modification | standard | Medium |
+    | `ACT-0007` | `data.import` | Data Import | high | High |
+    | `ACT-0008` | `data.delete` | Data Deletion | high | High |
+    | `ACT-0031` | `data.export` | Bulk Data Export *(also protects intellectual property)* | high | High |
+    | `ACT-0058` | `sensitive_data.access` | Sensitive Data Access | high | High |
+    | `ACT-0050` | `communication.external.send` | External Communication Send | high | High |
+    | `ACT-0013` | `content.publish` | Content Publication *(also protects intellectual property)* | high | High |
+    | `ACT-0027` | `healthcare.record.amend` | Patient Health Record Amendment | high | High |
+    | `ACT-0048` | `genomic.data.release` | Identifiable Genomic Data Release | critical | High |
+    | `ACT-0049` | `genomic.data.export` | Cross-Border Genomic Data Export | critical | High |
+    | `ACT-0017` | `service.suspend` | Service Suspension | high | High |
+    | `ACT-0018` | `service.resume` | Service Resumption | high | High |
+    | `ACT-0039` | `traffic.failover` | Traffic Failover | high | High |
+    | `ACT-0040` | `host.isolate` | Host Isolation | high | High |
+    | `ACT-0021` | `trial.unblinding.execute` | Clinical Trial Unblinding | critical | Extreme |
+    | `ACT-0023` | `trial.unblinding.emergency` | Emergency Clinical Trial Unblinding | critical | Extreme |
+    | `ACT-0022` | `trial.blinding.setup` | Clinical Trial Blind Establishment | high | High |
+    | `ACT-0051` | `trial.randomization.break` | Trial Randomization Code Break | high | High |
+    | `ACT-0046` | `trial.biomarker.reclassify` | Biomarker Result Reclassification | high | High |
+    | `ACT-0047` | `trial.biomarker.eligibility.override` | Biomarker Eligibility Override | critical | High |
+    | `ACT-0041` | `protocol.amend` | Clinical Protocol Amendment | critical | High |
+    | `ACT-0026` | `industrial.control.actuate` | Industrial Control Actuation | critical | Extreme |
+    | `ACT-0055` | `industrial.safety.bypass` | Safety Instrumented System Bypass *(also protects employees)* | critical | Extreme |
+    | `ACT-0056` | `industrial.controller.configure` | Industrial Controller Configuration | critical | Extreme |
+  </Tab>
+  <Tab title="Employees (9)">
+    When an action lands on a person's job, pay, or access, who authorized it? Accountability attaches to the authority that decided, not to the nearest human in the chain.
+
+    **9 protected actions.** AI-risk mix: 5 extreme, 2 high, 1 medium, 1 low.
+
+    | Canon | Action | What it governs | Posture | AI risk |
+    |---|---|---|---|---|
+    | `ACT-0042` | `employment.terminate` | Employment Termination | critical | High |
+    | `ACT-0043` | `compensation.change` | Compensation Change | high | Medium |
+    | `ACT-0009` | `access.grant` | Access Grant | critical | Extreme |
+    | `ACT-0010` | `access.revoke` | Access Revocation | critical | Extreme |
+    | `ACT-0028` | `identity.privileged.grant` | Privileged Access Grant | critical | High |
+    | `ACT-0032` | `security.breakglass` | Break-Glass Access *(also protects customers)* | critical | Extreme |
+    | `ACT-0011` | `control.override` | Control Override | critical | Extreme |
+    | `ACT-0003` | `workflow.approve` | Workflow Approval | standard | Extreme |
+    | `ACT-0019` | `workflow.escalate` | Workflow Escalation | standard | Low |
+  </Tab>
+  <Tab title="Intellectual property (11)">
+    Code, models, signing keys, and release pipelines are how proprietary work leaves the building. Each is a path an unauthorized action could take it out of.
+
+    **11 protected actions.** AI-risk mix: 2 extreme, 9 high.
+
+    | Canon | Action | What it governs | Posture | AI risk |
+    |---|---|---|---|---|
+    | `ACT-0002` | `artifact.release` | Artifact Release | high | High |
+    | `ACT-0033` | `release.create` | Release Creation | high | High |
+    | `ACT-0001` | `production.deploy` | Execute Authorized Change Plan *(also protects shareholder interests)* | high | High |
+    | `ACT-0034` | `production.rollback` | Production Rollback | high | High |
+    | `ACT-0030` | `model.promote` | Model Promotion *(also protects customers)* | critical | Extreme |
+    | `ACT-0014` | `identity.sign` | Identity Signature | critical | Extreme |
+    | `ACT-0038` | `secret.rotate` | Secret Rotation | high | High |
+    | `ACT-0057` | `secret.configuration.change` | Secret Configuration Change | high | High |
+    | `ACT-0036` | `infrastructure.change` | Infrastructure Change | high | High |
+    | `ACT-0035` | `database.migrate` | Database Migration | high | High |
+    | `ACT-0029` | `agent.tool.invoke` | Agent Tool Invocation *(also protects all four)* | high | High |
+  </Tab>
+  <Tab title="Shareholders (11)">
+    Money movement, the ledger, and the certifications filed on top of it. These are the actions where an unauthorized execution becomes a material misstatement.
+
+    **11 protected actions.** AI-risk mix: 2 extreme, 4 high, 4 medium, 1 low.
+
+    | Canon | Action | What it governs | Posture | AI risk |
+    |---|---|---|---|---|
+    | `ACT-0024` | `finance.payment.authorize` | High-Value Payment Authorization | critical | High |
+    | `ACT-0025` | `finance.wire.transfer` | High-Value Wire Transfer | critical | Extreme |
+    | `ACT-0044` | `journal.post` | Journal Entry Posting | high | Medium |
+    | `ACT-0053` | `journal_entry.approve` | Journal Entry Approval | high | High |
+    | `ACT-0045` | `period.close` | Accounting Period Close | high | Medium |
+    | `ACT-0052` | `reconciliation.certify` | Reconciliation Certification | high | High |
+    | `ACT-0054` | `variance_review.escalate` | Variance Review Escalation | standard | Medium |
+    | `ACT-0020` | `compliance.certify` | Compliance Certification | critical | Extreme |
+    | `ACT-0016` | `resource.destroy` | Resource Destruction | critical | High |
+    | `ACT-0015` | `resource.create` | Resource Creation | standard | Low |
+    | `ACT-0037` | `feature.enable` | Feature Enablement | standard | Medium |
+  </Tab>
+</Tabs>
+
+## One action restates the board's old question
+
+<Note>
+  `agent.tool.invoke` (`ACT-0029`) governs the moment an autonomous agent
+  reaches for a tool. Because it is a protected action like any other, "how much
+  AI are we deploying?" stops being a number nobody can source and becomes a
+  governed count: how many agent invocations were authorized, under whose
+  authority, against which of the four constituencies.
+
+  It is also the only action that can land in all four at once — an agent
+  holding a tool can touch a customer record, an employee's access, a release
+  pipeline, and a payment. That makes it the first action to instrument, and the
+  one whose coverage figure a board should ask for by name.
+</Note>
+
+## What this map establishes — and what it does not
+
+The distinction matters more than the inventory. A register that overstates
+itself is worth less than no register, because a reader who finds one soft claim
+stops trusting the hard ones.
+
+<CardGroup cols={2}>
+  <Card title="What it establishes" icon="circle-check">
+    **The governable surface.** These are the canonical action records, each
+    with its own risk posture, AI-risk rating, and regulatory mappings.
+
+    **Coverage of all four constituencies.** Every group a board names has
+    actions defined against it — not one corner of the estate.
+
+    **A shared vocabulary.** Board, engineering, and audit can name the same
+    action with the same identifier.
+  </Card>
+  <Card title="What it does not establish" icon="circle-minus">
+    **That your organization has provisioned these.** A canonical action
+    existing is not the same as your policy carrying that action's
+    requirements.
+
+    **That the grouping is authoritative.** Assignment to one constituency is a
+    presentation choice; the canonical action catalog is the authority.
+
+    **That coverage equals enforcement.** What you actually enforce is a
+    separate, evidenced question — asked per action, and per execution path.
+  </Card>
+</CardGroup>
+
+<Warning>
+  Do not present this map to a board as deployed coverage. It describes what
+  AtlaSent can govern, not what any given organization has switched on. Your
+  real coverage figure comes from your own console, against your own
+  provisioned action classes — and the gap between the two is the honest
+  starting point for a board conversation, not something to paper over.
+</Warning>
+
+## The part a dashboard cannot supply
+
+Every vendor in this market can show a director a green screen. The harder
+question is whether the director has to believe it.
+
+An authorization record that is hash-linked, Ed25519-signed, and
+verifiable offline by a third party — without a
+network call, and without trusting the vendor that produced it — is the form of
+this claim that survives an adversarial audit. That, not the inventory above, is
+what turns governance discipline into a durable advantage.
+
+<Card title="Verify it yourself" icon="shield-check" href="/concepts/what-can-atlasent-authorize">
+  Start from the authorization surface: what AtlaSent authorizes, how a permit
+  binds to the exact execution plan, and what evidence the run leaves behind.
+</Card>

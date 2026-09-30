@@ -1,139 +1,70 @@
 ---
-title: "GxP change control policy templates and framework mapping"
-sidebarTitle: "GxP Change Control"
-description: "Implement GxP change control for pharmaceutical software using Atlasent. Covers ICH Q10, EU Annexes 11 and 15, 21 CFR Part 211, and GAMP 5."
+title: "GxP change control"
+description: "Change-control gates for regulated GxP systems — ICH Q10, Annex 11/15, 21 CFR 211, GAMP 5."
 ---
+{/* Generated from the Atlasent docs source (site/compliance/gxp-change-control.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-GxP change control governs how modifications to validated computerized systems are authorized, documented, and closed out. Uncontrolled changes to GxP systems are a leading cause of regulatory findings, and manual approval gates are easily bypassed when deployment pipelines move faster than quality processes. Atlasent enforces change-control authorization at execution time — a deployment cannot proceed without a valid permit, and every decision lands in the append-only audit chain with the full evaluation context attached.
+AtlaSent's `gxp:change-control` action class enforces change-control authorization gates for regulated systems, covering software validation lifecycle changes, infrastructure modifications, and manufacturing process updates.
 
-## Regulatory mapping
+## Requirement-to-primitive mapping
 
-The table below maps the key GxP change-control requirements to the Atlasent primitives that satisfy them.
-
-| Regulation | Requirement | Atlasent primitive |
+| Ref | Requirement | AtlaSent primitive |
 |---|---|---|
-| ICH Q10 §3.2 | Change management must assess impact and obtain required approvals | `qrb_status`, `approvals[]` context fields; QRB approval gate |
-| EU GMP Annex 15 §10 | Validation change control must document impact on validated state | `validation_impact`, `gamp_category` context fields |
-| EU GMP Annex 11 §10 | Changes to computerized systems must follow formal change control | `system_name`, `cfr_part_11_applicable` context fields |
-| 21 CFR 211.100 | Written procedures required for production and process controls | `change_type`, `risk_level` authorization |
-| GAMP 5 Chapter 8 | Risk-based approach to software change validation | `gamp_category`, `risk_level` routing |
-| 21 CFR Part 11 | Electronic record integrity for audit-controlled changes | `cfr_part_11_applicable` gate + audit chain |
+| ICH Q10 §3.2          | Change management must assess impact and obtain approvals | `qrb_status`, `approvals[]` required context; QRB approval gate. |
+| EU GMP Annex 15 §10   | Validation change control must document impact on validated state | `validation_impact`, `gamp_category` gates. |
+| EU GMP Annex 11 §10   | Changes to computerized systems must follow formal change control | `system_name`, `cfr_part_11_applicable` gates. |
+| 21 CFR 211.100        | Written procedures required for production and process controls | `change_type`, `risk_level` authorization. |
+| GAMP 5 Chapter 8      | Risk-based approach to software change validation | `gamp_category`, `risk_level` routing. |
+| 21 CFR Part 11        | Electronic record integrity for audit-controlled changes | `cfr_part_11_applicable` gate + audit chain. |
 
-## Key context fields
+## Starter templates
 
-You pass context fields in the `context` object of every `/evaluate` call. The fields below are required for GxP change-control evaluations — include all of them so your policy rules can make a fully-informed authorization decision.
+Apply the full Annex 15 guard:
+
+```json
+{ "pack_id": "gxp-change-control", "template_id": "annex-15-full-guard" }
+```
+
+Or the fast path for low-risk like-for-like changes:
+
+```json
+{ "pack_id": "gxp-change-control", "template_id": "like-for-like-fast-path" }
+```
+
+## Example evaluation context
 
 ```json
 {
-  "gamp_category": "4",
-  "risk_level": "high",
+  "system_name": "LIMS-v3",
+  "gamp_category": 5,
+  "change_type": "software_update",
+  "risk_level": "major",
   "qrb_status": "approved",
-  "validation_impact": "true",
-  "change_ticket_id": "CHG-2026-042"
+  "validation_impact": "revalidation_required",
+  "cfr_part_11_applicable": true,
+  "in_production_window": false,
+  "rollback_plan_verified": true,
+  "approvals": ["qa_head", "it_delegate", "site_qp"]
 }
 ```
-
-<Tip>
-  Set `change_ticket_id` to the identifier from your Change Management System. This links the Atlasent audit entry back to the change record and gives you a two-way traceability path for inspections.
-</Tip>
-
-## Policy templates
-
-### Full guard — high-risk changes
-
-Use the full guard template for any change where `gamp_category` is 4 or 5, `risk_level` is `high`, or `validation_impact` is `true`. This template requires both QRB approval and completed validation before issuing a permit.
-
-```json
-{
-  "action_type": "production.deploy",
-  "rules": [
-    {
-      "id": "require-qrb-approval",
-      "condition": { "context.qrb_status": { "ne": "approved" } },
-      "decision": "deny",
-      "deny_code": "DENY_AUTHORITY",
-      "message": "GxP: QRB approval required before deployment"
-    },
-    {
-      "id": "require-validation-complete",
-      "condition": {
-        "context.validation_impact": {
-          "eq": "true",
-          "and": { "context.validation_complete": { "ne": "true" } }
-        }
-      },
-      "decision": "hold",
-      "message": "GxP: Validation required for validation-impacting changes"
-    },
-    {
-      "id": "allow-approved",
-      "condition": {},
-      "decision": "allow"
-    }
-  ]
-}
-```
-
-### Like-for-like fast path — low-risk changes
-
-For low-risk like-for-like changes (GAMP category 1–3, `risk_level` is `minor`, `validation_impact` is `false`), you can use the fast-path template, which skips the QRB gate and routes directly to an expedited approval queue.
-
-```json
-{
-  "pack_id": "gxp-change-control",
-  "template_id": "like-for-like-fast-path"
-}
-```
-
-<Warning>
-  The fast path is only appropriate when your SOP explicitly classifies the change as like-for-like and your risk assessment confirms no impact on validated state. If in doubt, use the full guard template.
-</Warning>
 
 ## Implementation checklist
 
-<Steps>
-  <Step title="Register the change first">
-    Register the change in your Change Management System and obtain a `change_ticket_id` before calling Atlasent. The evaluation context must include this ID.
-  </Step>
-  <Step title="Populate GAMP category">
-    Set `gamp_category` according to GAMP 5 software categorization (1–5). Category 4 and 5 systems require the full guard template.
-  </Step>
-  <Step title="Set risk level">
-    Set `risk_level` to `minor`, `major`, or `critical` per your SOP. High risk levels trigger QRB-approval gates automatically.
-  </Step>
-  <Step title="Obtain QRB sign-off">
-    Obtain Quality Review Board sign-off before setting `qrb_status: "approved"` in the context. The approval gate denies any deployment where this field is absent or not equal to `"approved"`.
-  </Step>
-  <Step title="Confirm validation status">
-    If `validation_impact` is `true`, set `validation_complete: "true"` only after completing all required validation activities. The hold rule blocks deployment until both fields are set correctly.
-  </Step>
-  <Step title="Store the permit ID">
-    Store the `permit_id` on the change record in your CMS. This closes the traceability loop and provides the electronic record evidence required by 21 CFR Part 11.
-  </Step>
-</Steps>
+- [ ] Register the change in your CMS before calling AtlaSent.
+- [ ] Include your CMS change identifier in the evaluation context (for example `change_ticket_id`) so the audit entry links back to the change record.
+- [ ] Populate `gamp_category` per GAMP 5 (1–5).
+- [ ] Set `risk_level` to `minor`, `major`, or `critical` per SOP.
+- [ ] Obtain QRB sign-off; set `qrb_status: "approved"` before release.
+- [ ] Set `validation_impact` to `none`, `revalidation_required`, or `full_validation`.
+- [ ] Set `rollback_plan_verified: true` before production changes.
+- [ ] Store the permit ID on the change record.
+- [ ] Call `/v1/permits/{id}/verify` after apply/rollback to close the loop.
 
-## ISO 27001 A.12.1.2 crosswalk
+## ISO 27001 cross-walk
 
-The same GxP change-control policy template satisfies ISO 27001 change-management control A.12.1.2 when you supplement the context with an information classification tag and a security review ID.
+The same policy template satisfies the ISO 27001 change-management control A.12.1.2 when augmented with:
 
-| ISO 27001 control | Atlasent primitive |
-|---|---|
-| A.12.1.2 Change management | Deploy gate evaluation, audit evidence |
-| A.9.4.1 Information access restriction | API key scopes, RBAC roles |
-| A.12.4.1 Event logging | Append-only audit chain |
-| A.12.4.2 Protection of log information | Hash-linked entries, HMAC-signed permit tokens (GA); Ed25519 signatures when configured |
+- Information classification tag (`classification`)
+- Evidence of security review (`security_review_id`)
 
-<Note>
-  Add `classification` and `security_review_id` to your evaluation context to enable the ISO 27001 crosswalk. The `iso27001-change-mgmt` template in the `gxp-change-control` pack pre-configures these fields.
-</Note>
-
-## Related resources
-
-<CardGroup cols={2}>
-  <Card title="EU Annex 11" icon="syringe" href="/compliance/eu-annex-11">
-    EU Annex 11 §10 requirements for changes to computerized systems underpin the change-control gates on this page.
-  </Card>
-  <Card title="21 CFR Part 11" icon="flask" href="/compliance/21-cfr-part-11">
-    21 CFR Part 11 electronic-record requirements apply to the change records and audit evidence produced by these policy templates.
-  </Card>
-</CardGroup>
+See the `iso27001-change-mgmt` template in `gxp-starter`.

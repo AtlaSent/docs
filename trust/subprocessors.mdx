@@ -1,74 +1,58 @@
 ---
-title: "Atlasent sub-processors: who handles your customer data"
+title: "Sub-processors"
 sidebarTitle: "Sub-processors"
-description: "Every Atlasent sub-processor, their role, data handled, and location. Atlasent gives 30-day advance notice before adding or replacing sub-processors."
+description: "Every third party that processes Customer Personal Data on AtlaSent's behalf, with locations and cross-border transfer mechanisms. 30-day change notification."
 ---
-
-A sub-processor is any third party that Atlasent engages to process Customer Personal Data in connection with the Atlasent service. Atlasent discloses every sub-processor that handles customer data, along with the categories of data each one processes, and the region where that processing occurs. This page is the public record. If you are a customer with active data-residency requirements, email [privacy@atlasent.io](mailto:privacy@atlasent.io) to confirm the specific region for each relevant sub-processor in writing.
-
-## Current sub-processors
-
-| Sub-processor | Role | Data | Location |
-|---|---|---|---|
-| Supabase | Database and auth infrastructure | All customer data | us-east-1 (default) |
-| Vercel | Console hosting | Session tokens | Global CDN |
-| Cloudflare | DNS, WAF, edge | Request metadata | Global |
-| Stripe | Payment processing | Billing data only | Global |
-| Sentry | Error monitoring | Anonymized stack traces | US |
-| Anthropic | LLM (opt-in only) | Evaluation context (opt-in) | US |
-| OpenAI | LLM (opt-in only) | Evaluation context (opt-in) | US |
-| GitHub | Source code and CI/CD | Code only | US |
-| Google Workspace | Internal email and identity | Internal correspondence only — no customer governance data | Multi-region |
+{/* Generated from the Atlasent docs source (site/trust/subprocessors.mdx). Do not edit here: this file is overwritten on every publish. */}
 
 <Note>
-  Anthropic and OpenAI are used only for AI-assisted features within the Atlasent Console. These features are **opt-in** — if you do not enable them, no evaluation context is sent to either provider. Both providers operate under enterprise agreements with Atlasent that prohibit training on customer data. Atlasent targets zero data retention configuration on both providers; configuration status is verified at the annual LLM provider review.
+  The canonical, contractually-binding sub-processor list is available
+  on request from `legal@atlasent.io`. That document is incorporated by
+  reference into the AtlaSent DPA and MSA. This page is the buyer-friendly
+  summary; if the two disagree, the contractual list is authoritative.
 </Note>
 
-## LLM sub-processor handling
+## What a sub-processor is
 
-When you enable AI-assisted features in the Console, Atlasent may send evaluation context to Anthropic or OpenAI to generate suggestions. The following restrictions apply:
-
-- Atlasent does not send credentials, signing keys, or data classified as Restricted to any LLM provider.
-- Enterprise agreements with both providers prohibit use of customer data for model training.
-- You can disable LLM-assisted features at any time from **Console → Settings → AI Features**.
-- Disabling LLM features removes both Anthropic and OpenAI from your data flow immediately.
+A sub-processor is a third party AtlaSent engages to process Customer
+Personal Data in connection with the AtlaSent service. The categories of
+Customer Personal Data, processing location, and cross-border transfer
+mechanism for each sub-processor are documented at the canonical link
+above.
 
 ## Change notification
 
-Atlasent provides **at least 30 days' advance notice** before adding a new sub-processor or replacing an existing one that processes Customer Personal Data. Notice is sent to the email addresses you have registered for sub-processor notifications.
+We notify customers of any **addition** or **replacement** of a
+sub-processor processing Customer Personal Data **at least 30 days**
+before the change takes effect.
 
-If you object to a new sub-processor in good faith, you may terminate the affected service within the notice window without penalty for the unused portion of any pre-paid fees, per the DPA.
+Customers who object to a new sub-processor in good faith may terminate
+the affected service within the notice window without penalty for the
+unused portion of any pre-paid fees, per DPA §11.
 
-### Subscribe to change notifications
+## Subscribe to change notifications
 
-To receive sub-processor change notices, email [privacy@atlasent.io](mailto:privacy@atlasent.io) with the subject `Subscribe: sub-processor notices` and include the email address or addresses that should receive notices.
+- **Email** `subprocessors@atlasent.io` with subject `subscribe` and the
+  email address(es) that should receive notices.
+- *(Planned)* `https://trust.atlasent.io/subprocessors/subscribe` self-serve form.
 
-<Tip>
-  Enterprise customers should subscribe at least one address from their privacy, security, or procurement function, not just a personal inbox, to ensure continuity of notification if personnel change.
-</Tip>
+## Categories at a glance
 
-## Data categories processed
+| Category | Sub-processors involved (today) | Where to look |
+|---|---|---|
+| Core data plane (database, auth, storage) | Supabase | DPA Annex III row 1 |
+| Transactional email | Resend | DPA Annex III row 2 |
+| Subscription billing | Stripe | DPA Annex III row 3 |
+| Optional AI assistance (opt-in only) | Anthropic | DPA Annex III row 4 |
+| Console hosting | (See canonical list) | DPA Annex III row 5 |
+| DNS / DDoS / WAF | (See canonical list) | DPA Annex III row 6 |
+| Source code & CI (no Customer Personal Data) | GitHub | DPA Annex III row 7 |
 
-The table below summarizes the categories of Customer Personal Data that flow through Atlasent's systems and which sub-processors handle each category.
+For processing location, categories of Personal Data, and the transfer
+mechanism (EU SCCs Module 2 / Module 3 / UK IDTA), see the canonical list.
 
-| Data category | Sub-processors |
-|---|---|
-| Customer policies, evaluations, permits, audit entries | Supabase |
-| User account data (name, email, org membership) | Supabase, Vercel |
-| Session tokens | Vercel, Supabase |
-| Billing data | Stripe |
-| Error diagnostics (anonymized) | Sentry |
-| Evaluation context (opt-in AI features only) | Anthropic, OpenAI |
-| Request metadata (IP, headers for WAF) | Cloudflare |
-| Internal email and identity (staff only) | Google Workspace |
+## See also
 
-## Related resources
-
-<CardGroup cols={2}>
-  <Card title="Trust Center" icon="shield-check" href="/trust">
-    Overview of all Trust Center sections, including quick links for enterprise buyers.
-  </Card>
-  <Card title="Contact" icon="envelope" href="/trust/contact">
-    Email [privacy@atlasent.io](mailto:privacy@atlasent.io) to subscribe to change notices, request the DPA, or raise a sub-processor objection.
-  </Card>
-</CardGroup>
+- Canonical sub-processor list and Data Processing Agreement template:
+  available on request from `legal@atlasent.io`
+- Legal documents index

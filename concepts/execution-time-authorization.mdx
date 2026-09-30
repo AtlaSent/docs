@@ -1,0 +1,133 @@
+---
+title: "What Is Execution-Time Authorization?"
+description: "Execution-time authorization determines whether a consequential computational action is organizationally authorized at the execution boundary, before its effect occurs."
+---
+{/* Generated from the Atlasent docs source (site/concepts/execution-time-authorization.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**Execution-time authorization** is a per-request authorization determination
+made at the execution boundary, before a consequential computational action is
+allowed to produce its native effect.
+
+AtlaSent uses execution-time authorization to answer a question that identity,
+access, workflow, and post-hoc audit systems do not answer on their own:
+
+> **Does the organization authorize this exact action, by this actor, against
+> this resource, in this environment, under the authority, policy, approvals,
+> assertions, and operating facts in force right now?**
+
+That timing matters. A request can be authenticated, technically possible, and
+even previously approved while still being unauthorized under the conditions
+that exist when execution is attempted.
+
+## Why "execution-time" matters
+
+Authorization can become stale between request and execution.
+
+Examples include:
+
+- a delegation expires;
+- the target environment changes;
+- separation-of-duties conditions change;
+- a payload differs from the one reviewed;
+- a required approval is missing or no longer applicable;
+- policy changes;
+- the actor or execution principal changes;
+- a Permit expires, is revoked, or has already been consumed.
+
+Execution-time authorization evaluates the action under the conditions that
+matter **at the execution boundary**, not only when the request was created.
+
+## The AtlaSent lifecycle
+
+```text
+Intent / proposed Action
+        ↓
+Actor + Resource/Target + Context + trusted Assertions
+        ↓
+organizational Authority
+        ↓
+Policy
+        ↓
+Evaluation → Decision
+        ↓ allow only
+Permit
+        ↓
+Gate → Verification
+        ↓
+Execution → Native Effect
+        ↓
+Evidence / Proof
+```
+
+Commercial shorthand:
+
+`Intent → Authority → Policy → Evaluation → Permit → Verification → Execution → Evidence`
+
+An `allow` Decision is not proof that execution occurred. Authorization,
+verification, execution, and evidence are separate states.
+
+## How it differs from adjacent controls
+
+| System | Typical question | Execution-time authorization adds |
+|---|---|---|
+| IAM / RBAC | Who are you and what can you access? | Is this exact consequential action authorized now? |
+| Approval workflow | Did someone approve the request? | Is the current request still authorized after considering approval plus all other required conditions? |
+| Policy engine | What do these rules evaluate to? | Binding the positive determination to an execution attempt, enforcing it at a Gate, and preserving evidence. |
+| Observability / SIEM | What happened? | A control point before the governed effect, plus evidence connecting the decision to the outcome. |
+
+Execution-time authorization composes with these systems; it does not require
+replacing them.
+
+## Example: a production change
+
+Consider a production deployment. The engineer may have access to the
+repository and deployment system. A change request may already exist. A reviewer
+may already have approved it.
+
+Execution-time authorization can still evaluate, immediately before the governed
+deployment path proceeds:
+
+- the resolved Actor and execution principal;
+- the exact Action Type and target environment;
+- the current organizational Authority for that change class;
+- the applicable Policy and separation-of-duties rules;
+- the approved payload, commit, plan, or other binding evidence;
+- current required Assertions and state;
+- Permit validity and replay state at the Gate.
+
+If the required conditions are satisfied, a bounded Permit can be verified for
+the execution attempt. If the governed path is configured fail-closed and the
+Permit is invalid or absent, that path does not proceed.
+
+## Execution-time authorization is not "approval before execution"
+
+Approval may be required, but Approval is one input to Authorization.
+
+A complete model keeps these concepts separate:
+
+- **Authority** — standing organizational right to cause a class of change;
+- **Approval** — verified approver input satisfying a condition;
+- **Authorization** — per-request determination that this exact Action may
+  proceed now;
+- **Permit** — bounded runtime artifact implementing a positive Authorization;
+- **Verification** — point-in-time check of that Permit for the execution
+  attempt;
+- **Evidence / Proof** — durable record of what was decided, verified, and
+  executed.
+
+<Card title="Authority, authorization, approval, and access" icon="arrows-left-right" href="/concepts/authority-vs-authorization">
+  See the distinctions side by side.
+</Card>
+
+## The phrase to remember
+
+> **AtlaSent provides authorization for consequential computational actions.
+> Execution-time authorization is the mechanism.**
+
+Related concepts:
+
+- [Organizational authority](/concepts/organizational-authority)
+- [Consequential computational actions](/concepts/consequential-computational-actions)
+- [Permit](/concepts/permit)
+- [Runtime flow](/concepts/runtime-flow)
+- [Proof verification](/concepts/proof-verification)

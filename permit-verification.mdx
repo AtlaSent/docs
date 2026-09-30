@@ -1,0 +1,128 @@
+---
+title: "Permit Verification"
+description: "How single-use permit tokens prove every authorized action was explicitly allowed — and can be verified offline."
+sidebarTitle: "Permit Verification"
+---
+{/* Generated from the Atlasent docs source (site/permit-verification.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# Permit Verification
+
+When AtlaSent evaluates an action and returns `allow`, it issues a **permit token** — a cryptographically signed, single-use token that proves the authorization happened.
+
+The token must be verified before the action is considered complete. Verification confirms:
+
+1. The token was issued by AtlaSent (not forged)
+2. The token matches the action being performed (not replayed from a different request)
+3. The token hasn't been used before (not replayed from the same request)
+4. The token hasn't expired (1-hour TTL by default)
+
+If verification fails for any reason, the action should be treated as unauthorized.
+
+## The verification call
+
+```ts
+// client.evaluate()'s TS SDK response is camelCase: decision.permitToken.
+// verifyPermit()'s parameter names are also SDK-specific — permitId
+// (not permitToken), and the optional cross-checks are action/agent
+// (not actionType/actorId).
+const result = await client.verifyPermit({
+  permitId: decision.permitToken,
+  action:   'production.deploy',
+  agent:    'agent:copilot',
+});
+
+if (!result.verified) {
+  throw new Error(`Permit invalid: ${result.outcome}`);
+}
+```
+
+```python
+result = client.verify(
+    decision.permit_token,
+    action_type="production.deploy",
+    actor_id="agent:copilot",
+)
+
+if not result.valid:
+    raise Exception(f"Permit invalid: {result.outcome}")
+```
+
+Verification outcomes (the wire `outcome` field):
+
+| Outcome | Meaning |
+|---|---|
+| `allow` | Token is valid; action authorized; record added to audit chain |
+| `deny` | Token failed verification — see `verify_error_code` for why (`PERMIT_EXPIRED`, `PERMIT_ALREADY_USED`, `INVALID_SIGNATURE`, etc.) |
+| `revoked` | Token was explicitly revoked before use |
+
+There is no `verified`/`expired`/`consumed`/`invalid`/`error` outcome vocabulary
+on the wire — those distinctions live in `verify_error_code` under a `deny`
+outcome. Only `outcome: "allow"` (`valid: true`) means the action is authorized.
+
+## Why single-use tokens
+
+A permit token is single-use by design. Once verified, it's consumed and cannot be re-used.
+
+This prevents two attack classes:
+
+**Replay attacks:** an attacker captures a valid permit token and uses it to authorize a different action (or the same action again). Single-use tokens make this impossible.
+
+**Permit stockpiling:** a system accumulates pre-approved permits for future use, bypassing the real-time authorization check. With single-use tokens, each permit authorizes only the specific action it was issued for.
+
+## The `withPermit` pattern
+
+The idiomatic SDK pattern binds evaluation, execution, and verification together in one call:
+
+```ts
+await withPermit(
+  {
+    agent:  'agent:copilot',
+    action: 'production.deploy',
+    context: { target: 'svc-checkout', environment: 'production', commit: sha },
+  },
+  async (permit) => {
+    // This runs only if evaluate() returned allow AND the resulting permit
+    // verified. If either fails, withPermit throws AtlaSentDeniedError
+    // before reaching this line.
+    await deployToProduction();
+    return permit.permitId;
+  }
+);
+```
+
+The execution callback is unreachable without a verified permit.
+
+## Offline verification
+
+Permit tokens are part of the audit chain export. The entire export is Ed25519-signed with AtlaSent's published signing key.
+
+To verify an export offline:
+
+```bash
+npx @atlasent/verify bundle.json --pubkey @atlasent-audit-key.pem
+```
+
+See Offline audit verification for the complete process.
+
+## What gets recorded
+
+Every permit verification adds a record to the audit chain:
+
+| Field | Value |
+|---|---|
+| `permit_token` | The consumed `pt.v2.*` token |
+| `action_type` | The action that was authorized |
+| `actor_id` | Who acted |
+| `verified_at` | Timestamp |
+| `outcome` | The audit-record result — `verified` for a successful verification. This audit vocabulary is separate from the wire `outcome` (`allow` / `deny` / `revoked`) described above. |
+| `policy_bundle_id` | Which policy authorized this |
+| `previous_hash` | SHA-256 of the previous audit record |
+
+The chain is append-only. Verification records cannot be deleted.
+
+## Next steps
+
+- Audit verification — export and verify the full audit chain offline
+- [Permit concept](/concepts/permit) — full permit lifecycle reference
+- [Deploy Gate](/deploy-gate) — the most common permit use case
+- [AI Agent Governance](/ai-agent-governance) — using permits in agent workflows

@@ -1,90 +1,137 @@
 ---
-title: "Atlasent API versioning policy and stability guarantees"
-sidebarTitle: "Versioning"
-description: "The Atlasent API uses URL path versioning under /v1/. Learn stability tiers, backward-compatible change rules, and the 90-day deprecation notice policy."
+title: "Versioning & Compatibility"
+description: "How AtlaSent versions its API, what stability guarantees apply to each endpoint category, what additive evolution looks like, and what to expect when things change."
 ---
+{/* Generated from the Atlasent docs source (site/api-reference/versioning.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The current Atlasent API version is **v1**, and it is the only version. All endpoints are served at `https://api.atlasent.io/v1/*`. New capabilities ship as additive evolution on `v1` — they do not introduce a new URL namespace, and you never need to update a URL to receive bug fixes or new optional features.
+This page covers everything enterprise customers need to know about API stability: what version you're on, what can change without notice, what can't, how roadmap work lands on top of the stable contract, and how much lead time you'll get before anything breaks.
 
-## Current version
+This page is the customer-facing summary of AtlaSent's internal versioning doctrine. Where the two differ, the doctrine governs.
+
+## Current API Version
+
+The current — and only — platform version is **AtlaSent v1**.
 
 | Property | Value |
 |---|---|
 | Stable version | `v1` |
-| Base URL | `https://api.atlasent.io/v1/` |
+| Base URL | `https://api.atlasent.io/functions/v1` |
 | Status | Generally Available |
 
-## URL path versioning
+All endpoints documented in this reference are served at this version. The version is part of the URL path, so you always know exactly which contract you're calling.
 
-Atlasent uses URL path versioning. The version segment `/v1/` is part of every endpoint path and stays `/v1/` indefinitely. New endpoints land under `/v1/*`; they never introduce `/v2/*` or `/v3/*` URL namespaces. When you see an endpoint in this reference, the URL you deploy against today is the URL you will use in two years.
+There is no "v2 product" and no "v3 product" on the roadmap. New capabilities ship as **additive evolution** on `v1` — see [Roadmap vs. version](#roadmap-vs-version) below.
 
-## Stability tiers
+## Versioning Scheme
 
-Different endpoint groups carry different stability commitments. The tier determines how much notice you receive before a breaking change or removal.
+AtlaSent uses **URL path versioning**. The public HTTP surface is `/v1/*` and stays `/v1/*` indefinitely. New endpoints land under `/v1/*`; they do not introduce `/v2/*` or `/v3/*` URL namespaces.
 
-| Tier | Stability | Examples |
+- The `v1` runtime contract — `evaluate → permit → verify → execute → audit` — has stable semantics. New capabilities extend the contract; they do not redefine it.
+- **Minor and patch changes** are made in-place within `v1` without a URL change. These are always backward compatible (see [What "Backward Compatible" Means](#what-backward-compatible-means)).
+- A breaking platform version (`v2`) is a doctrinal exception, not a roadmap milestone, and would require all four of: an unavoidable breaking change, a documented customer-runnable migration plan, a minimum 12-month deprecation runway with both versions operated, and a written compatibility policy for `v1`-era artifacts. Until those exist, nothing in the roadmap is labeled `v2`.
+
+You never need to update a URL to receive bug fixes or new optional features.
+
+## Roadmap vs. version
+
+Roadmap sequencing is **separate** from the public contract. The roadmap uses phase / wave / pillar vocabulary; it does not use product-generation labels.
+
+| Phase | What it brings | Contract impact |
 |---|---|---|
-| GA | Stable; breaking changes require 90-day notice | `/v1/evaluate`, `/v1/verify-permit`, `/v1/audit/exports` |
-| Beta | Stable but may have minor changes; 3-month notice | Evidence exports, Go SDK, LangChain/LlamaIndex integration |
-| Preview | Subject to change without notice | SCIM 2.0, SIEM export, batch/streaming evaluate, GraphQL |
+| Phase 1 — Stabilization & Pilot Readiness | Deploy gate, permit lifecycle, audit chain, gateway enforcement, SDK + runtime stabilization | Additive on `v1` |
+| Phase 2 — Enterprise Hardening & Runtime Expansion | SSO, SCIM, evidence bundles, Delta VQP, parity systems, governance primitives, enterprise procurement readiness, replay foundations | Additive on `v1` |
+| Phase 3 — Execution Assurance & Operational Sovereignty | Deterministic replay, deployment sovereignty, supply-chain integrity, multi-region continuity, runtime assurance, deterministic parity validation | Additive on `v1` |
 
-Build critical production workflows on GA endpoints. Use Beta endpoints with the understanding that a 3-month migration window accompanies any breaking change. Avoid automating Preview endpoints in production without first consulting your account team.
+All three phases ship as `v1` additions. The customer-visible contract surface stays `v1`.
 
-## Backward-compatible changes
+## Stability Guarantees
 
-The following changes are additive and do not require a version bump or deprecation notice. Write your client to tolerate them.
+Different parts of the API carry different stability commitments. The table below specifies the deprecation notice period you'll receive before a breaking change or removal.
 
-- Adding new **optional** request fields (your client ignores fields it does not send)
-- Adding new **response fields** (configure your deserializer to ignore unknown fields)
-- Adding new endpoint paths under `/v1/*`
-- Adding new enum values to extensible fields (use a default or fallback case for unknown values)
-- Refining human-readable `message` text in error responses (the `error` code and HTTP status are stable)
+| Endpoint Category | Stability | Deprecation Notice | Examples |
+|---|---|---|---|
+| Core evaluation | GA | 12 months | `/v1/evaluate`, `/v1/evaluate-batch` |
+| Audit + export | GA | 12 months | `/v1/audit/exports`, `/v1/verify-audit` |
+| Policy management | GA | 12 months | `/v1/policies`, `/v1/policy-bundles`, `/v1/rollback-bundle` |
+| IAM + keys | GA | 12 months | `/v1/api-keys`, `/v1/org` |
+| Webhooks | GA | 6 months | `/v1/webhooks`, `/v1/webhook-deliver` |
+| Integrations | Beta | 3 months | `/v1/integrations` |
+| AI gates | Beta | 3 months | `/v1/ai-gates` |
+| Red-team | Preview | Best-effort | `/v1/redteam`, `/v1/redteam-runs` |
 
-<Warning>
-  If your client deserializes API responses with strict schema validation that rejects unknown fields, new response fields will cause failures. Configure your deserializer to ignore unknown fields so additive changes do not break your integration.
-</Warning>
+**GA** endpoints are contractually supported under the MSA / SLA and safe to build critical workflows on.
 
-## Breaking changes
+**Beta** endpoints are functionally complete but their request/response shapes may change based on customer feedback. Use them with the understanding that a 3-month migration window will be provided.
 
-The following changes are breaking. Atlasent will not make them inside `v1` without going through the full deprecation cycle:
+**Preview** endpoints are early access. They may change at any time with best-effort notice. Do not use them in automated production workflows without consulting your account team.
+
+## What "Backward Compatible" Means
+
+### Changes that NEVER happen inside `v1`
+
+The following changes are considered breaking. AtlaSent will not make them inside `v1`:
 
 - Removing an endpoint
 - Renaming a required request field
 - Changing the type of a request or response field
-- Removing an enum value from a response field
-- Adding a mandatory field to a request body
 - Changing authentication requirements for an endpoint
+- Reducing the scope of a valid decision (for example, a response that previously returned `allow` returning `deny` under the same inputs)
+- Removing an enum value from a field
 
-## Deprecation policy
+### Changes that MAY happen inside `v1` (non-breaking, additive)
 
-When an endpoint or field must be deprecated, Atlasent follows this process:
+The following changes are safe to deploy in-place. Your client must be written to tolerate them:
 
-<Steps>
-  <Step title="Announcement">
-    All org admins with active API keys receive an email notification. The deprecated endpoint begins returning a `Deprecation` response header. A changelog entry is published.
-  </Step>
-  <Step title="Grace period">
-    The deprecated endpoint continues to function in full for the entire notice period: 90 days for GA endpoints, 3 months for Beta endpoints.
-  </Step>
-  <Step title="Removal">
-    After the notice period, the endpoint returns `410 Gone` with a JSON body that includes a `migration_guide_url`.
-  </Step>
-</Steps>
+- Adding new **optional** request fields (ignored if your client doesn't send them)
+- Adding new **response fields** (your client must not reject unknown fields — avoid strict deserialization that errors on extra keys)
+- Adding new endpoint paths under `/v1/*`
+- Adding new enum values to extensible fields (your client must handle unknown enum values gracefully — use a default/fallback case)
+- Improved error messages (the `error` code and HTTP status are stable; the human-readable `message` text may be refined)
 
-When a GA endpoint is removed, the `410` response body looks like this:
+<Warning>
+  If your client deserializes API responses with strict schema validation that rejects unknown fields, new response fields will break you. Configure your deserializer to ignore unknown fields.
+</Warning>
+
+## Deprecation Policy
+
+When an endpoint or field is deprecated, AtlaSent follows this process:
+
+1. **Announcement**: Email to all org admins with affected API keys, a `Deprecation` response header on the deprecated endpoint, and a changelog entry.
+2. **Grace period**: The deprecated endpoint continues to work in full for the entire notice period (see stability table above).
+3. **Removal**: After the notice period expires, the endpoint returns `410 Gone` with a JSON body containing a `migration_guide_url` pointing to the relevant migration documentation.
+4. **SDK deprecation**: Deprecated SDK methods are annotated with `@deprecated` JSDoc (TypeScript) or a deprecation docstring (Python). They are removed in the next major SDK version.
+
+Example `410` response body:
 
 ```json
 {
   "error": "endpoint_removed",
   "message": "This endpoint was removed on 2026-01-01. See the migration guide.",
+  "status": 410,
   "migration_guide_url": "https://docs.atlasent.io/guides/migration"
 }
 ```
 
-## SDK versioning
+## SDK Compatibility
 
-SDK major versions follow standard semantic versioning for each language package and are independent of the API version. An `@atlasent/sdk@2.x` release represents a breaking change in SDK ergonomics or the TypeScript type surface — it is not "Atlasent API v2." The API contract remains `/v1/`.
+Per-language SDK majors evolve under standard SemVer rules for that package. They are **independent** of platform phases and are not platform-version markers. An `@atlasent/sdk@2.x` is the second major SDK contract generation — a breaking change in SDK ergonomics, wire-call API, or type surface. It is **not** "AtlaSent v2."
 
-<Note>
-  Subscribe to API changelog notifications in **Console → Settings → Notifications** to receive email updates whenever an endpoint is added, deprecated, or removed.
-</Note>
+| SDK | Package | Versioning | Compatibility Guarantee |
+|---|---|---|---|
+| TypeScript | `@atlasent/sdk` | semver | Minor versions add features (non-breaking); patch versions fix bugs; major versions may introduce breaking SDK changes |
+| Python | `atlasent` | semver | Same as TypeScript |
+| GitHub Action | `Atlasent/atlasent-action` | `@v1` tag | Maintained for all compatible v1 API updates; pin to an exact tag (for example, `@v1.4.2`) for fully reproducible CI builds |
+
+An SDK major version bump may also be triggered by a language ecosystem change (for example, dropping support for an EOL runtime). SDK release notes describe SDK changes; platform release notes describe platform phases; the two cross-reference but never identify.
+
+## Changelog
+
+All API changes — additions, deprecations, and removals — are published in the [Changelog](https://docs.atlasent.io/changelog). The changelog is also available at [`/changelog`](/changelog/overview) in this documentation site.
+
+Subscribe to changelog notifications in **Console → Settings → Notifications**.
+
+## Migration Guides
+
+Inside `v1`, you do not migrate between platform versions — you opt into new additive capabilities as your tenant flag flips them on. Per-language SDK majors carry their own migration guides under `site/sdks/`.
+
+If a true `v2` platform version is ever introduced (subject to the four doctrinal preconditions above), a migration guide will be published with a minimum 12-month overlap window during which both `v1` and `v2` are operated, deprecation announced at runway start, and `v1`-era artifacts (permits, audit chains, evidence bundles, signed exports) covered by an explicit compatibility policy.

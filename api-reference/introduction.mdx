@@ -1,86 +1,46 @@
 ---
-title: "Atlasent REST API reference: base URL and quickstart"
-sidebarTitle: "Introduction"
-description: "The Atlasent REST API is served at https://api.atlasent.io. All requests and responses are JSON. Authenticate with a Bearer token on every request."
+title: "API Reference"
+description: "The canonical AtlaSent REST API, rendered from the OpenAPI specification."
 ---
+{/* Generated from the Atlasent docs source (site/api-reference/introduction.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The Atlasent API is a versioned REST API over HTTPS. Every request and response body is JSON, every endpoint lives under `/v1/`, and every request must carry an `Authorization: Bearer` header. If you prefer to integrate through a typed client rather than raw HTTP, the [TypeScript](/sdks/typescript), [Python](/sdks/python), and [Go](/sdks/go) SDKs wrap this API and handle authentication, retries, and error typing for you.
+The AtlaSent API is a REST API over HTTPS. All requests and responses are JSON. All endpoints are versioned under `/v1/`.
 
-## Base URL
+## Base URLs
 
-```
-https://api.atlasent.io
-```
+| Environment | URL |
+|---|---|
+| Production | `https://api.atlasent.io/functions/v1` |
 
-All endpoints in this reference are relative to this base URL. For example, `POST /v1/evaluate` is the full URL `https://api.atlasent.io/v1/evaluate`.
+Endpoints are hyphenated function names appended to the base URL, e.g.
+`https://api.atlasent.io/functions/v1/v1-evaluate`. To test without touching production
+data, use a test-environment key (`ask_test_...`). A dedicated staging
+environment is available on request — contact support@atlasent.io.
 
-## Endpoints overview
+## Source of truth
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/v1/evaluate` | POST | Evaluate whether an action is permitted |
-| `/v1/verify-permit` | POST | Consume a permit before execution |
-| `/v1/audit/events` | GET | List audit log entries |
-| `/v1/audit/exports` | POST | Generate a signed audit bundle |
-| `/v1/policies` | GET, POST | Manage policy bundles |
-| `/v1/escalations` | GET, POST | Manage approval requests |
-| `/v1/webhooks` | GET, POST | Manage webhook subscriptions |
-| `/v1/status` | GET | Health check |
+This reference is generated from the AtlaSent OpenAPI specification (`openapi.yaml`), rendered in the API reference.
 
-## Authentication
+For the canonical type names (TypeScript ↔ OpenAPI mapping, permit lifecycle), start with the Wire contract page.
 
-Every request must include your API key as a Bearer token in the `Authorization` header:
-
-```bash
-curl https://api.atlasent.io/v1/evaluate \
-  -H "Authorization: Bearer ak_live_..." \
-  -H "Content-Type: application/json" \
-  -d '{ ... }'
-```
-
-See [Authentication](/api-reference/authentication) for full details on API key scopes and rotation.
-
-## Quick reference
-
-The two endpoints you call most frequently are `POST /v1/evaluate` and `POST /v1/verify-permit`. The examples below show the minimal viable request for each.
-
-<CodeGroup>
-```bash POST /v1/evaluate
-curl -X POST https://api.atlasent.io/v1/evaluate \
-  -H "Authorization: Bearer ak_live_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "actor": { "id": "user_123", "role": "engineer" },
-    "action": { "type": "production.deploy" },
-    "target": { "id": "my-service", "environment": "production" },
-    "context": { "git_sha": "a1b2c3d" }
-  }'
-```
-```bash POST /v1/verify-permit
-curl -X POST https://api.atlasent.io/v1/verify-permit \
-  -H "Authorization: Bearer ak_live_..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "permit_token": "tok_eyJ..."
-  }'
-```
-</CodeGroup>
-
-## OpenAPI spec
-
-The full OpenAPI 3.1 spec for this API is available at [`atlasent-api/openapi.yaml`](https://github.com/AtlaSent-Systems-Inc/atlasent-api/blob/main/openapi.yaml). Every endpoint in this reference is generated from that file. The docs CI fails if this site's copy of the spec falls more than one minor release behind the API repository.
+## Quick links
 
 <CardGroup cols={2}>
   <Card title="Authentication" icon="key" href="/api-reference/authentication">
-    API key scopes, the Bearer token format, and how to rotate keys safely.
+    JWT bearer (user sessions) and API keys (service-to-service).
+  </Card>
+  <Card title="Rate limits" icon="gauge-high" href="/api-reference/rate-limits">
+    Per-key and per-org quotas, plus 429 handling guidance.
   </Card>
   <Card title="Errors" icon="triangle-exclamation" href="/api-reference/errors">
-    Every error code, the error envelope format, and SDK-specific error handling.
-  </Card>
-  <Card title="Rate Limits" icon="gauge-high" href="/api-reference/rate-limits">
-    Per-plan limits, response headers, and how to handle 429 responses.
+    Every `error` code value and how to recover.
   </Card>
   <Card title="Pagination" icon="arrow-right" href="/api-reference/pagination">
-    Cursor-based pagination for all list endpoints with a Python fetch-all example.
+    Cursor-based, stable across inserts.
   </Card>
 </CardGroup>
+
+## Full endpoint index
+
+See the **Endpoints** section in the sidebar — every path from the OpenAPI spec is rendered there as an interactive reference (try-it-out included).
+

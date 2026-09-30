@@ -1,40 +1,64 @@
 ---
-title: "Atlasent MCP server: authorize AI agent tool calls"
-sidebarTitle: "MCP Server"
-description: "Install the Atlasent MCP server so any MCP-compatible AI agent checks authorization before executing tools — no language-specific SDK required."
+title: "MCP server"
+description: "Authorize-before-execute for any MCP-compatible AI agent: evaluate an action, get a Permit, verify it before the side effect runs."
 ---
+{/* Generated from the Atlasent docs source (site/integrations/mcp-server.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The Atlasent MCP server exposes `atlasent_evaluate` and `atlasent_verify_permit` as [Model Context Protocol](https://modelcontextprotocol.io) tools. Any MCP-compatible host — Claude Desktop, Cursor, Windsurf, or a custom agent — can call Atlasent authorization without installing a language-specific SDK. The server runs as a local process and communicates with your agent host over stdio or HTTP transport.
+`@atlasent/mcp-server` brings AtlaSent authorization to agents that speak the [Model Context Protocol](https://modelcontextprotocol.io): Claude Desktop, Claude Code, Cursor, Windsurf, or your own MCP host. The agent asks AtlaSent before a consequential action, receives a Decision, and on `allow` gets a bounded Permit that must pass verification before the side effect runs.
 
-## Installation
+- npm: [`@atlasent/mcp-server`](https://www.npmjs.com/package/@atlasent/mcp-server) (current release 2.16.0)
+- MCP Registry: `io.github.Atlasent/mcp-server`
+- Source: [Atlasent/atlasent-mcp-server](https://github.com/Atlasent/atlasent-mcp-server) (Apache-2.0)
 
-<Steps>
+## How it works
 
-### Install the MCP server
-
-Install globally with npm, or run on demand with npx (no prior install required):
-
-<CodeGroup>
-
-```bash npm
-npm install -g @atlasent/mcp-server
+```text
+Action proposed
+  → evaluate: organizational policy + context
+  → Decision
+      deny / hold / escalate → STOP
+      allow → bounded Permit
+  → verify the Permit at the execution boundary
+      invalid / expired / replayed / mismatched / error → STOP
+      verified → the side effect may run
 ```
 
-```bash npx
+Evaluation isn't execution. An `allow` Decision alone is not the gate: the Permit has to verify immediately before the protected side effect.
+
+## Modes
+
+The server runs in one of two modes, chosen by `ATLASENT_MODE`:
+
+| Mode | What decides | Use it for |
+|---|---|---|
+| `remote` | Your organization's published policies on the hosted AtlaSent API. Permits are Ed25519-signed and single-use, and every decision lands in the tamper-evident audit trail. | Real enforcement. |
+| `local` | A small built-in rules engine that runs in process, offline, with no account. Permits are **unsigned**. | Trying it out, demos, and CI. |
+
+<Warning>
+  Local mode isn't an enforcement boundary. Its permits are unsigned, it has no audit evidence, and its built-in rules allow anything they don't recognize. Use remote mode for anything that must actually be protected. The server refuses to start in local mode when `NODE_ENV=production`.
+</Warning>
+
+When `ATLASENT_MODE` is unset, the server uses `remote` if `ATLASENT_API_KEY` is set and `local` otherwise.
+
+## Install
+
+### Try it with no account (local mode)
+
+```bash
 npx -y @atlasent/mcp-server
 ```
 
-</CodeGroup>
+Add it to your MCP host with `ATLASENT_MODE=local`, then ask your agent to "deploy billing-api to production." The built-in rules deny it because it has no approvals.
 
-### Add your API key to the environment
+### Connect to AtlaSent (remote mode)
 
-Create an API key with `evaluate` scope in the Atlasent Console under **Settings → API Keys**. You will pass it to the server via the `ATLASENT_API_KEY` environment variable.
+1. [Create an account](https://console.atlasent.io/auth/sign-up).
+2. In the console, open **API keys** and create a key with the `evaluate:write` and `verify:execute` scopes.
+3. Add the server to your MCP host with the key, as shown below.
 
-### Register with your MCP host
+### Claude Desktop
 
-#### Claude Desktop
-
-Add the following block to your Claude Desktop config file and restart the application:
+Add to `claude_desktop_config.json`, then restart Claude Desktop:
 
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
@@ -46,71 +70,129 @@ Add the following block to your Claude Desktop config file and restart the appli
       "command": "npx",
       "args": ["-y", "@atlasent/mcp-server"],
       "env": {
-        "ATLASENT_API_KEY": "ak_live_..."
+        "ATLASENT_MODE": "remote",
+        "ATLASENT_API_KEY": "ask_live_...",
+        "ATLASENT_BASE_URL": "https://api.atlasent.io/functions/v1",
+        "ATLASENT_MCP_READONLY": "1"
       }
     }
   }
 }
 ```
 
-#### HTTP transport (Cursor, Windsurf, custom agents)
+### Cursor and Windsurf
 
-Start the server in HTTP mode and point your MCP host at the local port:
+Use the same `mcpServers` block:
+
+- **Cursor:** `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` globally.
+- **Windsurf:** `~/.codeium/windsurf/mcp_config.json`.
+
+Any other MCP host works the same way: command `npx`, arguments `["-y", "@atlasent/mcp-server"]`, and the same environment variables. Registry-aware hosts can install it directly as `io.github.Atlasent/mcp-server`.
+
+### Streamable HTTP transport
+
+The server speaks stdio by default. For hosts that connect over HTTP, start it with `--transport streamable-http` (or set `ATLASENT_MCP_TRANSPORT=streamable-http`):
 
 ```bash
-ATLASENT_API_KEY=ak_live_... npx @atlasent/mcp-server --transport http --port 3100
+ATLASENT_API_KEY=ask_live_... npx -y @atlasent/mcp-server --transport streamable-http
 ```
 
-Then configure your host to connect to `http://localhost:3100`.
+By default it listens on `http://127.0.0.1:3333/mcp`. `ATLASENT_MCP_HTTP_HOST`, `ATLASENT_MCP_HTTP_PORT`, and `ATLASENT_MCP_HTTP_PATH` change that. Set `ATLASENT_MCP_HTTP_BEARER` to require hosts to send `Authorization: Bearer <value>`; when it's unset, the server accepts requests without host authentication and logs a warning at startup, so leave it unset only for loopback, single-user use. The bearer authenticates your host to this server; `ATLASENT_API_KEY` still authenticates this server to AtlaSent.
 
-</Steps>
+### Claude Code plugin
 
-## Available tools
+A separate, local-only Claude Code plugin makes destructive and shipping commands (for example `DROP TABLE`, `terraform destroy`, `git push --force`, production deploys) wait for a person at the keyboard. It needs no account.
 
-Once the server is running, your agent host can call these tools:
-
-| Tool | Description |
-|---|---|
-| `atlasent_evaluate` | Evaluate whether an action is permitted for an actor |
-| `atlasent_verify_permit` | Consume a single-use permit token before executing |
-
-<Note>
-  Treat a tool error from Atlasent as a **deny**, not as permission to proceed. If `atlasent_evaluate` returns an error, the agent must not execute the consequential action.
-</Note>
-
-## How an agent should use the tools
-
-Guide your agent to follow this sequence for any consequential action:
-
-1. Call `atlasent_evaluate` **before** the action with the actor ID, action type, and target.
-2. Halt and surface the denial reason if `decision` is anything other than `allow`.
-3. Call `atlasent_verify_permit` immediately before executing the action to consume the single-use token.
-4. Record the decision ID in your application audit log.
-
-## Example agent conversation
-
-The following shows how Claude uses the Atlasent tools automatically when you instruct it to check authorization before acting:
-
-```
-User: Deploy version 2.1.4 to production
-
-Claude: I'll check if this deployment is authorized...
-[Calling atlasent_evaluate]
-{"actor": {"id": "claude-agent"}, "action": {"type": "production.deploy"}, ...}
-
-[Result: {"decision": "allow", "permit": {"token": "pt_01j..."}}]
-
-Deployment authorized. Proceeding with deployment...
-[Calling atlasent_verify_permit]
-{"permit_token": "pt_01j..."}
-
-Deployment complete. Audit record written.
+```text
+/plugin marketplace add Atlasent/atlasent-mcp-server
+/plugin install atlasent-guard@atlasent
 ```
 
-<Tip>
-  Include a system prompt instruction such as "Before executing any write, deploy, or delete action, call `atlasent_evaluate` and halt if the decision is not `allow`." This makes the authorization check part of the agent's standing behavior rather than requiring per-prompt reminders.
-</Tip>
+The plugin records that someone at the keyboard said yes. It doesn't issue an organizational Permit; for that, use the MCP server in remote mode.
 
-## Policy resources
+### Docker
 
-The MCP server also exposes your active policy bundles as MCP resources at `atlasent://policies/{policy_id}`. Attach a policy resource to a Claude conversation to give the model direct context about which actions are permitted under your current rules.
+The repository ships a `Dockerfile`. Build it from a clone of the source repository:
+
+```bash
+docker build -t atlasent-mcp .
+docker run -i --rm atlasent-mcp                                          # local mode, stdio
+docker run -i --rm -e ATLASENT_API_KEY -e ATLASENT_BASE_URL atlasent-mcp  # remote mode
+```
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ATLASENT_API_KEY` | none | API key from the AtlaSent console. Setting it selects remote mode when `ATLASENT_MODE` is unset. |
+| `ATLASENT_BASE_URL` | `https://api.atlasent.io/functions/v1` | AtlaSent API base address. One value serves every tool. |
+| `ATLASENT_MODE` | `remote` with a key, else `local` | `remote` or `local`. |
+| `ATLASENT_MCP_READONLY` | unset | `1` or `true` removes the mutating administrative tools (policy, webhook, permit revocation, SCIM, SIEM, evidence-export and VQP writes). Recommended for demos. It reduces the tools an agent can reach; it isn't a security boundary by itself. |
+
+## Core tools
+
+| Tool | Mode | What it does |
+|---|---|---|
+| `evaluate` | local or remote | Ask whether an action is allowed. Returns `allow`, `deny`, or `hold` (remote `escalate` maps to `hold`), with a `permit_token` on `allow`. On `allow`, don't execute yet. |
+| `verify_permit` | local or remote | Verify a Permit at the execution boundary. Proceed only when `valid` is `true`. A successful verification consumes a single-use Permit. |
+| `deploy_service` | local or remote | Protected deployment decision demo. It evaluates the request and may return a Permit, but it does not perform execution-boundary Permit Verification internally. Call `verify_permit` before any native side effect. |
+| `atlasent_evaluate` | remote | Evaluate against your published policies with full context. Accepts `execution_payload_hash`, `target_id`, and `change_plan` bindings. Returns `allow`, `deny`, `hold`, or `escalate`. |
+| `atlasent_verify_permit` | remote | Verify a Permit from `atlasent_evaluate` before executing. |
+| `atlasent_await_approval` | remote | Wait for a person to decide a held action in the console. On approval it returns a Permit that must still pass `atlasent_verify_permit`. |
+| `atlasent_check_permit` | remote | Read a Permit's status (`active`, `revoked`, `consumed`, `expired`) without consuming it. Not authorization. |
+| `atlasent_get_permit`, `atlasent_get_decision` | remote | Read one Permit or one Decision record. |
+| `atlasent_record_execution_evaluation` | remote | Record the observed outcome after the side effect. Doesn't replace verification beforehand. |
+| `atlasent_lookup_action` | local or remote | Find the canonical action type for what the agent wants to do, for example `production.deploy` or `agent.tool.invoke`. Never invents an action type. |
+
+The server also exposes read and administrative tools for policies, permits, audit events, evidence exports, webhooks, SCIM, SIEM, and VQP. Call MCP `tools/list` for the exact inventory of the version you installed.
+
+No tool approves an action. Approvals are made by a person in the AtlaSent console, never by an agent.
+
+## Agent pattern
+
+```ts
+const decision = await evaluate({
+  action_type: "agent.tool.invoke",
+  actor_id: "agent:research-bot",
+  environment: "production",
+});
+if (decision.decision !== "allow") throw new Error("Not authorized");
+
+const verification = await verify_permit({
+  permit_token: decision.permit_token,
+  action_type: "agent.tool.invoke",
+  actor_id: "agent:research-bot",
+  environment: "production",
+});
+if (!verification.valid) throw new Error("Permit did not verify");
+
+// Only now may the protected side effect run.
+await runProtectedTool();
+```
+
+A prompt, wrapper, or MCP tool definition isn't automatically a gate. The side effect must be unreachable unless authorization and Permit verification succeeded.
+
+## Fail-closed behavior
+
+Treat each of these as **stop**:
+
+- any Decision other than `allow`
+- a missing Permit
+- an authentication, network, or API error (the server turns errors into `deny`, or into `valid: false` on verify)
+- an invalid, expired, revoked, replayed, or mismatched Permit
+- a missing required binding
+
+## Binding the Permit to the exact payload and target
+
+To make a Permit valid only for one exact payload, bind a digest at evaluate time and present the same digest at verify time.
+
+- Send `execution_payload_hash` as a **bare 64-character hexadecimal SHA-256 digest** at the **top level** of the evaluate request, not inside `context` and not with a `sha256:` prefix. For ordinary action types the API drops a value, without an error, in any other shape and binds the Permit to its own hash of the request instead, so your digest never constrains execution. Change-control action types deny it outright.
+- The MCP server helps: it strips a `sha256:` prefix, converts the digest to lowercase, and refuses anything that isn't a 64-hex SHA-256 value rather than sending it.
+- Check `execution_payload_hash_accepted` in the evaluate response. `false` means the Permit isn't bound to your digest.
+- Pass `target_id` to bind the Permit to one target. Presenting a different target at verify time fails. Presenting a target at verify time that was never bound at evaluate time checks nothing.
+
+## Change plans and approvals
+
+`production.deploy`, `infrastructure.change`, `production.rollback`, and `secret.configuration.change` require a `change_plan` (`{ operation, revision?, artifact_ref? }`, with a revision or an artifact reference). Pass it to `deploy_service`, `evaluate`, or `atlasent_evaluate`.
+
+When an action is held for a person, the result carries an `approval_request_id`. Call `atlasent_await_approval` with it. A rejection, expiry, or timeout returns no Permit, and the action doesn't run. If your plan changed while you waited, pass the new plan as `change_plan` and the server files one linked re-request for it.

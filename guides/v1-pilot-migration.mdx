@@ -1,0 +1,195 @@
+---
+title: "V1 pilot migration"
+description: "Wire and SDK changes for callers moving onto AtlaSent V1 from earlier builds"
+---
+{/* Generated from the Atlasent docs source (site/guides/v1-pilot-migration.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# V1 pilot migration
+
+If you have caller code written against an earlier AtlaSent build,
+this page lists every wire-shape and SDK change you need to absorb
+before you can run against V1.
+
+The changes are intentional: each one closes a finding that
+surfaced before pilots started. **None of these are
+deprecations on a clock** — they are the V1 wire shape. Pre-V1
+SDKs do not run against V1.
+
+---
+
+## What changed
+
+### 1. `context.environment` is now **required** on every evaluate request
+
+**Before:** when `context.environment` was omitted, the runtime
+silently inferred it from the API key's environment. For live
+keys, the default was `"production"`.
+
+**After:** missing or empty `context.environment` returns:
+
+```
+HTTP/1.1 422 Unprocessable Entity
+X-AtlaSent-Protocol-Version: 1
+
+{
+  "error": "missing_environment",
+  "message": "context.environment is required (e.g. 'production', 'staging', 'test')",
+  "deny_reason": "precondition",
+  "status": 422
+}
+```
+
+**Fix in your caller:**
+
+```typescript
+// Before
+await client.evaluate({
+  action_type: "production.deploy",
+  actor_id: "ci-bot",
+});
+
+// After
+await client.evaluate({
+  action_type: "production.deploy",
+  actor_id: "ci-bot",
+  context: { environment: "production" },
+});
+```
+
+The TypeScript and Python SDKs (from v2.10.0+) also enforce this
+client-side — they throw `AtlaSentError({ code: "bad_request" })`
+before the network hop if `context.environment` is missing.
+
+### 2. `permit_expires_at` added to evaluate response
+
+**Before:** the response had `expires_at` (still present) but no
+explicit "this is the permit's TTL" field.
+
+**After:** when a permit is issued, the response carries
+**both**:
+
+```json
+{
+  "decision": "allow",
+  "permit_token": "pt.v2....",
+  "expires_at": "2026-04-17T13:00:00Z",
+  "permit_expires_at": "2026-04-17T13:00:00Z"
+}
+```
+
+Additive change. Existing callers reading `expires_at` continue
+to work. New callers should prefer `permit_expires_at` for
+clarity.
+
+### 3. `deny_reason` is now a closed enum
+
+**Before:** `deny_reason` could carry free-text strings
+including scope names, action types, actor IDs, environment
+values.
+
+**After:** `deny_reason` is constrained to:
+
+`unauthenticated`, `unauthorized`, `policy`, `precondition`,
+`replay`, `unavailable`, `clock_skew`, `unknown_action`,
+`internal_error`.
+
+Each value carries a **constant** `message` string. Rich detail
+is recorded server-side in the audit chain and not surfaced on
+the wire.
+
+**Fix in your caller:** if your code did substring matching on
+`deny_reason`, switch to checking the typed field:
+
+```typescript
+// Before
+if (response.deny_reason?.includes("scope")) { ... }
+
+// After
+if (response.deny_reason === "unauthorized") { ... }
+```
+
+### 4. Wire-protocol version header
+
+Every response now carries `X-AtlaSent-Protocol-Version: 1`. The
+SDKs send it on requests automatically. The compatibility window
+is N..N-1.
+Older versions get **426 Upgrade Required** with `current` +
+`accepted_min` + `accepted_max` in the body.
+
+### 5. `action_type` format validation
+
+`action_type` is validated against:
+
+```
+/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/
+```
+
+Examples that pass: `production.deploy`, `vendor.payment.release`,
+`model.agent.execute_tool`.
+
+Examples that fail: `"DEPLOY!"`, `"do_the_thing"`, `"x"`, `""`.
+
+Malformed inputs return **400 `invalid_action_type`** before any
+policy evaluation runs.
+
+### 6. Permit signing — no caller-side change
+
+The runtime's permit-signing path now goes through the
+KMS-delegated authority key.
+Your caller doesn't see the difference. Permits
+still arrive as opaque strings, still verify atomically, still
+consume single-use.
+
+The benefit: the signing key is rotatable + revocable without
+changing the wire shape.
+
+### 7. Audit chain v5 — no caller-side change
+
+Audit entries are now hash-chained AND optionally Ed25519-signed.
+Caller-facing wire is unchanged. The verifiable artifact is the
+chain export; the verification guide tells you
+how to verify it yourself.
+
+---
+
+## SDK upgrade
+
+| Language | Min version | Reason |
+|---|---|---|
+| TypeScript (`@atlasent/sdk`) | **2.10.0** | enforces `context.environment` client-side; sends `X-AtlaSent-Protocol-Version`; typed `deny_reason` |
+| Python (`atlasent`) | **2.10.0** | same |
+| Audit verifier (`atlasent-audit-verify`) | **v0.1.0** | first release with the signed-binary pipeline |
+
+> SDK is **v2.10.0** — a minor bump from the previous 2.x line.
+> Framing: V1 wire-shape compatibility, not a major SDK break.
+> AtlaSent runtime remains at V1.
+
+`atlasent-policy` CLI (the GitOps testing tool from
+[/sdks/cli](/sdks/cli)) is unchanged and runs against V1
+bundles identically.
+
+## Trying the migration with a test key
+
+Validate your caller with a test-environment key before flipping
+production traffic:
+
+```bash
+ATLASENT_BASE_URL=https://api.atlasent.io/functions/v1 \
+ATLASENT_API_KEY=ask_test_... \
+  npx @atlasent/sdk@2.10.0 examples/evaluate
+```
+
+A dedicated staging environment is available on request — contact
+support@atlasent.io.
+
+## What this guide does NOT cover
+
+- **Operator-side changes** (console refactor, route isolation) —
+  operator deployment work, not caller changes.
+- **Console rebrand / UX changes** — separate release notes.
+- **Compliance pack updates** — see [/compliance](/compliance/overview).
+
+## References
+
+- V1 readiness summary — what V1 ships overall
+- Audit chain verification — verify the chain export yourself

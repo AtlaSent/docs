@@ -1,12 +1,24 @@
 ---
-title: "Authorize LangChain agent tool calls with Atlasent"
-sidebarTitle: "LangChain"
-description: "Add Atlasent authorization to LangChain agents using AtlasentCallbackHandler or AtlasentToolWrapper in Python, and withLangChainGuard in TypeScript."
+title: "LangChain"
+description: "Wrap LangChain tools so every tool call is authorized by AtlaSent before it executes."
 ---
+{/* Generated from the Atlasent docs source (site/integrations/langchain.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The Atlasent LangChain integration intercepts every tool call in your agent loop and runs it through `/v1/evaluate` before the tool executes. You can apply authorization to an entire `AgentExecutor` with a callback handler, or wrap individual tools for more targeted control. Both Python and TypeScript are supported. Every evaluation — whether allowed or denied — is written to the Atlasent audit chain automatically.
+The AtlaSent LangChain integration wraps your tool functions with
+authorize-first semantics: each tool call is evaluated and its permit verified
+through AtlaSent before the underlying function runs. If authorization does not
+succeed, the tool does not execute. It works with any LangChain tool factory and
+has no dependency on `langchain` itself.
 
 ## Install
+
+<Warning>
+  **Not yet published.** `atlasent-langchain` is not yet on PyPI and `@atlasent/langchain` is not yet on
+  npm, so the install commands below do not work yet. Until a release is
+  published, install from source: [`python/atlasent_langchain`](https://github.com/Atlasent/atlasent-sdk/tree/main/python/atlasent_langchain)
+  and [`typescript/packages/langchain`](https://github.com/Atlasent/atlasent-sdk/tree/main/typescript/packages/langchain)
+  in the `atlasent-sdk` repository.
+</Warning>
 
 <CodeGroup>
 
@@ -22,152 +34,99 @@ npm install @atlasent/langchain @atlasent/sdk
 
 ## Python
 
-### Callback handler
-
-`AtlasentCallbackHandler` is the fastest way to add authorization to an existing agent. Attach it to any `AgentExecutor` and every tool call will be evaluated before it runs. A denied call raises `DeniedError` into the agent loop by default.
-
-```python
-from atlasent_langchain import AtlasentCallbackHandler, DenyBehavior
-
-handler = AtlasentCallbackHandler(
-    api_key=os.environ["ATLASENT_API_KEY"],
-    actor_id="agent_123",
-    deny_behavior=DenyBehavior.RAISE,  # or SKIP, WARN
-)
-
-agent = initialize_agent(
-    tools=tools,
-    llm=llm,
-    callbacks=[handler],
-)
-```
-
-### Deny behavior options
-
-Control what happens when Atlasent returns a `deny` decision:
-
-| Option | Behavior on deny |
-|---|---|
-| `DenyBehavior.RAISE` | Raise `AtlaSentDeniedError` — the agent stops (default) |
-| `DenyBehavior.SKIP` | Skip the tool call and return an empty result — the agent continues |
-| `DenyBehavior.WARN` | Log a warning but allow the call to proceed |
-
-<Warning>
-  Use `DenyBehavior.WARN` only during development. In production, a denied tool call that proceeds anyway defeats the purpose of the authorization check and produces misleading audit records.
-</Warning>
-
-### Tool wrapper
-
-Use `AtlasentToolWrapper` when you want to authorize specific tools rather than every call in an executor. Wrap each tool individually and pass the guarded tools to your agent:
+Wrap the callable, then hand the wrapped function to LangChain's `@tool`,
+`StructuredTool.from_function`, or any other tool factory:
 
 ```python
-from atlasent_langchain import AtlasentToolWrapper
-from langchain.tools import Tool
+import os
+from atlasent import AtlaSentClient
+from atlasent_langchain import with_langchain_guard
+from langchain_core.tools import tool
 
-protected_tool = AtlasentToolWrapper(
-    tool=my_deploy_tool,
-    action_type="model.agent.execute_tool",
-    actor_id="agent_123",
-    api_key=os.environ["ATLASENT_API_KEY"],
+client = AtlaSentClient(api_key=os.environ["ATLASENT_API_KEY"])
+
+def write_ehr(patient_id: str, note: str) -> dict:
+    ...
+
+guarded_write_ehr = with_langchain_guard(
+    write_ehr,
+    client,
+    agent="service:clinical-agent",
+    extra_context={"environment": "production"},
+    # Action classes require a state snapshot by default (SNAPSHOT_REQUIRED otherwise)
+    state_snapshot={"source": "clinical-agent", "complete": True},
 )
+
+write_ehr_tool = tool(guarded_write_ehr)
 ```
 
-Both `AtlasentCallbackHandler` and `AtlasentToolWrapper` support async via `await executor.ainvoke(...)`. The async Atlasent client is used automatically in async contexts.
-
-### Error handling
-
-Catch `DeniedError` to handle denials gracefully without crashing the outer application:
-
-```python
-from atlasent.exceptions import DeniedError
-
-try:
-    result = executor.invoke({"input": "Update the chart for patient 42..."})
-except DeniedError as e:
-    print(f"Agent action blocked: {e}")
-    # Surface to user or log for audit
-```
+Use `async_with_langchain_guard` with an `AsyncAtlaSentClient` for async tools.
 
 ## TypeScript
 
-### `withLangChainGuard`
-
-`withLangChainGuard` wraps an array of tool definitions with authorize-first semantics: it runs `evaluate → verifyPermit → execute` in sequence, and only calls the real tool if both authorization checks pass. It works with any LangChain tool factory — `DynamicStructuredTool`, `DynamicTool`, or custom `Tool` subclasses.
-
-```typescript
-import { withLangChainGuard } from '@atlasent/langchain';
-
-const guardedTool = withLangChainGuard(deployTool, {
-  actionType: 'model.agent.execute_tool',
-  actorId: 'agent_123',
-  client,
-});
-```
-
-For multiple tools, pass an array and map the results to your preferred tool factory:
-
 ```typescript
 import { AtlaSentClient } from "@atlasent/sdk";
-import { DynamicStructuredTool } from "@langchain/core/tools";
 import { withLangChainGuard } from "@atlasent/langchain";
+import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 
 const client = new AtlaSentClient({ apiKey: process.env.ATLASENT_API_KEY! });
 
-const defs = withLangChainGuard(
+const [queryDb] = withLangChainGuard(
   [
     {
       name: "query_database",
       description: "Run a read-only SQL query and return results as JSON",
       execute: async ({ sql }) => JSON.stringify(await db.query(sql)),
     },
-    {
-      name: "send_alert",
-      description: "Send an alert to the on-call team",
-      execute: async ({ message, severity }) =>
-        JSON.stringify(await alerting.send({ message, severity })),
-    },
   ],
   client,
-  { agent: "service:analytics-bot" },
+  {
+    agent: "service:analytics-bot",
+    extraContext: { environment: "production" },
+    // Action classes require a state snapshot by default (SNAPSHOT_REQUIRED otherwise)
+    stateSnapshot: { source: "analytics-bot", complete: true },
+  },
 );
 
-const tools = defs.map((d) =>
-  new DynamicStructuredTool({
-    name: d.name,
-    description: d.description,
-    schema: z.object({ sql: z.string() }),
-    func: d.execute,
-  }),
-);
-```
-
-By default, a denied call throws `AtlaSentDeniedError`. Set `onDeny: "tool-result"` to return a structured denial object instead, which lets the LLM observe the reason and adapt its plan:
-
-```typescript
-const defs = withLangChainGuard(tools, client, {
-  agent: "service:analytics-bot",
-  onDeny: "tool-result",
+const tool = new DynamicStructuredTool({
+  name: queryDb.name,
+  description: queryDb.description,
+  schema: z.object({ sql: z.string() }),
+  func: queryDb.execute,
 });
-
-// execute() returns on deny:
-// { denied: true, decision: "deny", evaluationId: "...", reason: "..." }
 ```
 
-### Result annotation
+## What the guard does
 
-When a guarded tool returns a JSON object string, the guard appends Atlasent permit metadata to the result automatically:
+- Before each tool call, evaluates the call through AtlaSent and verifies the
+  resulting permit.
+- Sends the tool's name as `context.tool` and the call's input as part of the
+  evaluated context.
+- Runs the tool only if authorization succeeds. Otherwise it raises
+  `AtlaSentDeniedError` (the default), or — with `on_deny="tool-result"`
+  (Python) / `onDeny: "tool-result"` (TypeScript) — returns a structured denial
+  instead, so the model can see the reason and adapt its plan. The tool still
+  does not run.
+- When the tool returns a JSON object, annotates it with
+  `_atlasent_permit_id` and `_atlasent_audit_hash`, linking the result to the
+  audit chain.
 
-```json
-{
-  "rows": [],
-  "_atlasent_permit_id": "permit_abc123",
-  "_atlasent_audit_hash": "sha256:..."
-}
-```
+## Action type and required context
 
-Plain-text results pass through unchanged.
+By default every call is evaluated as the canonical `agent.tool.invoke`
+action. That action class requires the `tool` and `environment` context inputs:
+the guard supplies `tool`, and you supply `environment` (via `extra_context` /
+`extraContext`) — the guard never invents one. Action classes also require a
+state snapshot by default; pass `state_snapshot` / `stateSnapshot` (for example
+`{"source": "my-agent", "complete": true}`) or calls are denied with
+`SNAPSHOT_REQUIRED`.
 
-<Tip>
-  Map each LangChain tool to a **stable action type** in your policy — for example `data.query` or `ehr.write` — rather than using the Python function name. Function names change during refactors; action types are the regulatory identifiers in your audit chain.
-</Tip>
+To gate a tool under a different action type, pass `action`. Map tools to
+**stable action types** that match your AtlaSent policy — don't use the Python
+function name, which couples regulatory meaning to code refactors.
+
+## Related
+
+- [LlamaIndex integration](/integrations/llamaindex)
+- Policy authoring

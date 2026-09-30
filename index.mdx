@@ -1,0 +1,167 @@
+---
+title: "AtlaSent: Consequential Action Protection"
+sidebarTitle: "Introduction"
+description: "AtlaSent controls consequential actions by people, software, and AI before they happen, and preserves proof of what was decided and what happened afterward."
+mode: "wide"
+---
+{/* Generated from the Atlasent docs source (site/index.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**AtlaSent controls consequential actions before they happen.**
+
+Before a production change ships, access is granted, sensitive data leaves, or an AI agent changes a real system, your system asks AtlaSent whether the organization authorized that exact action. If it did not, the action waits for approval or is refused. Every decision leaves a signed record your auditor can check without trusting us.
+
+AtlaSent sells two Enterprise products:
+
+- **Production Change Protection.** AtlaSent stops risky changes to production unless someone approved them, and gives you proof for your auditor.
+- **AI Action Protection.** An agent's tool access is not permission to act. AtlaSent gates the consequential tool call, keeps the agent's provenance, and holds for a person when your rules require one. It is offered through a design partner program.
+
+AtlaSent Enterprise adds the operating layer on top of both: a portfolio of protected actions, honest coverage of every execution path, identity and administration, separation of duties, findings, evidence, and implementation support. Developers can start free with the open tools, SDKs, API and MCP server, then move to the separate self-service cloud plans.
+
+Under the hood, AtlaSent is security and organizational authority infrastructure for consequential actions by people, software, and AI. The rest of this documentation uses that architecture vocabulary (organizational authority, authorization, permit, verification, evidence) where it is the precise term.
+
+The most common starting point is production changes:
+
+1. **Add one step** to your deploy pipeline, or connect it to your AI agent.
+2. **Risky changes wait** for a person to approve them. Everything else runs as normal.
+3. **Every change gets a signed receipt** your auditor can check, without trusting us.
+
+An approval decision is not proof that the action ran. AtlaSent verifies the permit where the action executes and records what happened only when it is actually observed or reported.
+
+<CardGroup cols={3}>
+  <Card title="Production Change Protection" icon="github" href="/deploy-gate">
+    Put the deploy gate in a GitHub Actions workflow and see a refusal and a valid run.
+  </Card>
+  <Card title="AI Action Protection" icon="robot" href="/ai-agent-governance">
+    Gate an agent's consequential tool calls through the MCP server or SDK.
+  </Card>
+  <Card title="Start free" icon="rocket" href="/quickstart/overview">
+    Try it locally with no account, or get a free API key.
+  </Card>
+</CardGroup>
+
+<Note>
+**Enterprise** is custom annual pricing, and Enterprise Launch (assisted implementation of your first protected action) is scoped with the Enterprise engagement. [Schedule an Enterprise call](https://cal.com/atlasent/discovery). Community, Developer Cloud and Team Cloud are separate self-service plans: see [pricing](https://www.atlasent.io/pricing#developers).
+</Note>
+
+## For engineers
+
+AtlaSent provides **authorization for consequential computational actions** across high-risk execution domains: CI/CD production deployments, financial close and approval controls, and AI agent execution.
+
+A plausible request is not organizational authority. Identity systems can establish **who or what is acting**; tool permissions establish what the caller can technically reach. Neither fact, by itself, establishes organizational authority. AtlaSent determines whether **this exact action** by a human, AI, service, or automated workflow is authorized by the organization under the authority, policy, approvals, duties, resource state, environment, and transaction facts in force right now.
+
+The public model is deliberately explicit:
+
+**Verified Identity → Organizational Authority → Authorization → Permit → Verification → Execution → Effect → Proof**
+
+Each stage establishes something different. An identity assertion does not grant authority. An approval is an input to authorization, not the final authorization decision. An `allow` does not prove execution. A permit does not prove effect. Proof is only as strong as the execution/effect evidence actually established.
+
+Whether the caller is a release pipeline, a controller signing off a journal entry, or an AI agent proposing a consequential tool call, the contract is the same: evaluate before the protected execution boundary, issue a bounded permit when the exact request is allowed and a permit is required, verify that permit at the gate, and preserve evidence of what was decided and what was later observed. On a path configured and accepted as fail-closed, the protected effect stays unreachable when required authorization or permit verification cannot be established.
+
+Five primitives, one contract, one evidence universe:
+
+- **Verified actor identity** — identity can be established from an authoritative source without treating identity as authority.
+- **Organizational authority + execution-time authorization** — AtlaSent separates standing, scoped authority from the fresh decision about whether this exact action may proceed now.
+- **Approval controls** — a `hold` or `escalate` can require verified input from an eligible approver; approval does not silently become standing authority or execution proof.
+- **Bounded permits + verification** — issued permits are scope/time/resource bound, verified at the execution boundary, and replay-protected where the contract requires single use.
+- **Tamper-evident evidence** — authorization, permit lifecycle, verification, and separately observed execution/effect facts can be tied into independently verifiable evidence without inferring later stages from earlier ones.
+
+## What AtlaSent does in 4 steps
+
+<Steps>
+  <Step title="Evaluate">
+    A human, AI, service, or workflow presents the consequential action and its current context to `POST /v1-evaluate`. AtlaSent resolves the applicable authority and policy and returns one of the canonical decisions — `allow`, `deny`, `hold`, or `escalate`.
+  </Step>
+  <Step title="Permit">
+    When the exact request is `allow` and the protected path requires an executable artifact, AtlaSent issues a bounded **permit token**. `allow` and Permit issuance are related but distinct facts.
+  </Step>
+  <Step title="Verify">
+    The Permit is checked at the execution boundary for authenticity, currentness, exact binding, expiry/revocation, and replay state as applicable. The native system may execute only after the configured gate's verification requirement succeeds.
+  </Step>
+  <Step title="Prove">
+    AtlaSent preserves tamper-evident authorization and verification evidence. Native execution and effect are shown as proven only when the applicable provider/observer evidence establishes them; otherwise they remain explicitly unobserved or unproven.
+  </Step>
+</Steps>
+
+## The evaluate round-trip
+
+```bash
+curl -X POST https://api.atlasent.io/functions/v1/v1-evaluate \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_type": "journal_entry.approve",
+    "actor_id": "agent-close-bot",
+    "context": {
+      "environment": "production",
+      "target": { "id": "entity:US-OpCo:Q1-2026", "type": "gl_period" },
+      "amount_usd": 50000,
+      "account_code": "5450-Accruals",
+      "approvals": ["ticket-42"]
+    }
+  }'
+```
+
+```json Response
+{
+  "decision": "allow",
+  "authorization_state": {
+    "permit_requirement": "required",
+    "permit_status": "present",
+    "verification_status": "not_verified"
+  },
+  "permit_token": "pt.v4.g6EBOKGBWCC4wNi5vZmZzZXQ...",
+  "request_id": "req_01HX6Z8...",
+  "mode": "live",
+  "human_approval_required": false,
+  "human_approval_status": "not_required",
+  "expires_at": "2026-05-07T15:32:11Z",
+  "permit_expires_at": "2026-05-07T15:32:11Z",
+  "risk_score": 5.2
+}
+```
+
+Notice that this response says the Permit is **present but not yet verified**. It does not claim execution occurred. Additional fields (a structured `risk_envelope` breakdown, the full `decisionObject` CDO, remediation hints on deny) are omitted above for brevity — see the wire contract reference for the complete response shape.
+
+## Execution domains
+
+<CardGroup cols={2}>
+  <Card title="CI/CD Deployment Authorization" icon="code" href="/quickstart/overview">
+    Permit-gated production deployments. Pipelines call `evaluate` before the protected deploy boundary and gate the native deploy on successful permit verification, not on a bare `allow` value.
+  </Card>
+  <Card title="Financial & Operational Approval Controls" icon="calculator" href="/runbooks/governed-close-operations">
+    Close-cycle reconciliations, sign-offs, journal entries, and certifications bound to current organizational authority and exact action context. Approval evidence remains distinct from the final authorization decision and from execution evidence.
+  </Card>
+  <Card title="AI Agent Execution Governance" icon="robot" href="/sdks/overview">
+    Put a real execution gate between an agent request and a consequential tool effect. Verified agent/workload identity is an input; it does not by itself establish authority to act.
+  </Card>
+  <Card title="Security & IT" icon="lock" href="/api-reference/authentication">
+    Fail-closed protected paths, scoped keys, tamper-evident evidence, and SIEM export. Tenant and role boundaries remain separate from protected-action authority.
+  </Card>
+</CardGroup>
+
+## Regulated-workflow use
+
+The same authorization primitive can be used inside regulated workflows with framework-specific control mappings and customer validation responsibilities. AtlaSent does **not** claim that installing an authorization gate by itself makes a customer's system GxP validated, Part 11 compliant, or otherwise certified.
+
+<CardGroup cols={2}>
+  <Card title="Biotech / Pharma" icon="microscope" href="/biotech/overview">
+    Controlled-pilot patterns for clinical and life-sciences consequential actions, with explicit identity, approval, execution, evidence, and validation boundaries.
+  </Card>
+  <Card title="GxP change control" icon="flask-vial" href="/compliance/gxp-change-control">
+    Authorization-gated change-control patterns mapped to relevant GxP frameworks, with customer validation and procedural responsibilities kept explicit.
+  </Card>
+</CardGroup>
+
+## Start shipping
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart/overview">
+    Go from API key to a bounded Permit, execution-boundary verification, and a downloadable audit bundle.
+  </Card>
+  <Card title="API Reference" icon="rectangle-terminal" href="/api-reference/introduction">
+    Every endpoint, rendered from the canonical `openapi.yaml`.
+  </Card>
+  <Card title="SDKs" icon="cubes" href="/sdks/overview">
+    TypeScript and Python clients. One-line install, typed responses.
+  </Card>
+</CardGroup>

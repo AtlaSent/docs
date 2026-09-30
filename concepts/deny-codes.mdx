@@ -1,147 +1,321 @@
 ---
-title: "Deny codes: machine codes for why Atlasent blocked"
-sidebarTitle: "Deny Codes"
-description: "A complete reference for every Atlasent deny code, grouped by engine and deploy-gate category, with TypeScript and Python handling examples."
+title: "Deny codes"
+description: "Stable machine codes the engine returns when a decision is not allow. One page to point at when an operator sees a deny_code in the audit trail."
 ---
+{/* Generated from the Atlasent docs source (site/concepts/deny-codes.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-When Atlasent's evaluation returns anything other than `allow`, the response carries a `deny_code` — a short, stable machine-readable string — alongside a human-readable `deny_reason`. You can safely branch your routing logic, dashboards, and alerting rules on `deny_code` values; they form a closed enum that Atlasent does not rename or remove without a deprecation notice.
+When `evaluate` returns anything other than `allow`, the response
+carries a `deny_code` (short, stable machine string) and a
+`deny_reason` (human-readable detail). Codes are stable across
+versions so dashboards, alerting, and routing logic can pin to them.
 
-Deny codes appear on `deny`, `hold`, and `escalate` decisions alike. The code names *why* the engine reached that state, not merely whether the action was outright blocked. A `hold` code means the action is paused pending an external condition; an `escalate` code means it has been routed to a human reviewer queue.
+The same codes appear on `decision: hold` and `decision: escalate` —
+the code names *why* the engine reached that state, not whether the
+action was outright denied. See the [Glossary](/concepts/glossary)
+for the four-value decision enum.
 
-<Note>
-  Pin your client code to `deny_code` values, not to `deny_reason` strings. Reason strings are human-readable and may change without notice; the codes are the stable contract.
-</Note>
+## Engine codes (from `evaluate`)
 
-## Engine deny codes
+These are returned by the rule engine itself.
 
-These codes are returned by the rule engine on any evaluation.
+### Actor & role
 
-| Code | Meaning |
-|---|---|
-| `DENY_POLICY` | A policy rule explicitly denied this action |
-| `DENY_AUTHORITY` | The actor lacks authority for this action type |
-| `DENY_ENVIRONMENT` | The action is not permitted in this environment |
-| `VERIFY_FAILED` | Permit verification failed — the permit is expired, already consumed, or invalid |
-| `ESCALATE_REQUIRED` | The action requires human approval before it can proceed |
-| `NO_ACTIVE_POLICY` | No published policy bundle exists for this action type |
-| `NO_MATCH` | No policy rule matched and `fail_mode` is `closed` |
-| `FROZEN` | The action falls inside an active freeze window |
-| `RATE_LIMIT_EXCEEDED` | A rate counter exceeded its configured maximum |
-| `INSUFFICIENT_APPROVALS` | The action requires more approvals than were supplied |
-| `RISK_ESCALATE` | The computed risk score met or exceeded the escalate threshold |
-| `AMBIGUOUS_POLICY` | Two or more rules share the same priority — the engine refused to choose |
+<ResponseField name="ACTOR_BLOCKED" type="deny">
+  The actor's ID is on the policy's deny list. **Decision: `deny`.**
+  Operator action: confirm whether the block is intended; if the
+  actor should be reinstated, remove them from the deny list.
+</ResponseField>
 
-## Deploy gate codes
+<ResponseField name="ACTOR_ESCALATED" type="escalate">
+  The actor's ID is on the policy's escalate list — every action
+  by this actor routes to a human reviewer. **Decision: `escalate`.**
+  Operator action: review and resolve the queued item.
+</ResponseField>
 
-These codes are emitted by the Deploy Gate policy, which runs as a pre-check on every `production.deploy` evaluation before the bundle rules engine.
+<ResponseField name="ROLE_ESCALATED" type="escalate">
+  The actor's role is on the policy's escalate list. **Decision:
+  `escalate`.** Operator action: same as `ACTOR_ESCALATED` but the
+  trigger is the role, not the individual identity.
+</ResponseField>
 
-| Code | Meaning |
-|---|---|
-| `NO_ACTIVE_POLICY` | No published policy bundle for this action type |
-| `PILOT_MODE` | The org is in pilot mode; the action requires explicit approval |
-| `TTL_EXPIRED` | The permit TTL exceeded 900 seconds before verification |
+<ResponseField name="ACTOR_HELD" type="hold">
+  The actor's ID is on the policy's hold list — actions wait for
+  manual release. **Decision: `hold`.** Operator action: review
+  and release in the held queue.
+</ResponseField>
 
-<Accordion title="DENY_POLICY — policy rule explicitly denied the action">
-  The active policy contains a rule that matched the request and returned `deny`. Check the `deny_reason` field for the rule ID and the matched condition. Review the policy in the console to determine whether the rule is correctly configured for this actor and context.
-</Accordion>
+<ResponseField name="ROLE_HELD" type="hold">
+  The actor's role is on the policy's hold list. **Decision:
+  `hold`.** Same handling as `ACTOR_HELD` but the trigger is the
+  role.
+</ResponseField>
 
-<Accordion title="DENY_AUTHORITY — actor lacks authority">
-  The actor's role is not on the approved list for this action type. Verify `actorMetadata.role` in your request and confirm the actor has the correct role assigned in your identity system. If the role is correct, check whether the policy's approved role list needs updating.
-</Accordion>
+<ResponseField name="ACTOR_UNVERIFIED" type="deny">
+  The action class requires a **verified actor identity**
+  (`requires_verified_actor = true`) but the request carried no
+  valid, in-binding `actor_identity.v1` assertion — so the request
+  fails closed **before authority evaluation**. **Decision: `deny`.**
+  A self-asserted `actor_id` is not a trusted signal; this is a
+  missing-credential error, not a policy denial. Integrator action:
+  attach a top-level `actor_identity` assertion signed by a trusted
+  issuer, with `subject.principal_id` equal to `actor_id` and its
+  `binding` matching the request's `action_type`, tenant, and
+  `environment`.
+</ResponseField>
 
-<Accordion title="DENY_ENVIRONMENT — environment mismatch">
-  The permit's `environment` field does not match `context.environment`, or `context.environment` is absent. Ensure the permit was issued for the environment you are actually deploying to and that `context.environment` is set in the evaluation request.
-</Accordion>
+### Approvals
 
-<Accordion title="VERIFY_FAILED — permit verification failed">
-  No permit was provided, the permit is missing `permit_id`, or the permit's `verified` flag is not `true`. Call `POST /v1/permits/{id}/verify` with the permit token before submitting the evaluation, and pass the verified result back as `context.permit`.
-</Accordion>
+<ResponseField name="INSUFFICIENT_APPROVALS" type="deny">
+  The action requires *N* approvals; *M* were supplied. **Decision:
+  `deny`.** `deny_reason` carries the exact counts. Operator
+  action: collect the additional approvals and resubmit.
+</ResponseField>
 
-<Accordion title="ESCALATE_REQUIRED — human approval required">
-  An unknown or inconsistent state was detected — for example, a malformed timestamp or a missing `evaluation_confirmed` field. A human reviewer must inspect the context and authorize or deny before the action proceeds. This code is emitted even in pilot (shadow) mode because an inconsistent state means the evaluation itself cannot be trusted.
-</Accordion>
+<ResponseField name="INSUFFICIENT_ROLE_APPROVALS" type="deny">
+  The action requires *N* approvals from a specific role (e.g.
+  *controller*); *M* matching approvals were supplied. **Decision:
+  `deny`.** `deny_reason` names the role and the counts.
+</ResponseField>
 
-<Accordion title="NO_ACTIVE_POLICY — no published bundle">
-  No active policy bundle exists for the `(org_id, action_type)` pair. Because `fail_mode` defaults to `closed`, Atlasent returns `deny`. Publish a policy bundle for this action type to allow evaluations to proceed.
-</Accordion>
+### Risk
 
-<Accordion title="FROZEN — action inside a freeze window">
-  The action was submitted during an active freeze window (for example, a quarter-end close period). The `deny_reason` names the window. Wait for the window to close or request an override if your policy permits one.
-</Accordion>
+<ResponseField name="RISK_ESCALATE" type="escalate">
+  The computed risk score met or exceeded the policy's escalate
+  threshold. **Decision: `escalate`.** `deny_reason` carries the
+  score and threshold.
+</ResponseField>
 
-<Accordion title="TTL_EXPIRED — permit exceeded 15-minute TTL">
-  The permit's `issued_at` timestamp is more than 900 seconds old. Re-issue a fresh permit by calling evaluate again. Do not reuse permit tokens across attempts.
-</Accordion>
+<ResponseField name="RISK_HOLD" type="hold">
+  The computed risk score met or exceeded the policy's hold
+  threshold. **Decision: `hold`.** Operator action: review the
+  evaluated context and release or deny.
+</ResponseField>
 
-## Handling deny codes in your code
+### Rate limits and windows
 
-### TypeScript
+<ResponseField name="RATE_LIMIT_EXCEEDED" type="deny">
+  A user-defined rate counter exceeded its configured maximum
+  inside the configured window. **Decision: `deny`** by default
+  (a policy may override to `hold` or `escalate`). `deny_reason`
+  carries the counter name and the n/m ratio.
+</ResponseField>
 
-```typescript
-try {
-  await client.protect({ ... }, async (permit) => { ... });
-} catch (err) {
-  if (err instanceof AtlaSentDeniedError) {
-    switch (err.denyCode) {
-      case 'ESCALATE_REQUIRED':
-        // Route to approval workflow
-        break;
-      case 'DENY_POLICY':
-        // Show policy violation to user
-        break;
-      case 'INSUFFICIENT_APPROVALS':
-        // Prompt user to collect additional approvals and resubmit
-        break;
-      case 'FROZEN':
-        // Surface "inside freeze window" message
-        break;
-      case 'TTL_EXPIRED':
-        // Re-evaluate to obtain a fresh permit
-        break;
-      default:
-        // Generic "denied — check audit trail" surface
-        break;
-    }
+<ResponseField name="FROZEN" type="deny">
+  The action fell inside an active freeze window (e.g. quarter-end
+  close). **Decision: `deny`.** `deny_reason` names the window.
+  Operator action: wait for the window to close, or grant an
+  override if policy permits.
+</ResponseField>
+
+### Policy resolution
+
+<ResponseField name="NO_MATCH" type="deny">
+  No policy rule matched the request and `fail_mode` is `closed`
+  (the default). **Decision: `deny`.** Operator action: confirm
+  whether a matching rule should exist; if so, publish it.
+</ResponseField>
+
+<ResponseField name="NO_RULES" type="deny">
+  No active constraint bundle is published for this org and
+  `fail_mode` is `closed`. **Decision: `deny`.** Operator action:
+  publish a bundle for the affected action class.
+</ResponseField>
+
+<ResponseField name="NO_TEMPLATE_MATCH" type="deny">
+  A rule matched but its template's condition set could not match
+  any branch. **Decision: `deny`.** Operator action: review the
+  template — usually indicates a constraint expects a context field
+  the caller did not provide.
+</ResponseField>
+
+<ResponseField name="SNAPSHOT_REQUIRED" type="deny">
+  The action class has `requires_state_snapshot = true` (the default
+  for every action class) but the evaluate request did not include a
+  **top-level** `state_snapshot`. **Decision: `deny`**, returned with
+  **HTTP 200** (a normal deny body, not a 4xx error). Caller action:
+  add a top-level `state_snapshot` to the request body — it is *not*
+  nested under `context`:
+
+  ```json
+  "state_snapshot": { "source": "my-ci-system", "complete": true }
+  ```
+
+  The GitHub Action injects this automatically, so you only hit this
+  when calling `/v1-evaluate` directly. SDK callers should branch on
+  the response body's `deny_code`, not on the HTTP status. Retry advice:
+  **retry with the field added** — this is a recoverable, input-shape
+  error, not a policy denial.
+</ResponseField>
+
+<ResponseField name="AMBIGUOUS_POLICY" type="hold">
+  Two or more rules share the same `layer`, `priority`, and
+  `created_at` — the engine refuses to choose between them.
+  **Decision: `hold`** (fail-safe — the action is not denied,
+  but it is not authorized either). Operator action: republish
+  one of the rules with a higher `priority` or a different
+  `layer` to break the tie.
+</ResponseField>
+
+## Deploy gate codes (from `deployment.production`)
+
+These codes are emitted by the Deploy Gate V1 policy, which runs as a
+pre-check on every `deployment.production` evaluation before the bundle
+rules engine. They appear on the `deny_code` field alongside the normal
+`decision` values.
+
+<ResponseField name="DENY_POLICY" type="deny">
+  The active deploy gate policy rule explicitly denied the request.
+  Common causes: `permit.action_type` does not match
+  `deployment.production`; an override block is present but
+  `override_reason` or `authority_basis` is missing. **Decision:
+  `deny`.** Retry advice: **never** — fix the input.
+</ResponseField>
+
+<ResponseField name="DENY_AUTHORITY" type="deny">
+  The actor's role is not on the approved list for
+  `deployment.production`. Approved roles: `admin`, `approver`,
+  `deploy_engineer`. **Decision: `deny`.** Operator action: verify
+  the actor's role in `actorMetadata.role` and re-submit, or
+  request a role change.
+</ResponseField>
+
+<ResponseField name="DENY_ENVIRONMENT" type="deny">
+  The permit's `environment` field does not match
+  `context.environment`, or `context.environment` is absent.
+  **Decision: `deny`.** Operator action: ensure the permit was
+  issued for the environment you are deploying to and that
+  `context.environment` is set.
+</ResponseField>
+
+<ResponseField name="VERIFY_FAILED" type="deny">
+  No permit was provided, the permit is missing `permit_id`, or
+  `permit.verified` is not `true`. **Decision: `deny`.** Operator
+  action: call `POST /v1-verify-permit` with the permit token
+  before submitting the deploy evaluation; pass the result back
+  as `context.permit`.
+</ResponseField>
+
+<ResponseField name="PERMIT_EXPIRED" type="deny">
+  The permit's `issued_at` timestamp is older than the deploy gate's
+  15-minute TTL (900 s), or `issued_at` is absent. This shorter TTL
+  applies to the deploy gate only; the default permit TTL is 1 hour. **Decision: `deny`.**
+  Operator action: re-issue a fresh permit and retry. Do not
+  reuse permit tokens across deploy attempts.
+</ResponseField>
+
+<ResponseField name="ESCALATE_REQUIRED" type="escalate">
+  An unknown or inconsistent state was detected — for example, a
+  malformed ISO-8601 timestamp in `evaluation_confirmed_at` or
+  `permit.issued_at`, or `evaluation_confirmed` is absent.
+  **Decision: `escalate`.** A human reviewer must inspect the
+  context and authorise or deny before the deploy proceeds. This
+  code is emitted even in pilot (shadow) mode because an
+  inconsistent state means the evaluation itself cannot be trusted.
+</ResponseField>
+
+<ResponseField name="OVERRIDE_APPROVED" type="allow">
+  A valid override was applied — both `context.override.override_reason`
+  and `context.override.authority_basis` were present and non-empty.
+  **Decision: `allow`.** The override short-circuits all other deploy
+  gate rules. The `deny_reason` field carries the approver ID and
+  reason for audit purposes. Treat override-approved evaluations as
+  high-priority audit events.
+</ResponseField>
+
+## API error codes (HTTP errors, not decisions)
+
+These are not `deny_code` values on a decision — they are
+`error_code` values on a non-2xx HTTP response. They surface the
+same way in client code: branch on the code, not the message.
+
+<ResponseField name="UNAUTHORIZED" type="error">
+  Missing or invalid API key. HTTP `401`. Check the `Authorization`
+  header and the key's status in the console.
+</ResponseField>
+
+<ResponseField name="RATE_LIMITED" type="error">
+  Concurrent request rate exceeded. HTTP `429`. Retry with
+  exponential backoff. Distinct from `RATE_LIMIT_EXCEEDED` (which
+  is a *decision*, not a transport error).
+</ResponseField>
+
+<ResponseField name="QUOTA_EXCEEDED" type="error">
+  Per-tier monthly evaluation quota exhausted. HTTP `429` with
+  `plan`, `limit`, and `used` fields in the body. Operator action:
+  upgrade the plan or wait until the next billing cycle.
+</ResponseField>
+
+<ResponseField name="BATCH_TOO_LARGE" type="error">
+  More than 1000 items in a `/v1/evaluate:batch` request. HTTP
+  `400`. Split the batch.
+</ResponseField>
+
+## How to handle these in your client
+
+```ts
+const result = await client.evaluate({ /* ... */ });
+
+// Pin to the canonical lowercase 4-value field. The legacy
+// `decision` field returns "ALLOW" / "DENY" only and collapses
+// hold/escalate into "DENY" — read decision_canonical instead.
+if (result.decision_canonical === "allow") {
+  // proceed
+} else {
+  switch (result.deny_code) {
+    case "INSUFFICIENT_APPROVALS":
+    case "INSUFFICIENT_ROLE_APPROVALS":
+      // collect more approvals, resubmit
+      break;
+    case "FROZEN":
+      // surface "inside freeze window" to the caller
+      break;
+    case "AMBIGUOUS_POLICY":
+      // alert ops — policy needs a tie-break
+      break;
+    case "SNAPSHOT_REQUIRED":
+      // add a top-level state_snapshot to the request and retry
+      break;
+    case "ACTOR_HELD":
+    case "ROLE_HELD":
+    case "RISK_HOLD":
+      // surface "waiting for review" UI
+      break;
+    // Deploy gate codes
+    case "DENY_AUTHORITY":
+      // actor's role is not approved — surface role requirement
+      break;
+    case "DENY_ENVIRONMENT":
+      // permit environment mismatch — check context.environment
+      break;
+    case "VERIFY_FAILED":
+      // no verified permit — call verify-permit first
+      break;
+    case "PERMIT_EXPIRED":
+      // permit TTL exceeded — re-issue
+      break;
+    case "ESCALATE_REQUIRED":
+      // inconsistent state — route to human reviewer queue
+      break;
+    case "DENY_POLICY":
+    default:
+      // generic "denied — see audit trail" surface
   }
 }
 ```
 
-### Python
+Pin to the codes, not to `deny_reason` strings. The reasons are
+human-readable and may change without notice; the codes are the
+contract.
 
-```python
-from atlasent import AtlaSentDeniedError
+## Stability
 
-try:
-    with client.with_permit(...):
-        deploy()
-except AtlaSentDeniedError as e:
-    if e.deny_code == 'ESCALATE_REQUIRED':
-        # Route to approval workflow
-        pass
-    elif e.deny_code == 'DENY_POLICY':
-        # Show policy violation to user
-        pass
-    elif e.deny_code == 'INSUFFICIENT_APPROVALS':
-        # Prompt user to collect additional approvals and resubmit
-        pass
-    elif e.deny_code == 'FROZEN':
-        # Surface "inside freeze window" message
-        pass
-    elif e.deny_code == 'TTL_EXPIRED':
-        # Re-evaluate to obtain a fresh permit
-        pass
-    else:
-        # Generic "denied — check audit trail" surface
-        pass
-```
-
-## Code stability
-
-All codes listed on this page are stable across v1. Atlasent may add new codes in future releases; existing codes are not renamed or removed without a deprecation notice published in the changelog.
+Codes in this page are stable across v1. New codes may be added;
+existing codes are not renamed or removed without a deprecation
+notice.
 
 ## Related
 
-- [Runtime Flow](/concepts/runtime-flow) — the fail-closed matrix showing when each error type is raised.
-- [Permit](/concepts/permit) — what an `allow` decision produces, and how `VERIFY_FAILED` and `TTL_EXPIRED` relate to the permit lifecycle.
-- [Audit Chain](/concepts/audit-chain) — deny codes appear in the `deny_code` field of every non-allow audit entry.
-- [Glossary](/concepts/glossary) — canonical definitions for Decision, Hold, Escalate, and Fail-Closed.
+- [Glossary](/concepts/glossary) — canonical decision values.
+- [Permit](/concepts/permit) — what `allow` produces.
+- [Governed close operations](/runbooks/governed-close-operations)
+  — end-to-end flow showing where deny codes appear in audits.

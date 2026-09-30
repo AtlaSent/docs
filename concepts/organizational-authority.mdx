@@ -1,0 +1,151 @@
+---
+title: "What Is Organizational Authority?"
+description: "Organizational authority is the standing, scoped organizational right to cause a class of change. It is distinct from technical access, approval, and per-request authorization."
+---
+{/* Generated from the Atlasent docs source (site/concepts/organizational-authority.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**Organizational authority** is the standing, scoped organizational right to
+cause a class of change.
+
+It answers a different question from identity or technical access. A person,
+service, workflow, or AI agent can be technically capable of performing an
+action without having the organization's authority to cause that change.
+
+AtlaSent treats that distinction as foundational:
+
+> **A plausible request is not organizational authority.**
+
+## Authority is not access
+
+Access systems are necessary, but access and authority are not the same thing.
+
+A user may be able to reach a production system because of an IAM role. A
+service may hold credentials that can invoke an API. An AI agent may have a tool
+available in its runtime.
+
+Those facts establish **technical capability**. They do not necessarily establish
+that the organization authorizes every consequential action that capability can
+produce.
+
+| Concept | Question |
+|---|---|
+| Identity | Who or what is acting? |
+| Access / capability | What can this identity technically reach or invoke? |
+| Organizational Authority | What class of change does the organization give this principal the right to cause? |
+| Authorization | May this exact Action proceed now? |
+
+## Authority belongs to an organization boundary
+
+An AtlaSent organization is the boundary that owns policy, authority
+configuration, connectors, billing, evidence, and audit history. A person may
+hold memberships in several organizations, but each membership and every
+resulting authorization remain bound to one organization.
+
+Membership answers whether an identity may participate in the organization. It
+does not answer whether a particular action is authorized.
+
+<Card title="Organizations and memberships" icon="building">
+  See how organizations of one, internal team members, and external consultants fit the authority model.
+</Card>
+
+## Authority can be structured
+
+Organizational Authority can depend on facts such as:
+
+- role or control ownership;
+- business, security, finance, clinical, or change-management responsibility;
+- direct grants and scoped delegation;
+- effective dates and expiration;
+- resource, environment, or business-unit scope;
+- amount or materiality thresholds;
+- separation of duties;
+- quorum or distinct-actor requirements;
+- emergency or break-glass authority;
+- escalation and temporary coverage.
+
+The exact model is organization-specific. AtlaSent evaluates the applicable
+Authority together with Policy and current request context when a consequential
+Action is attempted.
+
+## Authority is not approval
+
+An **Approval** is verified approver input satisfying a required condition.
+
+An approval can be important evidence, but it does not automatically become
+standing organizational Authority. It also does not by itself establish the
+final per-request Authorization or prove that execution occurred.
+
+For example, a reviewer might approve a proposed production change, while the
+organization separately requires:
+
+- the requester and approver to be different people;
+- the approved commit to match the deployed commit;
+- the deployment window to still be open;
+- the target environment to remain the approved environment;
+- the Permit to be current and unused at execution.
+
+Approval is one part of the authorization context.
+
+## Authority is not authorization
+
+**Authority** is standing and scoped. **Authorization** is per request.
+
+A principal can hold Authority for a class of actions while a particular request
+is denied because the current conditions do not satisfy Policy. Conversely, a
+request cannot manufacture Authority merely by including favorable context or an
+approval.
+
+```text
+standing Authority
+      +
+current Policy
+      +
+Action + Resource + Context + Assertions + required Approval
+      ↓
+per-request Evaluation
+      ↓
+Authorization Decision
+```
+
+<Card title="Authority vs. authorization vs. approval vs. access" icon="scale-balanced" href="/concepts/authority-vs-authorization">
+  Compare the four concepts in one table.
+</Card>
+
+## Humans, AI, and software
+
+Organizational Authority is not a human-only concept.
+
+The actor or execution principal can be:
+
+- a human;
+- an AI agent;
+- a service account;
+- a workload;
+- an integration;
+- a workflow;
+- another software process.
+
+The organizational question remains the same: **what authority, if any, has the
+organization granted for this class of consequential change, and does this
+specific request satisfy the current conditions for exercising it?**
+
+## The architectural role
+
+You may see AtlaSent described as an **organizational authority layer**. That is
+useful architectural shorthand, not a claim of exclusive ownership over the
+generic phrase.
+
+The differentiated AtlaSent model connects:
+
+`Authority → Policy → Authorization → Permit → Verification → Execution → Evidence`
+
+The goal is not merely to record organizational authority. It is to make that
+authority operational at the execution boundary for consequential computational
+actions.
+
+## Related concepts
+
+- [Execution-time authorization](/concepts/execution-time-authorization)
+- [Consequential computational actions](/concepts/consequential-computational-actions)
+- [Permit](/concepts/permit)
+- [Runtime flow](/concepts/runtime-flow)

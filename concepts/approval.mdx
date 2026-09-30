@@ -1,0 +1,58 @@
+---
+title: "Approval"
+description: "Human-in-the-loop gate for hold and escalate decisions."
+---
+{/* Generated from the Atlasent docs source (site/concepts/approval.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+When a policy rule defers an action — emitting a `hold` (waiting on
+an external signal) or `escalate` (routed to a human reviewer queue)
+decision — AtlaSent creates an **approval request** instead of
+issuing a permit. A human with the `approver` role resolves it in
+the console (or via API), and the original evaluation either resumes
+as `allow` (with a permit) or becomes a terminal `deny`.
+
+## Flow
+
+<Steps>
+  <Step title="Agent evaluates">
+    `POST /v1/evaluate` returns a `hold` or `escalate` decision with an `approval_id` (for example, `apr_01HX7...`). No permit is issued yet.
+  </Step>
+  <Step title="Agent waits">
+    Options: poll `/v1/approvals/{id}`, or subscribe to the webhook `approval.resolved`.
+  </Step>
+  <Step title="Human resolves">
+    In the Console, an approver opens the queue, sees the actor/action/target/reason, and clicks **Approve** or **Deny**.
+  </Step>
+  <Step title="Decision emitted">
+    On approve, AtlaSent issues a permit as if the original evaluation had been `allow`. On deny, the original evaluation becomes a terminal `deny`.
+  </Step>
+  <Step title="Agent proceeds or stops">
+    Same as the regular flow from there: verify → act.
+  </Step>
+</Steps>
+
+## When does each apply?
+
+- **`hold`** is for deferrable decisions where an external signal
+  (an approval webhook, a paged on-call response) will arrive without
+  human queue triage. The agent typically polls or subscribes.
+- **`escalate`** is for decisions that go directly to a named
+  reviewer queue. The console surfaces them under
+  `Approvals → Escalations`.
+
+Both states create an `approval_id` and both resolve through the
+same `/v1/approvals/{id}/resolve` endpoint.
+
+## Timeouts
+
+Approvals have a TTL (default 15 minutes). Expired approvals become `deny` with reason `approval_timeout`. Your agent must not wait forever.
+
+## Attribution
+
+The audit chain entry records:
+
+- The original evaluation and its `hold` / `escalate` decision.
+- The approval ID and the human who resolved it.
+- The resolver's reason (if they provided one).
+
+This gives you a complete, attributable trail for any inspector who asks "who said yes?"

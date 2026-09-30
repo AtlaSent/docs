@@ -1,0 +1,50 @@
+---
+title: "Developer / API quickstart"
+description: "Run a safe AtlaSent evaluation, handle a Permit, verify it, and inspect evidence without implying execution occurred."
+---
+{/* Generated from the Atlasent docs source (site/quickstart/developer-api.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## 1. Use a sandbox credential
+
+Use the supported sandbox/test credential path. Do not put a production key into examples, source control, or client-side code.
+
+## 2. Evaluate a protected action
+
+```bash
+curl -X POST https://api.atlasent.io/functions/v1/v1-evaluate \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_type": "production.deploy",
+    "actor_id": "quickstart-user",
+    "context": {
+      "environment": "sandbox",
+      "target": {"id":"service:quickstart","type":"service"},
+      "commit_sha": "1111111111111111111111111111111111111111"
+    }
+  }'
+```
+
+The canonical runtime decision is one of `allow`, `deny`, `hold`, or `escalate`.
+
+## 3. Treat the Permit as a bounded execution artifact
+
+If the response requires and includes a Permit, carry that exact artifact to the execution boundary. Do not translate a bare `allow` into permission to execute.
+
+## 4. Verify before the effect
+
+Use the canonical verifier path documented in [Verify a Permit](/quickstart/verify-permit). Verification checks the artifact's authenticity/currentness and applicable binding, expiry, revocation, and replay state.
+
+**Permit verified does not mean execution happened.** It means the execution gate has established the Permit contract required before the effect.
+
+## 5. Inspect evidence
+
+Continue to [Audit export](/quickstart/audit-export) to inspect the decision and verification evidence. Execution/effect is shown only when the applicable observer/provider evidence establishes it.
+
+## Negative test
+
+Repeat the request after changing a decision-material field such as the commit SHA. On an execution-bound action, the changed request must not be allowed to reuse authorization for the original payload.
+
+<Note>
+Production activation is intentionally outside this quickstart. Complete the sandbox/rehearsal path first, then follow the controlled customer acceptance process.
+</Note>

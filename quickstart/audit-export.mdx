@@ -1,122 +1,73 @@
 ---
-title: "Step 4: Export and verify your signed audit bundle"
-sidebarTitle: "Audit Export"
-description: "Export a hash-linked audit bundle for compliance evidence and verify its chain integrity offline using the atlasent-audit-verify CLI tool."
+title: "4. Export the audit bundle"
+description: "Download a signed, offline-verifiable audit bundle."
 ---
+{/* Generated from the Atlasent docs source (site/quickstart/audit-export.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Every evaluation, permit issuance, and verify event in Atlasent is hash-linked into an immutable, append-only audit chain. When you export an audit bundle, you receive a self-contained NDJSON artifact you can hand to an auditor, store in your evidence repository, or verify on an air-gapped machine — no network connection required.
+AtlaSent's audit export is a **tamper-evident, offline-verifiable evidence artifact**. Evaluation records are hash-linked in chain order; the exported bundle carries the applicable signature and manifest material needed for independent verification. A successful bundle verification establishes the integrity properties the verifier actually checks — it does not, by itself, prove downstream execution, effect, global completeness, or regulatory compliance.
 
-## Export the bundle
-
-Call `POST /v1/audit/exports` with the time range you want to cover. Atlasent assembles all evaluation, permit, and verify events in that window into a single signed NDJSON file:
+## Export via API
 
 ```bash
-curl -X POST https://api.atlasent.io/v1/audit/exports \
+curl -X POST "$ATLASENT_API_URL/v1-export-audit-stream" \
   -H "Authorization: Bearer $ATLASENT_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "time_range": {
-      "start": "2026-05-01T00:00:00Z",
-      "end": "2026-05-31T23:59:59Z"
-    }
-  }'
+  -d '{"projection":"v5"}' \
+  > chain.ndjson
 ```
 
-The API responds with a download URL. Save the file locally:
-
-```bash
-curl -L "<download_url_from_response>" -o audit-export.ndjson
-```
-
-<Note>
-  The `audit` scope is required on your API key to call this endpoint. If your key was created with only the `evaluate` and `verify` scopes, generate a separate key with the `audit` scope for your export pipeline.
-</Note>
+The quickstart key's `audit:read` scope is sufficient. The export is newline-delimited JSON — one chain-ordered audit entry per line, carrying the hash-link and signature fields the offline verifier checks. See Verify the audit chain for the full field list and for large exports.
 
 ## Verify the bundle offline
 
-Use the `atlasent-audit-verify` CLI to confirm the bundle's hash chain is intact. You need the bundle file and the Atlasent public key URL — nothing else:
+Use the public `atlasent-audit-verify` CLI (install and usage). Verify against the public key you pinned from the [Audit signing key](/trust/audit-signing-key) page, not a key returned by the same channel as the export:
 
 ```bash
-# Install the CLI
-brew install atlasent/tap/audit-verify
-# Or download a binary from GitHub Releases:
-# https://github.com/AtlaSent-Systems-Inc/audit-verify/releases
-
-# Verify the bundle
-atlasent-audit-verify \
-  --input audit-export.ndjson \
-  --keys https://api.atlasent.io/v1/public-keys
+atlasent-audit-verify --chain chain.ndjson --keys atlasent-audit-key.pem --require-signatures
 ```
 
-A successful verification prints output similar to:
+`--require-signatures` makes an unloaded or wrong key a failure rather than a silent skip. Verification is performed without trusting a live AtlaSent decision at verification time.
 
-```
-✓ chain continuity:    312 entries, no gaps
-✓ hash linkage:        all prev_hash fields match
-✓ manifest:            entry count and chain_hash match
+A successful verification should be read narrowly:
 
-Bundle is intact.
-```
+- the checked chain/hash relationships are intact;
+- the checked signature/trust-root relationship is valid;
+- the checked manifest/digest relationships are consistent;
+- no unsupported verification claim is implied beyond those checks.
+
+It does **not** mean:
+
+- an `allow` was executed;
+- a Permit was necessarily verified at an execution boundary;
+- the provider/native effect occurred;
+- the bundle contains every record that should exist globally;
+- a regulated system is validated or compliant merely because the evidence verifies.
 
 <Tip>
-  You can give the `audit-export.ndjson` file and the `atlasent-audit-verify` binary to your FDA inspector or external auditor. They can reproduce the full verification on an air-gapped machine using only the public key — no Atlasent account or network access required.
+  Give the bundle and the applicable public verifier instructions to a reviewer or auditor so they can reproduce the integrity checks independently. For regulated use, keep your validation protocol, procedural controls, record-retention obligations, and trust-root procedures in the review scope as well.
 </Tip>
 
-## What the bundle contains
+## How this supports common control requirements
 
-Each export bundle is a single NDJSON file where every line is a signed audit entry. The bundle envelope carries the following top-level fields:
+A tamper-evident, attributable, independently verifiable evidence chain can support controls mapped to requirements such as record protection, secure audit trails, and data-integrity expectations. The exact compliance conclusion remains environment-, procedure-, retention-, configuration-, and validation-dependent.
 
-| Field | What it contains |
-|---|---|
-| `chain_hash` | SHA-256 of the full audit entry sequence, computed over every entry in chain order. |
-| `signature` | Cryptographic signature over the bundle (Ed25519 when signing is GA; `null` until then). |
-| `entries` | All evaluation, permit issuance, and verify events in the requested time window, in chain order. |
-| `signing_key_id` | The key version Atlasent used to sign this bundle, so verifiers can fetch the correct public key. |
-| `issued_at` | ISO 8601 timestamp at which Atlasent generated this bundle. |
+See the relevant compliance mapping pages for the specific AtlaSent control mapping and the customer responsibilities that remain outside the product.
 
-## What the bundle proves
+## You're done with this quickstart stage
 
-A verified bundle provides five independently checkable guarantees:
+At this point you should be able to distinguish four separate facts:
 
-1. **Completeness** — every evaluation and verify event in the time window is present, with no gaps in the hash chain.
-2. **Integrity** — no entry has been altered after the fact; any modification breaks the SHA-256 chain linkage.
-3. **Authenticity** — when Ed25519 signing is generally available, the signature will confirm the bundle was produced by Atlasent and not forged. Until then, the hash chain itself provides integrity evidence.
-4. **Attribution** — every entry records the actor ID, action type, and target that were evaluated.
-5. **Non-repudiation** — the signed chain and key version allow any third party to independently verify the bundle without trusting Atlasent's servers.
+1. ✅ an authorization **Decision** was recorded;
+2. ✅ a bounded **Permit** was issued when required by the exercised path;
+3. ✅ **Permit Verification** succeeded when the quickstart exercised that boundary;
+4. ✅ the resulting audit bundle can be checked for the integrity properties supported by the verifier.
 
-## Compliance framework coverage
+None of those facts should be used to infer a native execution or effect unless the applicable provider/observer evidence establishes it separately.
 
-| Framework requirement | How the bundle satisfies it |
-|---|---|
-| **21 CFR Part 11 §11.10(b)** — Accurate and complete copies of records | The export covers a user-specified time window with no entry gaps, and the hash chain proves completeness. |
-| **21 CFR Part 11 §11.10(c)** — Protection of records; tamper-evident | The SHA-256 hash chain makes any post-hoc modification detectable. |
-| **21 CFR Part 11 §11.10(e)** — Secure, computer-generated audit trails | Atlasent generates entries server-side at evaluation time; no client can inject or suppress entries. |
-| **EU Annex 11 §9** — Audit trails | Each entry carries actor, action, timestamp, and decision, satisfying the attributable-and-contemporaneous requirement. |
-| **ALCOA+** (Attributable, Legible, Contemporaneous, Original, Accurate, Complete, Consistent, Enduring, Available) | Every field maps to one or more ALCOA+ attributes; the signed chain satisfies enduring and available. |
-
-<Note>
-  For the full compliance mapping — including field-level evidence for each 21 CFR Part 11 clause — see the [Compliance → 21 CFR Part 11](/compliance/21-cfr-part-11) reference page.
-</Note>
-
-## You're done
-
-You now have a complete Atlasent integration running end-to-end:
-
-- ✅ A scoped API key stored securely as an environment variable
-- ✅ A protected action evaluated and permitted via `POST /v1/evaluate`
-- ✅ A permit verified and consumed via `POST /v1/verify-permit`
-- ✅ A signed, offline-verifiable audit bundle exported from `POST /v1/audit/exports`
-
-The next step is wiring this same cycle into your real agent or service. Pick an SDK guide to go deeper:
+Next: pick an SDK and wire this into a real protected execution topology.
 
 <CardGroup cols={3}>
-  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript">
-    Full API reference, error types, and advanced patterns for Node.js and edge runtimes.
-  </Card>
-  <Card title="Python SDK" icon="python" href="/sdks/python">
-    Sync and async clients, context manager usage, and retry configuration.
-  </Card>
-  <Card title="REST API" icon="code" href="/api-reference">
-    Complete OpenAPI reference for all Atlasent endpoints.
-  </Card>
+  <Card title="TypeScript SDK" icon="js" href="/sdks/typescript" />
+  <Card title="Python SDK" icon="python" href="/sdks/python" />
+  <Card title="Go SDK" icon="golang" href="/sdks/go" />
 </CardGroup>

@@ -1,0 +1,136 @@
+---
+title: "Architecture"
+description: "How AtlaSent works — the request evaluation flow, system components, fail-closed design, and key invariants."
+sidebarTitle: "Architecture"
+---
+{/* Generated from the Atlasent docs source (site/architecture.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# Architecture
+
+AtlaSent is execution-time authorization infrastructure for consequential computational actions. At the moment an action is about to execute, it answers: **does the organization authorize this exact action right now?**
+
+Authentication establishes the caller. Tool permissions establish technical reach. Neither establishes organizational authority by itself. AtlaSent evaluates trusted assertions about the human, AI, organization, resource, and current context. The result is `allow`, `deny`, `hold`, or `escalate`; only `allow` can produce a bounded permit.
+
+## The flow
+
+```
+Caller (human / CI / AI agent)
+          │
+          │  POST /v1-evaluate
+          ▼
+┌────────────────────────────────────────┐
+│            AtlaSent runtime             │
+│                                        │
+│  1. Authenticate caller (API key)      │
+│  2. Resolve actor + principal context  │
+│  3. Verify trusted assertions          │
+│  4. Determine organizational authority│
+│  5. Evaluate policy + current context  │
+│  6. Record decision; permit on allow   │
+└──────────────────┬─────────────────────┘
+                   │
+        ┌──────────┴──────────┐
+        │                     │
+     allow                 deny / hold
+        │                     │
+        ▼                     ▼
+   permit issued        caller is blocked
+        │
+        ▼
+   caller executes action
+        │
+        │  POST /v1-verify-permit
+        ▼
+┌────────────────────────────────────────┐
+│  AtlaSent verifies permit               │
+│  (single-use, matches action/actor)    │
+│  Adds verification to audit chain      │
+└────────────────────────────────────────┘
+```
+
+Every step is recorded. Nothing is deleted. The chain is hash-linked and Ed25519-signed on export.
+
+## System components
+
+| Component | Purpose |
+|---|---|
+| `/v1-evaluate` | Evaluate an action; returns decision + permit |
+| `/v1-verify-permit` | Verify and consume a permit token |
+| `/v1-verify-chain` | Verify the integrity of an audit export |
+| Policy engine | Rules evaluator — first-match, deny-by-default |
+| Audit chain | Append-only, SHA-256 hash-linked evaluation log |
+| Permit store | Single-use permit nonce ledger |
+| Console | Policy management, key issuance, audit UI |
+
+## Fail-closed design
+
+AtlaSent is designed to fail closed. Every error path collapses to deny:
+
+| Situation | Outcome |
+|---|---|
+| `decision === 'allow'` and permit verified | Action runs |
+| `decision !== 'allow'` | Action blocked |
+| Network error to AtlaSent | Action blocked |
+| Response timeout (10s default) | Action blocked |
+| Malformed API response | Action blocked |
+| Permit replay attempt | Action blocked |
+| Permit expired | Action blocked |
+
+There is no fallback that allows the action when AtlaSent is unreachable. If your authorization layer can be bypassed by making it unavailable, it isn't an authorization layer.
+
+## Policy engine
+
+Policies are evaluated at request time against the active bundle for the action class:
+
+1. **First-match** — rules are evaluated in order; the first matching rule's decision is returned
+2. **Deny-by-default** — if no rule matches, the decision is `deny`
+3. **Most-restrictive-wins** — when multiple policy layers apply, the strictest outcome is used
+
+Rules can check action type, actor and on-behalf-of principal, organization, resource, environment, trusted assertion provenance, approval authority, separation of duties, time windows, transaction context, and risk-envelope fields.
+
+## Permit tokens
+
+A permit is a single-use, time-limited cryptographic token that proves a specific action was authorized. It:
+
+- Is tied to the specific action type, actor, and resource it was issued for
+- Expires after 1 hour by default
+- Is consumed on first verification — cannot be re-used
+- Is recorded in the audit chain on both issuance and consumption
+
+See [Permit Verification](/permit-verification) for the full lifecycle.
+
+## Audit chain
+
+Every evaluation produces an audit record. Records are:
+
+- **Append-only** — no UPDATE or DELETE, ever
+- **Hash-linked** — each record contains the SHA-256 hash of the previous record
+- **Signed** — exports are Ed25519-signed with the AtlaSent signing key
+- **Offline-verifiable** — the full chain can be verified against the published public key without calling AtlaSent
+
+## Deployment postures
+
+| Posture | How | Use case |
+|---|---|---|
+| SaaS | `https://api.atlasent.io/functions/v1` | Most customers |
+| Self-hosted (not yet released) | Kubernetes Helm chart | Regulated environments that need to run the runtime themselves |
+| Air-gapped (roadmap) | Offline license, no outbound network | Environments with no outbound network access |
+
+The SDK, policy format, and audit chain format are designed to be identical across all three postures.
+
+## Latency
+
+The evaluate endpoint is designed for inline, synchronous authorization. The latency figures below are design targets, not measured guarantees:
+
+- P50 latency target: < 30ms
+- P99 latency target: < 100ms
+- Timeout: 10s (configurable; fail-closed on expiry)
+
+See SLO reference for the full targets.
+
+## Next steps
+
+- [Core concepts](/concepts/overview) — the full concept reference
+- [Deploy Gate](/deploy-gate) — the most common integration pattern
+- [AI Agent Governance](/ai-agent-governance) — governing AI agent actions
+- Self-hosting — running AtlaSent in your own infrastructure

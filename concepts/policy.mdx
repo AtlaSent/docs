@@ -1,90 +1,41 @@
 ---
-title: "Policies: versioned rules that govern every evaluation"
-sidebarTitle: "Policy"
-description: "How Atlasent policies work: versioned, immutable rule bundles compiled per action type and org, with first-match evaluation and default deny."
+title: "Policy"
+description: "Versioned rules that decide the outcome for each action type."
 ---
+{/* Generated from the Atlasent docs source (site/concepts/policy.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-A policy is a versioned set of rules that Atlasent evaluates every protected action against. You associate a policy with an action type and an org; Atlasent compiles it into an immutable published bundle and loads that bundle on every evaluation request. Because bundles are immutable, you always get a precise answer to "what policy was in effect when this action ran?" — even years later.
+A **policy** is a versioned set of rules that AtlaSent evaluates every action against. Each policy targets one action type, and its `rules` object says under which conditions that action may proceed.
 
-## What a policy contains
-
-Each policy targets a single `action_type` (such as `production.deploy` or `ehr.write`) and contains an ordered list of rules. Each rule specifies:
-
-- **`id`** — a stable, human-readable identifier for the rule.
-- **`condition`** — a set of field matchers evaluated against the request context.
-- **`decision`** — the outcome if the condition matches: `allow`, `deny`, or `hold`.
-- **`deny_code`** — the machine-readable code to return when `decision` is `deny` (see [Deny Codes](/concepts/deny-codes)).
-
-```json
-{
-  "action_type": "production.deploy",
-  "rules": [
-    {
-      "id": "require-two-reviewers",
-      "condition": { "context.review_count": { "lt": 2 } },
-      "decision": "deny",
-      "deny_code": "DENY_POLICY"
-    },
-    {
-      "id": "block-friday-deploys",
-      "condition": { "context.day_of_week": { "eq": "friday" } },
-      "decision": "hold"
-    },
-    {
-      "id": "default-allow",
-      "condition": {},
-      "decision": "allow"
-    }
-  ]
-}
+```yaml
+action_type: production.deploy
+description: Two approvals, business hours only.
+rules:
+  change_window:
+    timezone: America/Los_Angeles
+    days_of_week: [1, 2, 3, 4]
+    hours: { start: "09:00", end: "17:00" }
+  require_approvals:
+    count: 2
+    exclude_actor: true
+  templates:
+    - decision: allow
 ```
 
-## Rule evaluation order
-
-The rule engine processes rules from top to bottom and applies a **first-match-wins** strategy:
-
-1. The engine tests each rule's `condition` against the incoming context in the order you defined.
-2. When a rule's condition matches, the engine returns that rule's `decision` immediately. No further rules are evaluated.
-3. If no rule matches — because every condition failed — the engine returns `deny` by default. This is the fail-closed guarantee: absence of a matching rule is never an implicit allow.
-
-<Warning>
-  Order matters. Place your most specific rules at the top (for example, explicit denies and holds) and your broader fallback rules lower down. A catch-all `allow` rule at the top would short-circuit all rules beneath it.
-</Warning>
-
-## Immutability and versioning
-
-Policy bundles are **immutable once published**. When you update a policy, Atlasent creates a new bundle version and activates it going forward. The previous bundle version remains queryable.
-
-This gives you two important guarantees:
-
-- Every evaluation decision records the `bundle_id` and `bundle_version` that produced it, so you can reconstruct the exact rule set that was in effect at any point in time.
-- Compliance auditors can verify that a policy was not retroactively changed after a decision was made.
-
-<Note>
-  Updating a policy does not retroactively affect decisions already recorded in the audit chain. Past decisions always reference the bundle version that was active when they ran.
-</Note>
-
-## Policy lifecycle
-
-| Step | What happens |
-|---|---|
-| **Author** | Write the policy JSON with your `action_type` and rules. |
-| **Publish** | POST to `/v1/policies` (or import via the console). Atlasent validates the schema, compiles the bundle, and assigns a `bundle_id` and `bundle_version`. |
-| **Activate** | The new bundle becomes the active version for its `(org_id, action_type)` pair. All subsequent evaluations load this bundle. |
-| **Update** | Submit a new policy. Atlasent creates a new bundle version. The previous version is retained for audit purposes. |
-| **Audit** | Every evaluation decision records `bundle_id` and `bundle_version` in the immutable audit chain. |
+`rules` is the same rule object the runtime evaluates. Templates are checked in order and the first match decides; each template's `decision` is one of the four decision values (`allow`, `deny`, `hold`, `escalate`). See the [Glossary](/concepts/glossary).
 
 ## Fail-closed by default
 
-If no published bundle exists for an `(org_id, action_type)` pair when an evaluation arrives, Atlasent returns `deny` with code `NO_ACTIVE_POLICY`. You never get an implicit allow from a missing policy. This default behavior is controlled by `fail_mode: closed` and applies to every action type unless you explicitly override it.
+If no policy is published for the action and `fail_mode` is `closed` (the default), evaluation returns `deny` with `NO_RULES`. If templates are present but none matches, evaluation returns `deny` with `NO_TEMPLATE_MATCH`. A missing or non-matching policy is never an implicit allow. See [Deny codes](/concepts/deny-codes).
 
-<Tip>
-  You can test a policy's evaluation behavior in the Atlasent console before activating it. Use the preview tool to supply sample actor and context values and inspect which rule would match.
-</Tip>
+## Versioning
 
-## Related
+Policies are immutable once activated. A change produces a new version; the old version remains queryable for audit. This is how AtlaSent gives you a point-in-time answer to "what policy was in effect when this agent took this action in Q2 last year?"
 
-- [Runtime Flow](/concepts/runtime-flow) — how the policy engine fits into the four-hop lifecycle.
-- [Permit](/concepts/permit) — the token that `allow` decisions produce.
-- [Deny Codes](/concepts/deny-codes) — the codes your `deny` rules should reference.
-- [Glossary](/concepts/glossary) — definitions for Bundle, Constraint, and Policy.
+## Import paths
+
+- **Policy as code:** keep policies as files in a repo and validate, test, plan, and apply them with the [`atlasent-policy` CLI](/sdks/cli).
+- **Starter:** `gxp-starter` policies for 21 CFR Part 11, EU Annex 11, and ICH E6 GCP are not yet publicly available.
+
+## Authoring a policy
+
+See the [`atlasent-policy` CLI](/sdks/cli) for the file format, offline tests, and how to preview changes with `plan` before you `apply` them.

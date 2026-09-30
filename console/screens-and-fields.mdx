@@ -1,0 +1,254 @@
+---
+title: "Console Screens and Fields"
+sidebarTitle: "Screens and fields"
+description: "A screen-by-screen reference for the primary signed-in AtlaSent Console, including the meaning and safe use of its common fields."
+---
+{/* Generated from the Atlasent docs source (site/console/screens-and-fields.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+This reference covers the 13 screens in the reduced customer workspace. Your role and enabled features may add, remove, or lock controls. When a value is blank, first confirm the organization, environment, filters, and time window.
+
+## Dashboard
+
+The Dashboard is an operational summary, not the authorization engine itself.
+
+| Area | Meaning | How to use it |
+|---|---|---|
+| Activity cards | Counts of recent decisions, permits, holds, or related events. | Use them to spot changes, then open the underlying list for details. |
+| Alerts | Conditions that may require attention, such as uncovered actions or pending work. | Open the related record before acting; a card is a summary. |
+| Coverage | Whether protected actions have applicable policy coverage. | Investigate uncovered actions before moving them to enforced mode. |
+| Recent activity | The newest visible authorization records. | Use record links to correlate the decision, permit, verification, and evidence. |
+
+## Protected Actions
+
+A Protected Action is a named class of consequential operation that must be evaluated before execution.
+
+| Field | Meaning | Guidance |
+|---|---|---|
+| Name | Human-readable label. | Make it recognizable to operators and auditors. |
+| Action type | Stable machine key or slug, such as `journal_entry.approve`. | Treat it as an integration contract. Avoid renaming it after callers use it. |
+| Description | Optional explanation of the business operation and control objective. | State what changes if the action executes. |
+| Category | Reporting group: deployment, data export, agent action, external sharing, financial, or other. | Choose the closest operational domain; category does not itself grant authority. |
+| Enforcement | Rollout mode: shadow, advisory, or enforced. | Start with observation, validate behavior, then deliberately move to enforcement. |
+| Authority scope | Authority family required by the action, such as deployment, override, attestation, audit access, or financial. | Select the narrowest scope that matches the action. |
+| Status | Current availability or lifecycle state of the action definition. | Confirm it is active before expecting runtime evaluation. |
+| Coverage | Whether an active policy applies. | No published policy coverage should be treated as deny-by-default. |
+
+### Enforcement modes
+
+| Mode | Meaning |
+|---|---|
+| Shadow | Evaluate and observe without using the result to block the underlying workflow. |
+| Advisory | Return and surface the authorization result while the integration remains non-blocking. |
+| Enforced | Require the configured authorization outcome and permit behavior before the protected action proceeds. |
+
+Changing enforcement can affect production behavior. Confirm policy coverage, test the expected outcomes, and use an authorized change process.
+
+## Decisions
+
+Decisions are runtime evaluation records. The canonical outcomes are `allow`, `deny`, `hold`, and `escalate`.
+
+| Field or filter | Meaning |
+|---|---|
+| Outcome | `allow` authorizes the evaluated request; `deny` blocks it; `hold` waits for required input; `escalate` routes it for review. |
+| Environment | Test or live context in which the request was evaluated. |
+| Signature | Whether the decision evidence includes the expected signature state. |
+| Action type | Protected Action evaluated by the request. |
+| Actor ID | Person, service, workflow, or agent that proposed the action. |
+| Target or resource | Exact object the actor intended to affect. |
+| Reason or deny code | Human-readable explanation and, when available, stable machine-readable result code. |
+| Policy or version | Policy artifact used for the result. |
+| Decision ID | Stable correlation key for related permits, verifications, and evidence. |
+| Time window | Date and time filter applied to the list. |
+
+An `allow` is scoped to the exact evaluated facts. Do not reuse it for a different actor, action, target, environment, or payload.
+
+## Permits
+
+A permit is a bounded positive authorization artifact issued after an eligible `allow` decision.
+
+| Field or filter | Meaning |
+|---|---|
+| Status | Active, expired, consumed, revoked, or another lifecycle state. |
+| Action class | Protected Action to which the permit is bound. |
+| Actor | Actor authorized by the permit. |
+| Environment | Test or live boundary for the permit. |
+| Issued at | Server time when the permit was created. |
+| Expires at | Last time at which the permit can remain eligible for verification. |
+| Decision ID | Evaluation that produced the permit. |
+| Permit ID | Stable identifier used for verification and correlation. |
+| Revocation reason | Why an authorized operator invalidated the permit. |
+
+### Token Inspector
+
+Use the Token Inspector to decode and check a permit without treating the displayed token as a reusable secret. Confirm signature, expiry, actor, action, resource, and environment. A valid permit is still limited to its bound request and lifecycle state.
+
+Never paste live permit tokens into documentation, tickets, or chat. Use IDs and sanitized evidence instead.
+
+## Verification History
+
+Verification History records checks performed at or near the execution boundary.
+
+| Field or filter | Meaning |
+|---|---|
+| Evidence type | Kind of verification or evidence event recorded. |
+| Outcome | Result of the verification attempt, such as valid or invalid. |
+| Decision ID | Authorization decision connected to the verification. |
+| Permit ID | Permit that was checked. |
+| Actor | Caller or execution boundary associated with the event. |
+| Timestamp | Server-recorded time of the verification event. |
+| Decision timeline | Grouped view showing related lifecycle events. |
+| Flat log | Event-by-event chronological view. |
+
+Verification establishes that the permit check met the verification contract at that moment. It does not, by itself, prove that the external system completed the business action.
+
+## Holds and Approvals
+
+Use Holds & Approvals for decisions awaiting authorized human input.
+
+| Field | Meaning |
+|---|---|
+| Type | Queue item kind, such as hold, escalation, or approval request. |
+| Action | Protected Action under review. |
+| Requestor | Actor or user that initiated the request. |
+| Status | Pending, approved, denied, resolved, expired, or another queue state. |
+| Created | Time the item entered the queue. |
+| Resolved | Time and identity associated with resolution, when complete. |
+| Decision | Result connected to the review. |
+| Reason | Policy explanation or reviewer rationale. |
+
+Approval is an input into authorization, not the final authorization artifact. Confirm that a released request receives the expected decision and permit before execution.
+
+## Audit Trail
+
+Audit Trail links the records needed to reconstruct authorization activity.
+
+| Tab or field | Meaning |
+|---|---|
+| Evidence Log | Chronological authorization and evidence records. |
+| Proof Chain | Links and integrity information used to detect alteration, omission, or reordering. |
+| Governance Events | Administrative and governance changes relevant to authorization. |
+| ALCOA+ mode | Review layout emphasizing attributable, legible, contemporaneous, original, accurate, and related data-integrity expectations. |
+| Timestamp | When the event was recorded. |
+| Actor and agent | Human and automated identities connected to the event. |
+| Action and target | Proposed operation and affected resource. |
+| Authority basis | Organizational authority or approval basis evaluated. |
+| Model or policy version | Versioned decision input associated with the record. |
+| Hash and signature | Integrity and authenticity data for verification. |
+
+Prefer the precise terms **tamper-evident**, **hash-linked**, **signed**, and **offline-verifiable** only where the exported artifact and verification procedure support those properties.
+
+## Reports and Evidence
+
+Reports & Evidence packages records for operational, executive, compliance, or audit review.
+
+| Field | Meaning |
+|---|---|
+| Report type | The evidence or review package to generate. |
+| Date range | Time boundary for included records. |
+| Environment | Test, live, or all eligible activity. |
+| Filters | Optional limits such as action, actor, outcome, or framework. |
+| Format | Available export representation. |
+| Generated at | Time the package was created. |
+
+An export is a point-in-time representation. Retain the report ID, generation time, filters, and verification instructions with the artifact.
+
+## Policies
+
+Policies express deterministic rules for evaluating protected actions.
+
+| Tab or field | Meaning |
+|---|---|
+| Rules | Ordered authorization conditions and outcomes. |
+| Constraints | Limits such as roles, amounts, environments, resources, approvals, or time windows. |
+| Builder | Guided interface for assembling policy logic. |
+| Simulate | Tests sample facts without making the simulation a production authorization. |
+| Bundles | Versioned sets of policies prepared for runtime use. |
+| Status | Draft, published, active, archived, or another lifecycle state. |
+| Version | Stable revision used to reproduce and audit a decision. |
+
+Authoring or saving a draft does not make it active at runtime. Confirm the intended bundle and version are published or provisioned according to your organization’s workflow. When no published policy covers a protected action, the safe expectation is deny-by-default.
+
+Advanced policy configurators, developer tools, graph views, and version tools may be visible to authorized administrators. Use them only when your organization has enabled the associated workflow.
+
+## Protected Systems
+
+Protected Systems is the integration front door for systems whose critical actions are governed.
+
+| Field | Meaning |
+|---|---|
+| System type | Execution-system family or connector category. |
+| Availability | Available, configured, disconnected, preview, or coming-soon packaging state. |
+| Connection status | Current Console view of connector health or setup state. |
+| Environment | Test or live integration boundary. |
+| Protected actions | Action classes mapped to the system. |
+
+A “coming soon” native connector means the packaged integration is not generally available. It does not mean the underlying action type cannot be protected through an API or custom integration.
+
+## Users and Roles
+
+Users & Roles controls who can access the organization and which Console capabilities they receive.
+
+| Role | Intended access |
+|---|---|
+| Owner | Full organization control, including billing and high-impact settings. |
+| Admin | Team, policy, and configuration administration. |
+| Auditor | Read-focused access to logs, reports, and compliance evidence. |
+| Operator | Operational evaluations, actions, holds, and approvals allowed by policy. |
+| Member | Basic organization access. |
+| Observer | View-only access to permitted surfaces. |
+| Bookkeeper | Financial oversight and billing-oriented access where enabled. |
+| Regulator | Controlled external audit access where enabled. |
+| Demo | Limited access to designated demonstration experiences. |
+
+Role labels are not a substitute for runtime authority. Server-side permissions and policy remain authoritative. Use least privilege and remove stale invitations or memberships promptly.
+
+## API Keys
+
+API keys authenticate SDK and integration calls. Treat every raw key as a secret.
+
+| Field | Meaning | Guidance |
+|---|---|---|
+| Label | Human-readable purpose. | Name the system, environment, and owner. |
+| Preset | Starting scope set, such as Evaluate only, Full SDK, Audit read-only, GxP clinical, SaaS Production Safeguard, or Custom. | Review the resulting scopes; a preset is a convenience, not a separate security boundary. |
+| Environment | Test or live key namespace. | Use test keys for development and isolated demonstrations. |
+| Scopes | API capabilities granted to the key. | Grant only the operations the integration needs. |
+| Expires in days | Requested credential lifetime. | Prefer a finite lifetime and rotate before expiry. |
+| IP allowlist | Optional CIDR ranges permitted to use the key. | Add stable egress ranges when your deployment supports them. |
+| Created or last used | Credential lifecycle and activity metadata. | Investigate unfamiliar usage and revoke unused keys. |
+
+The raw key is displayed once. Store it in an approved secret manager; do not put it in source code, documentation, screenshots, or support requests.
+
+## Settings
+
+Settings groups personal, organization, access, security, credential, and commercial configuration.
+
+| Tab | Common fields and meaning |
+|---|---|
+| Profile | Your name, contact information, and personal preferences. |
+| Alert Rules | Which authorization conditions create alerts and where they are delivered. |
+| Organization | Organization name, billing email, industry, compliance frameworks, stable slug or ID, session timeout, and failure posture. |
+| Team | Members, invitations, and membership status. |
+| Roles | Role assignments and permitted capabilities. |
+| Security | MFA, sessions, and related identity controls. |
+| API Keys | Credential creation, scope, rotation, and revocation. |
+| Billing | Plan, billing contact, and subscription information. |
+
+### Failure posture
+
+| Value | Meaning |
+|---|---|
+| Closed | If authorization cannot be completed, the protected action does not proceed. Recommended for real control enforcement. |
+| Open | The integration may proceed during an authorization failure. Use only with an explicitly accepted risk decision. |
+| Audit only | Record or observe without blocking, when supported by the integration. |
+
+Organization slug and ID are stable integration identifiers. Change them only through a supported migration process. Advanced settings such as SSO, mTLS, data boundaries, overrides, routing, risk, schedules, alerts, or integrations appear only when enabled and authorized.
+
+## Troubleshooting empty or missing data
+
+1. Confirm you are in the intended organization.
+2. Confirm the environment and time filters.
+3. Clear optional search and status filters.
+4. Check whether your role includes the required permission.
+5. Confirm the feature is included in the organization’s plan and enabled.
+6. Follow the record IDs across Decisions, Permits, Verification History, and Audit Trail.
+7. If a field still appears inconsistent, preserve the record ID and timestamp when contacting support; never include a raw API key or permit token.

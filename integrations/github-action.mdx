@@ -1,119 +1,159 @@
 ---
-title: "Gate production deploys with the Atlasent GitHub Action"
-sidebarTitle: "GitHub Action"
-description: "Use atlasent-action in a GitHub Actions workflow to gate production deployments — require an Atlasent permit before any deploy step runs."
+title: "GitHub Action"
+description: "Gate production deploys on an AtlaSent permit."
 ---
+{/* Generated from the Atlasent docs source (site/integrations/github-action.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The Atlasent GitHub Action calls `/v1/evaluate` before your deploy step and stops the job if authorization is denied, held, or escalates without resolution. Drop it into any existing workflow as a single step — no SDK installation required. If the Atlasent API is unreachable for any reason, the action fails the job rather than silently allowing the deploy through.
+`Atlasent/atlasent-action` is a GitHub Action that calls `/v1-evaluate` before your deploy step and fails the job if the action isn't permitted.
 
 ## Minimal usage
 
-Add the gate step before your deploy step. Store your API key in **Repository Settings → Secrets and variables → Actions** as `ATLASENT_API_KEY`.
-
 ```yaml
-- name: Atlasent Deploy Gate
-  uses: atlasent-systems-inc/atlasent-action@v1
-  with:
-    api-key: ${{ secrets.ATLASENT_API_KEY }}
-    action-type: production.deploy
-    actor-id: ${{ github.actor }}
-    target-id: my-service
-    context: |
-      {
-        "git_sha": "${{ github.sha }}",
-        "branch": "${{ github.ref_name }}"
-      }
-```
-
-If the decision is `allow`, the action sets `permit-token` and `evaluation-id` outputs and the workflow continues. On any other decision — `deny`, `hold`, or `escalate` — the step fails and the job stops before the deploy step runs.
-
-## Full deployment workflow
-
-Use the `id` field on the gate step to reference its outputs in downstream steps. Pass the permit token to your deploy script so it can write the token into the audit record.
-
-```yaml
-name: Deploy to Production
-
-on:
-  push:
-    branches: [main]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Atlasent Deploy Gate
+      - name: AtlaSent gate
         id: gate
-        uses: atlasent-systems-inc/atlasent-action@v1
+        uses: Atlasent/atlasent-action@v1
+        env:
+          ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+          ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
         with:
-          api-key: ${{ secrets.ATLASENT_API_KEY }}
-          action-type: production.deploy
-          actor-id: ${{ github.actor }}
+          action: production.deploy
           target-id: ${{ github.repository }}
-          environment: production
-          context: |
-            {
-              "git_sha": "${{ github.sha }}",
-              "branch": "${{ github.ref_name }}",
-              "run_id": "${{ github.run_id }}"
-            }
+          actor: ${{ github.actor }}
 
       - name: Deploy
-        run: ./deploy.sh
-        env:
-          PERMIT_TOKEN: ${{ steps.gate.outputs.permit-token }}
+        if: steps.gate.outputs.verified == 'true'
+        run: ./scripts/deploy.sh
 ```
+
+The API key and runtime base URL are read from the `ATLASENT_API_KEY` and
+`ATLASENT_BASE_URL` environment variables — there is no `api-key` `with:`
+input. `ATLASENT_BASE_URL` should point at the AtlaSent functions base,
+`https://api.atlasent.io/functions/v1` (self-hosted deployments use their own
+functions base instead); the `api-url` input can be used instead of/to
+override the env var.
+
+For change-controlled action types such as `production.deploy`, grant the
+job `permissions: id-token: write` so the action can mint a verified GitHub
+workload identity for the actor.
+
+The `atlasent-action` step fails the job if the decision is `deny`, `hold`, or `escalate`, if permit verification fails, or if the AtlaSent API is unreachable. **Gate the deploy step on `steps.gate.outputs.verified == 'true'`, not on `decision`** — `verified` is only `true` when the evaluation returned `allow` *and* the server confirmed the permit was verified.
+
+## Execution-boundary mode
+
+For a stronger boundary across jobs, issue the permit in one job without
+consuming it (`mode: evaluate-only`), then verify and consume it immediately
+before the protected step, in a later job:
+
+```yaml
+  authorize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # GitHub workload identity for the verified actor
+    outputs:
+      permit: ${{ steps.gate.outputs.permit-token }}
+      execution_hash: ${{ steps.gate.outputs.execution-hash }}
+    steps:
+      - id: gate
+        uses: Atlasent/atlasent-action@v1
+        env:
+          ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+          ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+        with:
+          action: production.deploy
+          target-id: ${{ github.repository }}
+          environment: production
+          mode: evaluate-only
+
+  deploy:
+    needs: authorize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - id: verify
+        uses: Atlasent/atlasent-action@v1
+        env:
+          ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+          ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+        with:
+          verify-permit: 'true'
+          permit-token: ${{ needs.authorize.outputs.permit }}
+          execution-hash: ${{ needs.authorize.outputs.execution_hash }}
+          action: production.deploy
+          target-id: ${{ github.repository }}
+          environment: production
+
+      - if: steps.verify.outputs.verified == 'true'
+        run: ./scripts/deploy.sh
+```
+
+`mode: evaluate-only` issues the permit but deliberately leaves it
+unconsumed (outputs `permit-issued=true`, `verified=false`); the later
+`verify-permit: 'true'` step re-verifies and consumes it at the real
+execution boundary. Gate the protected step on that later step's
+`verified` output, never on the first step's decision.
+
+For `production.deploy`, pass the first step's `execution-hash` output
+unchanged to the verify step's `execution-hash` input — it is the
+runtime-derived binding for the authorized change, and the verify step
+fails closed without it. Do not compute or substitute this value in the
+workflow. The action/target/environment inputs must also match the ones
+used at issue time.
 
 ## Wait-for-approval mode
 
-Set `wait-for-approval: true` to block the job when the decision is `hold` or `escalate` instead of failing immediately. The job suspends and polls until a reviewer approves or denies in the Atlasent Console (or connected [Slack bot](/integrations/slack-approval-bot)).
+By default a `hold` or `escalate` decision fails the step. Set
+`wait-for-approval: 'true'` (default `enforce` mode only) to pause instead:
+the step polls for a human resolution in the AtlaSent Console, bounded by
+`max-wait-minutes` (default `30`).
 
 ```yaml
-- name: Atlasent Deploy Gate (wait for approval)
-  uses: atlasent-systems-inc/atlasent-action@v1
-  with:
-    api-key: ${{ secrets.ATLASENT_API_KEY }}
-    action-type: production.deploy
-    actor-id: ${{ github.actor }}
-    target-id: ${{ github.repository }}
-    wait-for-approval: true
+      - name: AtlaSent gate (wait for approval)
+        id: gate
+        uses: Atlasent/atlasent-action@v1
+        env:
+          ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+          ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+        with:
+          action: production.deploy
+          target-id: ${{ github.repository }}
+          wait-for-approval: 'true'
+          max-wait-minutes: '60'
 ```
 
-<Note>
-  GitHub Actions jobs time out after 6 hours by default. Set `timeout-minutes` on the job to a value that matches your expected approval window so the job does not consume runner minutes indefinitely.
-</Note>
+On approval, the step re-verifies the fresh permit against the same
+action, target, environment, and execution binding before treating it as
+`allow` — an "approved" status alone is never trusted. A denied, expired,
+or timed-out request fails the step closed. Set the job's
+`timeout-minutes` above `max-wait-minutes` so the runner does not cut the
+wait short.
 
-## Inputs
-
-| Input | Required | Description |
-|---|---|---|
-| `api-key` | Yes | API key with `evaluate` scope |
-| `action-type` | Yes | Action type slug (e.g. `production.deploy`) |
-| `actor-id` | Yes | Identity of the deployer |
-| `target-id` | Yes | Resource being deployed |
-| `environment` | No | Target environment (default: `production`) |
-| `context` | No | JSON object of additional context fields |
-| `wait-for-approval` | No | Block and wait if escalation is required (default: `false`) |
-| `fail-on-deny` | No | Fail the step on deny (default: `true`) |
+> **Trajectory verify is not a supported mode.** Earlier material referenced `trajectory-verify` and `/v1/trajectory-verify` before a server-side endpoint existed. Do not use those inputs or outputs. Use the execution-boundary pattern above for exact-action authorization and verification.
 
 ## Outputs
 
-| Output | Description |
+| Output | Value |
 |---|---|
-| `decision` | The authorization decision: `allow`, `deny`, `hold`, or `escalate` |
-| `permit-token` | Single-use permit token (only present on `allow`) |
-| `evaluation-id` | Unique ID for this evaluation, for audit chaining |
+| `decision` | `allow` / `deny` / `hold` / `escalate`. Single-eval path only. |
+| `verified` | `"true"` only when the decision was `allow` **and** the server confirmed the permit was verified (and, in boundary mode, not replayed). Gate on this, not `decision`. |
+| `permit-token` | The permit token. Already consumed in the default `enforce` mode (audit reference only); unconsumed in `evaluate-only` mode until a later `verify-permit` step consumes it. |
+| `evaluation-id` | The evaluation ID for the audit trail. |
+| `execution-hash` | Runtime-derived execution binding. In `evaluate-only` mode, pass it unchanged to the later `verify-permit` step. |
+| `proof-hash` | Cryptographic proof hash. |
+| `risk-score` | Numeric risk score 0–100; empty string when the evaluator returned no risk assessment. |
+| `verify-outcome` | Coarse verification outcome (`verified` / `mismatch` / `expired` / `revoked` / `replay_blocked` / `invalid`). |
+| `verify-error-code` | Precise runtime verify error code when verification failed (e.g. `PAYLOAD_MISMATCH`, `PERMIT_EXPIRED`). |
 
-## Fail-closed guarantee
+This is a curated subset of the commonly-used outputs. See [`action.yml`](https://github.com/Atlasent/atlasent-action/blob/main/action.yml) for the complete list of supported inputs and outputs.
 
-If the Atlasent API is unreachable — network partition, DNS failure, or any HTTP error — the action **fails the job**. There is no "skip on outage" mode. A deploy that bypasses authorization is indistinguishable from one that was never checked, so the action treats an API error the same as a `deny`.
+## Fail-closed
 
-<Warning>
-  Do not set `fail-on-deny: false` in production workflows. That setting exists for testing and dry-run purposes only. With it disabled, a denied evaluation will not stop the deploy step from running.
-</Warning>
-
-## Audit trail
-
-Every workflow run creates an evaluation record in the Atlasent audit chain. The record automatically includes the GitHub Actions context — repository, ref, SHA, run ID, and actor — so you can cross-reference any deployment permit with the exact commit and workflow run that triggered it. View evaluation records in the Atlasent Console under **Audit → Evaluations**.
+The protected step must not execute when the decision is `deny`, `hold`, or `escalate`; when no permit is issued; when permit verification fails; when a permit is expired, revoked, invalid, or already consumed; or when the AtlaSent API is unreachable or authentication fails. No "skip on error" mode exists — that would defeat the point of the gate.

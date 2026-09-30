@@ -1,95 +1,65 @@
 ---
-title: "21 CFR Part 11 electronic records compliance with Atlasent"
-sidebarTitle: "21 CFR Part 11"
-description: "Map Atlasent audit chain, permit tokens, and policy rules to FDA 21 CFR Part 11 electronic records and electronic signature requirements."
+title: "21 CFR Part 11"
+description: "FDA regulation on electronic records and electronic signatures — which section maps to which AtlaSent primitive."
 ---
+{/* Generated from the Atlasent docs source (site/compliance/21-cfr-part-11.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-21 CFR Part 11 is the FDA regulation governing **electronic records and electronic signatures** in regulated life-sciences environments. When AI agents create, modify, amend, or sign electronic records, Part 11 applies to those actions. Atlasent satisfies Part 11's core requirements through three primitives working together: a deterministic, schema-validated rule engine; an append-only, hash-linked audit chain written before every API response; and tamper-evident permit tokens that serve as the electronic authorization record bound to each action.
+21 CFR Part 11 is the FDA regulation governing **electronic records and electronic signatures** in regulated life-sciences environments. When AI agents create, modify, amend, or sign electronic records, Part 11 applies.
 
-## Framework mapping
+## Requirement-to-primitive mapping
 
-The table below maps each relevant 21 CFR Part 11 section to the specific Atlasent primitive that satisfies it.
-
-| 21 CFR Part 11 section | Requirement | Atlasent primitive |
+| § | Requirement | AtlaSent primitive |
 |---|---|---|
-| §11.10(a) | Validation — system must be validated | Deterministic rule engine with test vectors |
-| §11.10(c) | Protection of records — limited access | API key scopes, RBAC roles |
-| §11.10(d) | Limiting access to authorized individuals | Evaluation actor identity, policy rules |
-| §11.10(e) | Audit trail — secure, computer-generated | Hash-linked, append-only audit chain |
-| §11.10(g) | Authority checks — ensure only authorized can use | Permit token + verify-permit endpoint |
-| §11.50 | Signature manifestations — identify signer, meaning | Actor ID, action type, decision ID in audit entry |
-| §11.70 | Signature/record linking | Decision ID links evaluation, permit, and audit records |
+| 11.10(a) | System validation | Policies are schema-validated on import; rule set is fingerprinted and version-locked. |
+| 11.10(b) | Accurate and complete copies | [Signed audit bundle export](/quickstart/audit-export); verifiable offline. |
+| 11.10(c) | Protection of records | Append-only, hash-linked [audit chain](/concepts/audit-chain); no UPDATE/DELETE possible. |
+| 11.10(d) | Limiting access | Scoped [API keys](/api-reference/authentication#scopes) + role-based Console access. |
+| 11.10(e) | Secure, computer-generated audit trails | Every `/evaluate` call produces an immutable chain entry, atomic with the decision. |
+| 11.10(g) | Authorized signatories only | Policy rules enforce role-based authorization; overrides are attributable. |
+| 11.50     | Signature manifestation | Ed25519-signed [permit tokens](/concepts/permit) linked to the action in the audit chain. |
+| 11.70     | Signature-to-record linking | Permit ID stored in audit entry; inseparable from the action record. |
+| 11.100    | Unique electronic signature | API key hash + actor ID + permit ID form a unique attributable tuple per action. |
 
-## Permit tokens as audit-level signature equivalents
+## Starter policy
 
-Under §11.50, an electronic signature must be linked to its record so it cannot be excised, copied, or transferred to another record. Atlasent's permit token fulfills this requirement as follows:
-
-1. The token is a cryptographically signed authorization record containing the agent ID, action type, policy ID, and timestamp. HMAC-SHA256 integrity is enforced at GA today; Ed25519 signing of individual audit entries is available when configured and will become mandatory in a later phase — see the [Security Overview](/trust/security-overview) for current status.
-2. The token ID is written into the audit chain at evaluation time — inseparable from the action record.
-3. You store the token alongside the record modification in your own system.
-4. You can verify the token at any time via `POST /v1/permits/{id}/verify`, which returns a pass/fail result plus the reason code.
-
-<Note>
-  The decision ID links the `/evaluate` call, the permit token, and the audit entry into a single attributable tuple. You should store this ID with every record modification your agent makes so that any future inspection can trace the authorization back to the original evaluation.
-</Note>
-
-## Starter policy rules
-
-The following JSON policy snippet denies the two operations that would violate §11.10(e) — deletion of records and deletion of audit logs. Import this into your Atlasent policy before any agents operate on electronic records.
+A ready-made Part 11 starter policy (`gxp-starter`) is not yet publicly available. Its core rules:
 
 ```json
-{
-  "action_type": "audit_log.delete",
-  "rules": [
-    {
-      "id": "deny-audit-log-deletion",
-      "condition": {},
-      "decision": "deny",
-      "deny_code": "DENY_POLICY",
-      "message": "21 CFR Part 11: Audit log records cannot be deleted"
-    }
-  ]
-}
+[
+  { "action_type": "ehr:read",              "decision": "allow" },
+  { "action_type": "ehr:write",             "decision": "allow" },
+  { "action_type": "ehr:amend",             "decision": "allow" },
+  { "action_type": "ehr:delete",            "decision": "deny",   "reason": "§11.10(e): records must not be deleted" },
+  { "action_type": "audit:delete",          "decision": "deny",   "reason": "§11.10(e): audit trails must be secure and unalterable" },
+  { "action_type": "export:unsigned",       "decision": "deny",   "reason": "§11.50: export requires electronic signature" },
+  { "action_type": "export:signed",         "decision": "allow" },
+  { "action_type": "audit:disable",         "decision": "deny",   "reason": "§11.10(e): audit trails must be active at all times" }
+]
 ```
 
-You should add a matching rule for `ehr.delete` (or the equivalent action type in your system) with the message `"21 CFR Part 11: Electronic records cannot be deleted — §11.10(e)"`.
+## Permit tokens as signatures
 
-<Warning>
-  If you do not explicitly deny `audit_log.delete` and `ehr.delete` in your policy, Atlasent's fail-closed default applies only to unevaluated actions. Actions that reach the rule engine without a matching deny rule will follow your policy's default decision. Always set your default decision to `deny` for Part 11 workloads and enumerate only the actions you explicitly permit.
-</Warning>
+Under §11.50, an electronic signature must be linked to its record so it cannot be excised, copied, or transferred. AtlaSent's [permit token](/concepts/permit):
+
+1. Is an Ed25519-signed JWT containing agent ID, action type, policy ID, and timestamp.
+2. Has its ID stored in the audit chain at evaluation time.
+3. Must be stored alongside the action's record in your own system.
+4. Is verifiable via `POST /v1-verify-permit`, producing a yes/no answer plus the reason.
 
 ## Implementation checklist
 
-Work through the following steps before you put agents into production against regulated electronic records.
+- [ ] Import a 21 CFR Part 11 starter policy. (The `gxp-starter` policies are not yet publicly available; until they are, author the equivalent rules for your organization.)
+- [ ] Set a stable, human-readable `actor.id` for each AI agent.
+- [ ] Store `permit_id` with every record modification.
+- [ ] Ensure `ehr:delete`, `audit:delete`, and `audit:disable` rules are `deny`.
+- [ ] Export and archive audit bundles monthly. [Audit export →](/quickstart/audit-export)
+- [ ] List AtlaSent policy ID + version in your system validation documentation.
+- [ ] Review override frequency monthly — high override counts indicate policy needs rewriting.
 
-<Steps>
-  <Step title="Create a scoped API key">
-    Create an API key with `evaluate` and `audit` scopes in the Atlasent Console. Do not use a key with broader scopes for agent workloads.
-  </Step>
-  <Step title="Import the framework preset">
-    Import the `21_cfr_part_11` framework preset in the Console under **Policies → Presets**. Review each rule before activating.
-  </Step>
-  <Step title="Wire protected actions">
-    Add an Atlasent `evaluate` call for every operation your agents perform on electronic records — reads, writes, amendments, exports.
-  </Step>
-  <Step title="Export signed audit bundle">
-    At the end of each audit cycle, export a signed audit bundle from **Audit → Export**. The bundle includes all permit and deny decisions with timestamps and actor identifiers.
-  </Step>
-  <Step title="Verify the bundle">
-    Run `atlasent-audit-verify --bundle <path>` to confirm the chain is intact and the signatures are valid before archiving.
-  </Step>
-  <Step title="Store in your DMS">
-    Store the verified, signed bundle in your Document Management System alongside the system validation documentation that lists the Atlasent policy ID and version.
-  </Step>
-</Steps>
-
-## Related resources
+## Related
 
 <CardGroup cols={2}>
-  <Card title="EU Annex 11" icon="syringe" href="/compliance/eu-annex-11">
-    Map Atlasent primitives to EMA computerized-system validation requirements — complementary to Part 11 for EU-regulated environments.
-  </Card>
-  <Card title="GxP Change Control" icon="code-branch" href="/compliance/gxp-change-control">
-    Enforce ICH Q10 and 21 CFR Part 211 change-control gates for software modifications that affect validated systems.
+  <Card title="Audit chain design" icon="link" href="/concepts/audit-chain">
+    How the chain is hash-linked and signed.
   </Card>
 </CardGroup>

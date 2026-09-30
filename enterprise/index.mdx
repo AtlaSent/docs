@@ -1,0 +1,47 @@
+---
+title: "AtlaSent Enterprise"
+description: "AtlaSent Enterprise is the operating layer for Consequential Action Protection across teams and systems. This section documents its identity, export and evidence capabilities."
+---
+{/* Generated from the Atlasent docs source (site/enterprise/index.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**AtlaSent Enterprise** (custom annual pricing) is the operating layer for Consequential Action Protection across teams, systems and business units: the Protection Portfolio, honest coverage of every execution path, identity and administration, organizational controls such as separation of duties, findings, evidence and proof, and implementation and support. It is scoped through an Enterprise engagement, starting with Enterprise Launch (assisted implementation of your first protected action), and it is separate from the self-service Community, Developer Cloud and Team Cloud plans. [Schedule an Enterprise call](https://cal.com/atlasent/discovery).
+
+The pages in this section document specific Enterprise capabilities for organizations with strict identity governance, data-residency, and audit-evidence requirements.
+
+<Warning>
+**Availability, as of 2026-09-27.** This page documents Enterprise capabilities; it is not a list of what every Enterprise agreement includes. "Deployed; customer validation pending" means the capability runs in production but has not yet been validated with a customer's own systems (for SSO and SCIM, a customer identity provider). That is different from unavailable. Org-wide login-time SSO enforcement is not offered. Self-hosted Helm deployment is not yet released. What your agreement includes, and on what timeline, is confirmed in writing before you sign. Contact [contact@atlasent.io](mailto:contact@atlasent.io).
+</Warning>
+
+## Enterprise features
+
+<CardGroup cols={2}>
+  <Card title="SCIM 2.0 Provisioning" icon="users" href="/enterprise/scim-admin">
+    Automated user lifecycle via your IdP. Provision, deprovision, and sync roles without manual console steps.
+  </Card>
+  <Card title="Multi-IdP SSO" icon="shield-halved">
+    Add multiple SSO connections — one per email domain.
+  </Card>
+  <Card title="Scheduled SIEM Export" icon="chart-bar" href="/enterprise/siem-export">
+    Scheduled, cursor-based bulk delivery to Splunk, Datadog, or Elastic, with retry on delivery failure.
+  </Card>
+  <Card title="Self-Hosted Deployment" icon="server">
+    Run the AtlaSent runtime in your own Kubernetes cluster via Helm. Not yet released.
+  </Card>
+  <Card title="Evidence Bundles" icon="file-certificate">
+    Generate cryptographically signed audit bundles for regulatory inspections. Scheduled delivery to S3/GCS.
+  </Card>
+</CardGroup>
+
+## Enterprise vs. Team
+
+| Capability | Team ($299/month or $2,990/year) | Enterprise (custom annual) | Status |
+|---|---|---|---|
+| Shared policies, hosted approvals, central management | Yes | Yes | Available |
+| SSO / SAML | — | Scoped in contract | Deployed; customer validation pending |
+| SCIM provisioning | — | Scoped in contract | Deployed; customer validation pending |
+| Signed audit export, offline verification | — | Yes | Available |
+| Scheduled SIEM export | — | Scoped in contract | Deployed; customer validation pending |
+| Self-hosted Helm deployment | — | Scoped in contract | Not yet released |
+| Uptime and support commitments | Available on request from [legal@atlasent.io](mailto:legal@atlasent.io) | Agreed in contract | Contractual terms only in a signed agreement |
+
+To discuss Enterprise, contact [contact@atlasent.io](mailto:contact@atlasent.io) or visit [atlasent.io/pricing](https://www.atlasent.io/pricing#enterprise). For a guided first deployment, see Authority Launch, a separate six-week implementation service, on the same page.

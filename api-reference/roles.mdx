@@ -1,0 +1,71 @@
+---
+title: "Roles Reference"
+description: "RBAC roles for the self-hosted AtlaSent control plane and how to assign them."
+---
+{/* Generated from the Atlasent docs source (site/api-reference/roles.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Warning>
+  **Self-hosted control plane only.** These roles and the `AUTH_MODE` settings below apply to the AtlaSent control-plane API that ships in the self-hosted Helm deployment, which is not yet released (see [Enterprise overview](/enterprise)). SaaS customers do not mint these tokens. They are separate from the Console's user roles, which are described under Users and Roles in [Console screens and fields](/console/screens-and-fields).
+</Warning>
+
+The AtlaSent control plane uses role-based access control (RBAC). Roles are checked on every authenticated request. Each role grants a specific set of permissions; roles are additive and do not override one another.
+
+## Roles
+
+| Role | Grants |
+|---|---|
+| `operator` | Standard agent operations: evaluate actions, read permits, read overrides. |
+| `override:approve` | Approve and revoke overrides. Cannot create overrides. |
+| `hitl:approve` | Cast approve or reject votes on HITL escalations. |
+| `admin` | All of the above. Org-wide superrole. |
+
+<Warning>
+  Grant `hitl:approve` only to human operators — never to autonomous agents. Agents may create escalations but must not be able to resolve them.
+</Warning>
+
+## How roles are assigned
+
+Role assignment depends on the `AUTH_MODE` the control plane is configured with.
+
+### AUTH_MODE=secret (JWT shared secret)
+
+When minting tokens with `AUTH_MODE=secret`, include a `roles` claim in the JWT payload:
+
+```json
+{
+  "sub": "user_01abc",
+  "org": "org_01xyz",
+  "roles": ["hitl:approve"],
+  "iat": 1747497600,
+  "exp": 1747501200
+}
+```
+
+Sign the token with `JWT_SECRET` using HS256 (or the algorithm configured for your deployment).
+
+### AUTH_MODE=jwks (external identity provider)
+
+When using `AUTH_MODE=jwks`, roles are read from the `roles` claim in the JWT issued by your identity provider. Configure your IdP to include the `roles` array in the token:
+
+- **Auth0:** Use a post-login Action or Rule to add `roles` to the token namespace.
+- **Okta:** Add a custom claim in the authorization server that maps group membership to the `roles` array.
+- **Generic OIDC:** Map user attributes or group membership to a `roles` claim in the token transformation layer.
+
+The claim name must be `roles` and its value must be an array of strings matching the role names in the table above.
+
+## Role summary by capability
+
+| Capability | `operator` | `override:approve` | `hitl:approve` | `admin` |
+|---|---|---|---|---|
+| Evaluate actions | Yes | Yes | Yes | Yes |
+| Read permits | Yes | Yes | Yes | Yes |
+| Read overrides | Yes | Yes | Yes | Yes |
+| Approve / revoke overrides | No | Yes | No | Yes |
+| Create HITL escalations | Yes | Yes | Yes | Yes |
+| Vote on HITL escalations | No | No | Yes | Yes |
+| Manage policies | No | No | No | Yes |
+| Manage API keys and org settings | No | No | No | Yes |
+
+<Info>
+  Creating HITL escalations requires only a valid authenticated credential — no specific role beyond basic authentication is needed. Any actor (including agents with `operator` role) may open an escalation; only holders of `hitl:approve` or `admin` may vote on one.
+</Info>

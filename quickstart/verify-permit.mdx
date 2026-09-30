@@ -1,102 +1,83 @@
 ---
-title: "Step 3: Explicitly verify a permit before executing"
-sidebarTitle: "Verify Permit"
-description: "Call POST /v1/verify-permit explicitly when you hold a raw permit token and need to confirm it is still valid before your code takes action."
+title: "3. Verify a permit explicitly"
+description: "The lower-level verify call — used when a permit crossed a boundary and the receiving side wants to re-confirm before acting."
 ---
-
-A permit token is not proof of authorization on its own — it is proof of authorization **if and only if** Atlasent confirms the token is still current at the moment you intend to execute. Calling `POST /v1/verify-permit` checks the Ed25519 signature, confirms the permit has not expired, and confirms it has not been revoked since it was issued. The verify call appends a linked entry to the audit chain, binding this confirmation to the original evaluation record.
+{/* Generated from the Atlasent docs source (site/quickstart/verify-permit.mdx). Do not edit here: this file is overwritten on every publish. */}
 
 <Note>
-  If you used `protect()` or `withPermit()` on the previous page, the SDK already issued this verify call internally and recorded it in the audit chain. Read this page when you hold a **raw permit token** — for example, a permit minted in one service and forwarded to another over a queue or API boundary, or when you need to confirm a permit is still valid immediately before a long-running state change.
+  If you used [`protect()` / `with_permit()` / `withPermit()`](/quickstart/first-evaluation) on the previous page, the SDK already issued this verify call for you and bound it into the audit chain. **Read this page when you hold a raw permit token** — for example, a permit minted in one service and forwarded to another, or when you want to confirm a permit is still current immediately before a state-changing call.
 </Note>
 
-## Make the verify call
+A permit token is not proof of authorization on its own — it's proof of authorization **if and only if** AtlaSent confirms it's current. Verification:
 
-Pass the permit token you received from `POST /v1/evaluate` (the `permit.token` field, prefixed `pt_…`):
+- Rejects tokens that were revoked (for example, policy changed between `/v1-evaluate` and execution).
+- Rejects expired tokens (default TTL: 1 hour).
+- Verifies the Ed25519 signature.
+- Binds this permit to its execution in the audit chain.
+
+## The request
 
 <CodeGroup>
 
 ```bash curl
-curl -X POST https://api.atlasent.io/v1/verify-permit \
-  -H "Authorization: Bearer $ATLASENT_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "permit_token": "pt_01j..."
-  }'
+curl -X POST "$ATLASENT_API_URL/v1/permits/$PERMIT_ID/verify" \
+  -H "Authorization: Bearer $ATLASENT_API_KEY"
 ```
 
 ```typescript TypeScript
-import { AtlaSentClient } from '@atlasent/sdk';
-
-const client = new AtlaSentClient({ apiKey: process.env.ATLASENT_API_KEY });
-
-const verified = await client.verifyPermitById('pt_01j...');
-
+const verified = await client.verifyPermitById(result.permitId);
 if (verified.valid) {
   await executeTheAction();
 }
 ```
 
 ```python Python
-from atlasent import AtlaSentClient
-import os
-
-client = AtlaSentClient(api_key=os.environ["ATLASENT_API_KEY"])
-
-verified = client.verify_permit_by_id("pt_01j...")
-
+verified = client.verify_permit_by_id(result.permit_token)
 if verified.valid:
     execute_the_action()
 ```
 
 </CodeGroup>
 
-## Example response
+## The response
 
-```json
-{
-  "valid": true,
-  "consumed_at": "2026-05-26T10:14:52Z",
-  "decision_id": "dec_01j..."
-}
-```
+The canonical verification envelope:
 
-## Response fields explained
+<ResponseField name="valid" type="boolean" required>
+  `true` if the permit is current, signature-valid, and not revoked.
+</ResponseField>
 
-| Field | Type | Description |
-|---|---|---|
-| `valid` | boolean | `true` if the permit passed all checks and has been consumed. `false` on any failure — do not execute. |
-| `consumed_at` | string | ISO 8601 timestamp at which the permit was marked consumed by this verify call. |
-| `decision_id` | string | The `decision_id` from the original evaluation, linking this verify event back to the evaluation entry in the audit chain. |
+<ResponseField name="verification_type" type="string" required>
+  Always `"permit"` on this surface.
+</ResponseField>
 
-## Permit lifecycle rules
+<ResponseField name="reason" type="string">
+  On `false`, an operator-readable explanation (e.g. "Permit expired",
+  "Permit was explicitly revoked"). `null` on success.
+</ResponseField>
 
-Atlasent enforces three hard rules on permit verification that you cannot override:
+<ResponseField name="verified_at" type="string" required>
+  ISO 8601 server clock at verification.
+</ResponseField>
 
-**Permits are single-use.** Each permit authorizes exactly one execution. Once the permit has been used and the protected action completes, any attempt to re-use the same `pt_…` token is rejected. Your code must treat any non-`valid: true` response as a hard stop.
-
-**Replaying a spent permit returns an error.** If `verify-permit` is called on a permit that is already expired, revoked, or has completed its lifecycle — for example, because a message was delivered twice — the API rejects it and returns `valid: false`.
-
-**Expired permits return an error.** The default permit TTL is 15 minutes (900 seconds) from issuance. If more time has elapsed between `evaluate` and `verify-permit` than the TTL allows, the API returns `permit_expired` and `valid: false`. Request a fresh evaluation.
-
-<Warning>
-  If `valid` is `false` for any reason — expiry, revocation, consumption, or a mismatched signature — you must not execute the protected action. There is no fallback path. Request a new evaluation if the action is still needed.
-</Warning>
+<ResponseField name="evidence" type="object" required>
+  Type-specific evidence: `{ permit_id, status, actor_id, action_id, expires_at, payload_hash, decision_id }`.
+</ResponseField>
 
 ## When to call verify explicitly
 
-The `protect()` and `withPermit()` SDK helpers already call `verify-permit` internally. Reach for the explicit call in these specific situations:
+The canonical execution-boundary surface — [`protect()` / `with_permit()` / `withPermit()`](/quickstart/first-evaluation) — already issues this verify call internally and binds it into the audit chain. Reach for the explicit verify call in these cases:
 
-- **Permit crossed a process boundary.** Service A called `protect()` and forwarded the `permit_id` to Service B via a queue or internal API. Service B must verify the permit is still valid before acting on it.
-- **Significant time may have elapsed.** If there is a delay between the policy decision and the state-changing call — for example, a human review step or a long-running batch job — verify immediately before executing to catch any revocations or TTL drift.
-- **You used the raw `evaluate()` SDK method.** The lower-level `client.evaluate()` method returns the decision object but does **not** verify the permit. You are responsible for calling `verifyPermitById()` before executing.
+- **Permit crossed a process boundary.** Service A called `protect()` and forwarded the `permit_id` to service B; B wants to re-confirm the permit is still current before acting on it.
+- **Long-running flow.** Time has elapsed between the policy decision and the state-changing call, and policy or actor state may have moved (e.g. operator revocation, TTL drift). Verify just before execute.
+- **You held the permit token after `evaluate()` rather than `protect()`.** The raw `evaluate()` primitive does not verify — callers using it must verify before executing.
 
-<Tip>
-  Keep the `decision_id` from the verify response alongside your own action record. That identifier is the two-way link that lets you navigate from your application's database record to the corresponding entry in the Atlasent audit chain.
-</Tip>
+Permits are single-use. Once a permit has been consumed, verifying it again returns an error rather than a valid result — a spent permit cannot be replayed.
 
-## Next step
+<Note>
+  **Why a separate verify call?** Separating evaluate from verify lets you short-circuit on policy changes that happen between "I got permission" and "I'm doing the thing" — e.g. an operator revoking the permit, or the permit's TTL elapsing.
+</Note>
 
-You now have a verified permit and a linked audit entry. Export the full audit bundle for your records.
+## Next
 
-[Step 4: Export the audit bundle →](/quickstart/audit-export)
+Now [download the audit bundle →](/quickstart/audit-export)

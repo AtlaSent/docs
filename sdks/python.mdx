@@ -1,60 +1,76 @@
 ---
-title: "Python SDK for Atlasent execution-time authorization"
-sidebarTitle: "Python"
-description: "Install the atlasent package, configure sync or async clients, and gate actions with protect() and with_permit(). Handle denial and unavailability errors."
+title: "Python SDK"
+description: "atlasent — Python client for AtlaSent."
 ---
+{/* Generated from the Atlasent docs source (site/sdks/python.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The Atlasent Python SDK (`atlasent`) supports Python 3.9 and above, ships full type hints with a `py.typed` marker, and works in both synchronous and asynchronous applications. The sync client is a drop-in addition to any existing Python codebase; the async client integrates naturally with `asyncio`, FastAPI, and other async frameworks.
-
-## Installation
+## Install
 
 ```bash
 pip install atlasent
 ```
 
-## Client setup
+Supports Python 3.9+.
 
-Create an `AtlaSentClient` and pass your API key directly or set the `ATLASENT_API_KEY` environment variable and omit the argument.
+## Hello, world
+
+The canonical execution-boundary surface. `protect()` mints and
+verifies a [Permit](/concepts/permit) end-to-end and returns it on
+success. There is no `permitted=False` return path — if `protect()`
+returns, the action is authorized.
 
 ```python
-from atlasent import AtlaSentClient
+import os
+from atlasent import protect, AtlaSentDeniedError, AtlaSentError
 
-client = AtlaSentClient(api_key=os.environ["ATLASENT_API_KEY"])
+# Picks up ATLASENT_API_KEY from the environment.
+try:
+    permit = protect(
+        agent="agent-001",
+        action="ehr.write",
+        context={"environment": "production", "patient_id": "patient-42"},
+    )
+except AtlaSentDeniedError as exc:
+    halt(exc.reason)               # policy denied / hold / escalate / verify-fail
+except AtlaSentError:
+    halt("fail-closed")            # transport / timeout / auth / 5xx
+
+# Authorized end-to-end. Execute and persist permit.permit_id alongside
+# your own record so the audit chain stays two-way navigable.
+db.patients.update("patient-42", payload, atlasent_permit_id=permit.permit_id)
 ```
 
-## protect() — fail-closed gate
+See [Runtime flow](/concepts/runtime-flow) for the full lifecycle and
+the fail-closed matrix.
 
-`protect()` evaluates the request, verifies the resulting permit, and calls your function only if both steps succeed. There is no `permitted=False` return value — if `protect()` returns, the action is authorized end-to-end.
+## `with_permit()` — lexically-scoped form
+
+When the action body is a single scope, bind it to the permit's
+lifetime directly. Same wire contract as `protect()`; same audit-chain
+entry. The body runs **only** on a verified permit.
 
 ```python
-client.protect(
-    actor={"id": "user_123", "role": "engineer"},
-    action={"type": "production.deploy"},
-    target={"id": "my-service", "environment": "production"},
-    context={"git_sha": os.environ["GITHUB_SHA"]},
-    fn=lambda permit: deploy(),
+from atlasent import with_permit
+
+result = with_permit(
+    agent="agent-001",
+    action="ehr.write",
+    context={"environment": "production", "patient_id": "patient-42"},
+    fn=lambda permit: db.patients.update(
+        "patient-42", payload, atlasent_permit_id=permit.permit_id,
+    ),
 )
 ```
 
-## with_permit() — context manager form
+`protect()` returns the Permit to the caller; `with_permit()` binds it
+to the body. Pick the form that fits the call site — both produce
+identical wire calls, identical audit-chain entries, and identical
+fail-closed semantics.
 
-Use `with_permit()` when you want to scope the authorized action to a `with` block. The block body runs only after a verified permit is issued; the permit is automatically consumed when the block exits.
+## `require_permit()` — descriptor form
 
-```python
-with client.with_permit(
-    actor={"id": "user_123", "role": "engineer"},
-    action={"type": "production.deploy"},
-    target={"id": "my-service", "environment": "production"},
-    context={},
-) as permit:
-    deploy()
-```
-
-`protect()` and `with_permit()` produce identical wire calls and identical audit-chain entries. Pick the form that fits your call site.
-
-## require_permit() — descriptor form
-
-Use `require_permit()` for high-risk operations that carry structured metadata such as `resource_id` and `environment`. It accepts a `ProtectedAction` descriptor and calls your executor only if the full evaluate-and-verify cycle succeeds.
+For dangerous operations described by a richer `ProtectedAction`
+(`resource_id`, `environment`). Async-only:
 
 ```python
 from atlasent import require_permit, ProtectedAction
@@ -67,73 +83,155 @@ await require_permit(
         environment="production",
         context={"reversibility": "irreversible"},
     ),
-    lambda: db.raw_async("DROP TABLE users"),
+    execute=lambda: db.raw_async("DROP TABLE users"),
 )
-```
-
-## Async client
-
-Import `AsyncClient` for applications built on `asyncio`. The async client exposes the same methods as the sync client but all methods are coroutines. Use it as an async context manager to ensure the underlying HTTP session is properly closed.
-
-```python
-from atlasent import AsyncClient
-
-async with AsyncClient(api_key=os.environ["ATLASENT_API_KEY"]) as client:
-    async with client.with_permit(
-        actor={"id": "user_123", "role": "engineer"},
-        action={"type": "production.deploy"},
-        target={"id": "my-service", "environment": "production"},
-        context={},
-    ) as permit:
-        await async_deploy()
 ```
 
 ## Error model
 
-Catch `AtlaSentDeniedError` for policy outcomes and `AtlaSentError` for network or service failures. `AtlaSentDeniedError` inherits from `AtlaSentError`, so catching `AtlaSentError` handles both if you want a single catch-all.
-
 ```python
-from atlasent.exceptions import AtlaSentDeniedError, AtlaSentError
+from atlasent import AtlaSentDeniedError, AtlaSentError
+from atlasent.exceptions import RateLimitError, StreamTimeoutError
 
 try:
-    with client.with_permit(...):
-        deploy()
+    permit = protect(agent=..., action=..., context=...)
 except AtlaSentDeniedError as e:
-    print(f"Denied: {e.decision}, code: {e.deny_code}")
-    # Predicates: e.is_revoked, e.is_expired, e.is_consumed, e.is_not_found
+    halt(e.reason)                 # policy said no, or permit verify-fail
+except RateLimitError as e:
+    backoff(e.retry_after_s)       # 429
 except AtlaSentError:
-    print("Authorization unavailable — action blocked")
+    halt("fail-closed")            # transport / auth / 5xx / timeout
 ```
 
-<Warning>
-  When you catch `AtlaSentError` (transport or service failure), always treat it as a denial. Never fall back to permitting the action if the authorization service is unreachable — that defeats the fail-closed guarantee.
-</Warning>
+`protect()` and `with_permit()` collapse policy denial, hold,
+escalate, and verification failure into `AtlaSentDeniedError`.
+Inspect `exc.decision` (`"deny"` / `"hold"` / `"escalate"`) if you
+need to branch.
 
-## Four-value decision with evaluate()
+## Inspecting the four-value decision
 
-`protect()` and `with_permit()` collapse `deny`, `hold`, and `escalate` into `AtlaSentDeniedError`. If you need to inspect the specific outcome — for example, to route a `hold` to an approval queue — use the raw `evaluate()` primitive instead.
+`protect()` and `with_permit()` raise on anything other than `allow`.
+If you need to inspect `hold` / `escalate` at the call site — for
+example, to route to an approval queue — drop down to the raw
+`evaluate()` primitive:
 
 ```python
 from atlasent import evaluate
 
-result = evaluate(
-    action_type="production.deploy",
-    actor_id="user_123",
-    context={"environment": "production"},
-)
-
+result = evaluate(action_type="ehr.write", actor_id="agent-001", context={...})
 match result.decision:
-    case "allow":
-        # Call verify_permit_by_id(), then execute
-        pass
-    case "deny":
-        print("Denied:", result.deny_reason)
-    case "hold":
-        print("Action on hold — waiting for approval webhook")
-    case "escalate":
-        print("Routed to a human reviewer")
+    case "allow":    ...  # call verify_permit_by_id(), then execute
+    case "deny":     ...  # surface result.deny_reason
+    case "hold":     ...  # wait for the approval webhook
+    case "escalate": ...  # routed to a human reviewer
 ```
 
-<Note>
-  `evaluate()` does not verify the permit for you. If you use `evaluate()` directly and the decision is `allow`, you must call `verify_permit_by_id()` before executing the action.
-</Note>
+`evaluate()` does not verify the permit for you. Callers using the
+raw primitive must verify before executing — see [Verify a permit
+explicitly](/quickstart/verify-permit).
+
+## Async
+
+```python
+from atlasent import AsyncAtlaSentClient
+from atlasent.aio import with_permit as awith_permit
+
+async with AsyncAtlaSentClient() as client:
+    result = await awith_permit(
+        client,
+        agent="agent-001",
+        action="ehr.write",
+        context={"environment": "production"},
+        fn=lambda permit: do_async_work(permit.permit_id),
+    )
+```
+
+## SCIM provisioning
+
+Manage SCIM 2.0 user and group provisioning via the `ScimClient` sub-client.
+
+```python
+from atlasent import AtlaSentClient
+from atlasent.scim_client import ScimClient
+
+client = AtlaSentClient(api_key="ask_live_...")
+scim = ScimClient(client)
+
+# List provisioned users
+page = scim.users.list(org_id="org_abc", count=50)
+for user in page["Resources"]:
+    print(user["userName"], user["active"])
+
+# Provision a new user
+new_user = scim.users.create(org_id="org_abc", user={
+    "userName": "alice@example.com",
+    "active": True,
+    "name": {"givenName": "Alice", "familyName": "Smith"},
+    "emails": [{"value": "alice@example.com", "primary": True}],
+})
+
+# Deprovision
+scim.users.delete(org_id="org_abc", user_id=new_user["id"])
+```
+
+`schemas` is injected automatically if absent. See [SCIM 2.0 provisioning guide](/enterprise/scim-admin) for IdP configuration.
+
+## Token management
+
+Multi-IdP token refresh via the `atlasent.auth` module. Use this in programmatic integrations that maintain long-lived access tokens.
+
+```python
+from atlasent import AtlaSentClient
+from atlasent.auth import refresh_token, refresh_with_idp, list_idp_connections
+
+client = AtlaSentClient(api_key="ask_live_...")
+
+# List available IdP connections
+connections = list_idp_connections(client)
+# [{"id": "idp_okta_prod", "name": "Okta Production", "provider": "okta", ...}]
+
+# Refresh using the default IdP
+tokens = refresh_token(client, current_refresh_token)
+# {"access_token": "at_...", "refresh_token": "rt_...", "expires_in": 3600}
+
+# Refresh against a specific IdP (multi-IdP orgs)
+tokens = refresh_with_idp(client, idp_id="idp_okta_prod",
+                           refresh_token=current_refresh_token)
+```
+
+## Evidence bundles
+
+Create and download compliance evidence bundles.
+
+```python
+from atlasent.evidence_bundle import (
+    create_evidence_bundle,
+    get_evidence_bundle,
+    download_evidence_bundle,
+)
+
+bundle = create_evidence_bundle(
+    client,
+    org_id="org_abc",
+    incident_id="inc_001",
+    include_overrides=True,
+)
+
+# Poll until ready
+while bundle["status"] == "generating":
+    import time; time.sleep(2)
+    bundle = get_evidence_bundle(client, "org_abc", bundle["bundle_id"])
+
+# Download as PDF
+pdf_bytes = download_evidence_bundle(
+    client, "org_abc", bundle["bundle_id"], format="pdf"
+)
+with open("evidence.pdf", "wb") as f:
+    f.write(pdf_bytes)
+```
+
+## Links
+
+- Source: [`atlasent-sdk/python`](https://github.com/Atlasent/atlasent-sdk/tree/main/python)
+- Changelog: [`/changelog/sdks#python`](/changelog/sdks#python)
+- Type hints: full; `py.typed` marker shipped.

@@ -1,29 +1,41 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Atlasent",
   "theme": "luma",
+  "name": "AtlaSent",
+  "description": "AtlaSent Consequential Action Protection: control consequential actions by people, software, and AI before they run, and verify the proof afterward.",
   "colors": {
     "primary": "#0b699a",
     "light": "#64c4cb",
     "dark": "#d7e8ed"
   },
-  "favicon": "https://media.brand.dev/6cdb6cd6-ca9b-4e45-b168-5d172d2b5554.jpg",
   "logo": {
     "light": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
-    "dark": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg"
+    "dark": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
+    "href": "https://atlasent.io"
+  },
+  "favicon": "https://media.brand.dev/6cdb6cd6-ca9b-4e45-b168-5d172d2b5554.jpg",
+  "appearance": {
+    "default": "dark"
   },
   "navbar": {
     "links": [
       {
         "label": "Console",
-        "href": "https://app.atlasent.io"
+        "href": "https://console.atlasent.io"
+      },
+      {
+        "label": "Pricing",
+        "href": "https://console.atlasent.io/pricing"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Get Started",
-      "href": "https://app.atlasent.io"
+      "label": "Start Free",
+      "href": "https://console.atlasent.io/auth/sign-up"
     }
+  },
+  "search": {
+    "prompt": "Search AtlaSent docs"
   },
   "navigation": {
     "tabs": [
@@ -33,7 +45,7 @@
           {
             "group": "Get Started",
             "pages": [
-              "introduction",
+              "index",
               "quickstart/overview",
               "quickstart/api-key",
               "quickstart/first-evaluation",
@@ -42,39 +54,50 @@
             ]
           },
           {
+            "group": "Console Guide",
+            "pages": [
+              "console/index",
+              "console/screens-and-fields"
+            ]
+          },
+          {
+            "group": "Use Cases",
+            "pages": [
+              "deploy-gate",
+              "production-change-gate-assessment",
+              "ai-agent-governance",
+              "protected-actions",
+              "permit-verification",
+              "authorization-for-ai-agents",
+              "architecture"
+            ]
+          },
+          {
             "group": "Core Concepts",
             "pages": [
               "concepts/overview",
+              "concepts/verified-actor-identity",
+              "concepts/execution-time-authorization",
+              "concepts/organizational-authority",
+              "concepts/consequential-computational-actions",
+              "concepts/authority-vs-authorization",
               "concepts/runtime-flow",
+              "concepts/glossary",
+              "concepts/action-class",
               "concepts/policy",
               "concepts/permit",
               "concepts/audit-chain",
+              "concepts/proof-verification",
               "concepts/deny-codes",
-              "concepts/glossary"
+              "concepts/override",
+              "concepts/approval"
             ]
           },
           {
-            "group": "Guides",
+            "group": "Authorization Surface",
             "pages": [
-              "guides/protected-actions",
-              "guides/deploy-gate",
-              "guides/policy-authoring",
-              "guides/execution-binding",
-              "guides/approvals",
-              "guides/webhooks",
-              "guides/audit-verification"
-            ]
-          },
-          {
-            "group": "Integrations",
-            "pages": [
-              "integrations/overview",
-              "integrations/github-action",
-              "integrations/mcp-server",
-              "integrations/langchain",
-              "integrations/llamaindex",
-              "integrations/slack-approval-bot",
-              "integrations/siem-export"
+              "concepts/what-can-atlasent-authorize",
+              "concepts/board-constituency-map"
             ]
           },
           {
@@ -88,23 +111,68 @@
             ]
           },
           {
+            "group": "Integrations",
+            "pages": [
+              "integrations/overview",
+              "integrations/github-action",
+              "integrations/github-app",
+              "integrations/mcp-server",
+              "integrations/langchain",
+              "integrations/llamaindex",
+              "integrations/siem-export",
+              "integrations/siem-export-console",
+              "integrations/slack-approval-bot"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/v1-pilot-migration",
+              "guides/sso-setup",
+              "guides/webhooks"
+            ]
+          },
+          {
+            "group": "Enterprise",
+            "pages": [
+              "enterprise/index",
+              "enterprise/scim-admin",
+              "enterprise/siem-export"
+            ]
+          },
+          {
+            "group": "Runbooks",
+            "pages": [
+              "runbooks/governed-close-operations"
+            ]
+          },
+          {
             "group": "Compliance",
             "pages": [
               "compliance/overview",
               "compliance/21-cfr-part-11",
               "compliance/eu-annex-11",
+              "compliance/alcoa-plus",
               "compliance/ich-e6-gcp",
               "compliance/gxp-change-control"
             ]
           },
           {
-            "group": "Trust & Security",
+            "group": "Trust",
             "pages": [
               "trust/index",
               "trust/security-overview",
               "trust/compliance-status",
               "trust/subprocessors",
+              "trust/audit-signing-key",
               "trust/contact"
+            ]
+          },
+          {
+            "group": "For Biotech CCOs",
+            "pages": [
+              "biotech/overview",
+              "biotech/thesis"
             ]
           }
         ]
@@ -113,12 +181,13 @@
         "tab": "API Reference",
         "groups": [
           {
-            "group": "Overview",
+            "group": "API Reference",
             "pages": [
               "api-reference/introduction",
               "api-reference/authentication",
-              "api-reference/errors",
+              "api-reference/roles",
               "api-reference/rate-limits",
+              "api-reference/errors",
               "api-reference/pagination",
               "api-reference/versioning"
             ]
@@ -126,13 +195,21 @@
           {
             "group": "Endpoints",
             "pages": [
-              "api-reference/endpoints/evaluate",
-              "api-reference/endpoints/verify-permit",
-              "api-reference/endpoints/audit",
-              "api-reference/endpoints/policies",
-              "api-reference/endpoints/permits",
-              "api-reference/endpoints/escalations",
-              "api-reference/endpoints/webhooks"
+              "api-reference/escalations"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog/overview",
+              "changelog/api",
+              "changelog/console",
+              "changelog/sdks"
             ]
           }
         ]
@@ -141,7 +218,77 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/AtlaSent-Systems-Inc"
+      "github": "https://github.com/Atlasent",
+      "linkedin": "https://www.linkedin.com/company/atlasent"
     }
-  }
+  },
+  "integrations": {
+    "plausible": {
+      "domain": "docs.atlasent.io"
+    }
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "AtlaSent Docs",
+      "twitter:site": "@atlasent"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/introduction",
+      "destination": "/"
+    },
+    {
+      "source": "/guides/approvals",
+      "destination": "/concepts/approval"
+    },
+    {
+      "source": "/guides/audit-verification",
+      "destination": "/trust/audit-signing-key"
+    },
+    {
+      "source": "/guides/deploy-gate",
+      "destination": "/deploy-gate"
+    },
+    {
+      "source": "/guides/execution-binding",
+      "destination": "/permit-verification"
+    },
+    {
+      "source": "/guides/policy-authoring",
+      "destination": "/concepts/policy"
+    },
+    {
+      "source": "/guides/protected-actions",
+      "destination": "/protected-actions"
+    },
+    {
+      "source": "/api-reference/endpoints/audit",
+      "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/api-reference/endpoints/escalations",
+      "destination": "/api-reference/escalations"
+    },
+    {
+      "source": "/api-reference/endpoints/evaluate",
+      "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/api-reference/endpoints/permits",
+      "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/api-reference/endpoints/policies",
+      "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/api-reference/endpoints/verify-permit",
+      "destination": "/api-reference/introduction"
+    },
+    {
+      "source": "/api-reference/endpoints/webhooks",
+      "destination": "/guides/webhooks"
+    }
+  ]
 }

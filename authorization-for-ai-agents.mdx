@@ -1,0 +1,208 @@
+---
+title: "How to Require Authorization Before an AI Agent Executes an Action"
+description: "Place a permit-gated execution boundary in front of consequential AI-agent tool actions so verification occurs before effect."
+sidebarTitle: "Authorization for AI Agents"
+---
+{/* Generated from the Atlasent docs source (site/authorization-for-ai-agents.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# How to Require Authorization Before an AI Agent Executes an Action
+
+The goal is not merely to ask an authorization service a question. The goal is
+to make the **native side effect unreachable until the required Authorization
+has produced a Permit and that Permit has been verified for this execution
+attempt**.
+
+The controlled sequence is:
+
+`Action → Authority → Policy → Evaluation → Permit → Verification → Execution → Evidence`
+
+> **Never execute first and verify the Permit afterward.**
+
+## Preferred pattern: guard the callback
+
+Use a helper whose contract performs the AtlaSent authorization/verification
+path before invoking the protected function.
+
+```ts
+import { configure, withPermit } from '@atlasent/sdk';
+
+configure({ apiKey: process.env.ATLASENT_API_KEY! });
+
+await withPermit(
+  {
+    agent: 'agent:my-assistant',
+    action: 'agent.tool.invoke',
+    context: {
+      tool: 'database.delete',
+      environment: 'production',
+      table: 'users',
+      record_id: userId,
+    },
+  },
+  async () => {
+    // The governed side effect is inside the permit-gated callback.
+    await deleteFromDatabase(userId);
+  },
+);
+```
+
+Check the current SDK documentation for the exact helper/version you are using.
+The invariant is stable even if helper ergonomics change.
+
+## Raw HTTP pattern
+
+If you integrate without a guarded SDK helper, implement the boundary explicitly:
+
+```text
+1. POST /v1/evaluate
+2. require Decision = allow and a permit_token
+3. POST /v1-verify-permit with the required execution binding
+4. require successful Verification
+5. execute the native tool/action
+6. record/correlate execution result evidence
+```
+
+Pseudo-code:
+
+```ts
+const evaluation = await evaluate({
+  action_type: 'agent.tool.invoke',
+  actor_id: 'agent:my-assistant',
+  context: {
+    environment: 'production',
+    tool: 'database.delete',
+    table: 'users',
+    record_id: userId,
+  },
+});
+
+if (evaluation.decision !== 'allow' || !evaluation.permit_token) {
+  return `Action not authorized: ${evaluation.decision}`;
+}
+
+const verification = await verifyPermit({
+  permit_token: evaluation.permit_token,
+  action_type: 'agent.tool.invoke',
+  actor_id: 'agent:my-assistant',
+  environment: 'production',
+  context: {
+    tool: 'database.delete',
+    table: 'users',
+    record_id: userId,
+  },
+});
+
+if (!verification.verified) {
+  return 'Action blocked: Permit verification failed';
+}
+
+await deleteFromDatabase(userId);
+```
+
+The current OpenAPI and server-authoritative handlers govern the exact wire
+shape. Do not rely on historical docs that show a nested `permit` object or an
+obsolete verification endpoint.
+
+## Use Canon-backed Action Types
+
+Do not invent a new `action_type` for every tool string. AtlaSent separates:
+
+- **Action Type** — canonical identity of the kind of Action;
+- **Action Instance** — this specific occurrence;
+- **Action Class** — organization-specific governance configuration for the Action Type;
+- **Target / Resource + Context** — where tool-specific details belong.
+
+For generic AI-agent tool execution, use the applicable Canon-backed Action Type,
+such as `agent.tool.invoke`, and represent the particular tool/arguments in the
+Target/Context according to the integration contract.
+
+## Framework wrappers
+
+### LangChain / LlamaIndex
+
+A framework guard is useful only if it delegates to the real AtlaSent execution
+boundary. The wrapper itself is not the source of Authority and should not be
+the basis for a non-bypassability claim.
+
+### MCP
+
+MCP integrations can expose AtlaSent evaluation and Permit-verification tools.
+A system prompt that tells an agent to call those tools is **not**, by itself, a
+non-bypassable enforcement point. Place the Gate in the execution path that
+actually controls the native side effect.
+
+### Direct SDK
+
+Prefer an atomic/guarded helper such as `withPermit` when the integration model
+supports it. This reduces the chance that application code accidentally inserts
+the side effect between Evaluation and Verification.
+
+## What each outcome means
+
+- **allow** — the current Evaluation may issue a Permit; do not execute until the Permit passes required Verification.
+- **deny** — no authorized execution.
+- **hold** — required conditions/evidence are incomplete; no authorized execution yet.
+- **escalate** — additional Authority/review/evidence is required; no authorized execution yet.
+
+Approval can satisfy a Policy condition, but Approval is not itself the final
+Authorization determination.
+
+## Enforced versus shadow/advisory
+
+### Enforced permit-gated path
+
+When the selected integration is configured and accepted as fail-closed, the
+native effect cannot proceed through that governed path when Evaluation,
+Verification, binding, expiry, replay, or required evidence checks fail.
+
+### Shadow/advisory path
+
+AtlaSent evaluates and records without claiming that the native effect is being
+blocked. Use this mode to validate mappings, Policy, Authority, and operational
+behavior before enforcement.
+
+Do not describe shadow mode as fail-closed enforcement.
+
+## Evidence after execution
+
+An `allow` Decision or successfully verified Permit does not prove the native
+action happened. Preserve/correlate execution evidence so an independent reviewer
+can answer:
+
+- what Action was proposed;
+- which Actor / execution principal attempted it;
+- on whose behalf it acted;
+- what organizational Authority and Policy applied;
+- what Decision was returned;
+- which Permit was issued and verified;
+- what native execution/result occurred;
+- whether it matched the authorized Action and Context.
+
+That separation—**Authorization before execution, Evidence after execution**—is
+central to AtlaSent's model.
+
+## Failure posture checklist
+
+Before calling a path "fail-closed," verify that:
+
+- the side effect is actually behind the AtlaSent Gate;
+- network/API failure prevents the guarded callback/path from executing;
+- non-allow Decisions do not reach the side effect;
+- missing/expired/replayed/mismatched Permits fail Verification;
+- no alternate unguarded path can reach the same effect within the claimed topology;
+- break-glass behavior, if any, is explicit and evidenced.
+
+## Local development
+
+Mocks and local demos are useful for SDK integration, but they are not evidence
+that a customer production topology is enforced. Promote a path from demo/shadow
+to an enforcement claim only after the applicable acceptance evidence exists.
+
+## Next steps
+
+- [AI Agent Governance](/ai-agent-governance)
+- [Execution-time authorization](/concepts/execution-time-authorization)
+- [Organizational authority](/concepts/organizational-authority)
+- [Permit](/concepts/permit)
+- [Runtime flow](/concepts/runtime-flow)
+- [Proof verification](/concepts/proof-verification)

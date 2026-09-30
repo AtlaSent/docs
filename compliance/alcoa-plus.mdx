@@ -1,0 +1,25 @@
+---
+title: "ALCOA+"
+description: "Data integrity principles — how each maps to an AtlaSent primitive."
+---
+{/* Generated from the Atlasent docs source (site/compliance/alcoa-plus.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+ALCOA+ is the data-integrity vocabulary cited by FDA, EMA, WHO, MHRA, and PIC/S. It describes what "good data" looks like in a regulated environment.
+
+## Mapping
+
+| Principle | Definition | AtlaSent primitive |
+|---|---|---|
+| **A** — Attributable | Who did what, when | `actor.id` in every evaluation; human overrides name the user; API key hash identifies the service. |
+| **L** — Legible | Human-readable | JSON entries; Console viewer; exported bundle is plain JSONL. |
+| **C** — Contemporaneous | Recorded at time of event | Audit entry is **atomic** with the decision — no "write later." |
+| **O** — Original | Not a copy | Audit chain is the system of record for authorization decisions. |
+| **A** — Accurate | Free of error | Server-generated entries; hash-linked to prevent tampering. |
+| **+C** — Complete | All data, including meta | Policy ID, version, rule, reason, permit ID all in the entry. |
+| **+C** — Consistent | In sequence | Chain order is preserved; `prev_hash` encodes the order. |
+| **+E** — Enduring | Preserved as long as needed | Export is self-contained, verifiable offline, no dependency on AtlaSent uptime. |
+| **+A** — Available | Retrievable on demand | Console query + API pagination; export for air-gapped review. |
+
+## Where ALCOA+ ends and your SOPs begin
+
+AtlaSent's audit chain is ALCOA+ for **the authorization decision**. The underlying record (the EHR, the batch record, the trial data) still lives in your system of record — your own SOPs have to ensure ALCOA+ for that data. What AtlaSent adds is a tamper-evident authorization trail that links the two.

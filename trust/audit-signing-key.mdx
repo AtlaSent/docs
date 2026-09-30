@@ -1,0 +1,117 @@
+---
+title: "Audit signing key"
+sidebarTitle: "Audit signing key"
+description: "AtlaSent's public Ed25519 audit-entry signing key. Pin it out-of-band and verify any exported audit chain or proof bundle offline — against a key you got from us, not from the bundle."
+---
+{/* Generated from the Atlasent docs source (site/trust/audit-signing-key.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+AtlaSent signs every audit-chain entry with an **Ed25519** key. The
+**public** half is published here so you can verify an exported audit
+chain or proof bundle **offline, against a key you obtained from this
+trust center — not from the bundle itself.** That independence is the
+whole point: a bundle that ships its own key proves nothing; a bundle
+whose signatures verify under the key on this page was signed by AtlaSent.
+
+<Note>
+  This is the **audit-entry** signing key. It is **not** the
+  export-bundle key and not an API key. Pin the value on this page
+  out-of-band (this page, a signed email, or your contract appendix) and
+  verify against your pinned copy.
+</Note>
+
+## Current key
+
+<Warning>
+**Corrected 2026-09-12.** The key shown here from 2026-06-08 to 2026-09-12
+(fingerprint `111a26ca…fb9d69`) was wrong and verified no production entry.
+If you pinned it, discard it and re-pin the key below; anything "verified"
+under the old key was not verified. No audit entry was altered and this was
+not a key compromise — see *Corrections* below.
+</Warning>
+
+| | |
+|---|---|
+| `key_version` (as stamped on every entry) | `v1` |
+| Algorithm | Ed25519 (signature over the raw 32-byte `entry_hash` digest, standard base64) |
+| SPKI SHA-256 fingerprint | `8c3d2752094d1d0a21097294867d7e51b73a223cf1c70d3872e699859a6187c7` |
+| Signing since | 2026-06-07 (first signed production entry) |
+| Published here | 2026-09-12 (corrected — see *Corrections*) |
+| Also published as | JWKS `kid: v1`, `role: R3_audit`, at `https://keys.atlasent.io/.well-known/atlasent-verifier-keys.json` |
+
+Save the following as `atlasent-audit-key.pem`:
+
+```
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAr0leDQfIerrgVCb8M1shVf6L5Qer0C13qV3Dee70D3o=
+-----END PUBLIC KEY-----
+```
+
+Raw base64 (same key, for `--pubkey` and the `ATLASENT_PUBLIC_KEY_PEM` shortcut):
+`MCowBQYDK2VwAyEAr0leDQfIerrgVCb8M1shVf6L5Qer0C13qV3Dee70D3o=`
+
+Confirm the fingerprint before pinning:
+
+```bash
+openssl pkey -pubin -in atlasent-audit-key.pem -outform DER | openssl dgst -sha256
+# (stdin)= 8c3d2752094d1d0a21097294867d7e51b73a223cf1c70d3872e699859a6187c7
+```
+
+**How this key was verified before publication (2026-09-12).** It was
+obtained from the production runtime's own key-export route, which since
+2026-09-12 refuses to advertise a key that fails a sign→verify round-trip
+against its private half. It was then checked offline, with OpenSSL, against
+seven real production audit-entry signatures sampled across the entire signed
+history — the two earliest entries (2026-06-07), one each from July and
+August, and the three most recent (2026-09-11/12) — and all seven verify.
+Every production entry stamped `key_version v1` was signed under this key;
+there was no rotation.
+
+## Verify with it
+
+**Proof bundle** (`GET /v1/proofs/export` → `bundle.json`) — `--pubkey`
+pins this key and **ignores** the bundle's own key registry:
+
+```bash
+npx @atlasent/verify bundle.json --pubkey @atlasent-audit-key.pem
+# key source: out-of-band pinned key
+# verified N/N proofs (0 invalid)
+```
+
+`--pubkey` also accepts the raw-base64 value directly, and the
+`ATLASENT_PUBLIC_KEY_PEM` environment variable is honored as an
+alternative.
+
+**Audit chain** (`atlasent-audit-verify` Go CLI) — supply the same PEM and
+require signatures, so an unloaded or wrong key is a failure rather than a
+silent skip:
+
+```bash
+atlasent-audit-verify --chain chain-export.ndjson --keys atlasent-audit-key.pem --require-signatures
+```
+
+## Rotation policy
+
+When the key rotates, the new `key_version` is added to this page and
+the old one is **kept published indefinitely** — every audit entry
+records the `key_version` it was signed under, so historical exports
+stay verifiable forever under their original key. A retired key is no
+longer used for new signatures but remains valid for verification. A key
+is marked **revoked** only on confirmed compromise; revocation
+intentionally breaks verification of entries signed under it.
+
+**Publication gate (added 2026-09-12):** a public key is added to this page
+only after it has been shown to verify a current production audit entry
+offline. A key that has not passed that check is not published, whatever
+the runtime reports as its configured value.
+
+## Past keys
+
+| `key_version` | SPKI SHA-256 | Published | Status |
+|---|---|---|---|
+| `v1` (as published 2026-06-08) | `111a26cac271b2197cfa34b04d7e619fd004880d983e672a35ef6f3a46fb9d69` | 2026-06-08 | **withdrawn 2026-09-12** — not the production signer's counterpart; verifies no production entry. Discard it if you pinned it; anything "verified" under it was not verified. |
+| `v2-audit-2026` (JWKS only) | `82ed08ffd39fee3a0c605b645f7e629fa218fe46bc5ae89ca189762892ebebf1` | 2026-05-28 | **revoked 2026-09-12** — never signed a production entry or export envelope |
+
+## Corrections
+
+- **2026-09-12 (later the same day)** — Published the verified key above (`8c3d2752…6187c7`). It was obtained from the runtime's self-tested key-export route and verified offline against seven production entries spanning 2026-06-07 → 2026-09-12 (7/7). This is a **publication correction only**: the runtime always signed with this key; the value published in June was wrong. Also revoked the JWKS entry `v2-audit-2026`, which never signed anything on production.
+- **2026-09-12** — Withdrew the key published 2026-06-08 after offline verification showed it does not verify production audit-entry signatures. No entry was altered; the hash chain is intact.

@@ -1,0 +1,112 @@
+---
+title: "What Can AtlaSent Authorize?"
+sidebarTitle: "What AtlaSent authorizes"
+description: "AtlaSent authorizes consequential actions before they happen. One authorization model governs deployments, business-system changes, clinical actions, identity changes, and AI-agent execution — every surface mapping back to a canonical action."
+mode: "wide"
+---
+{/* Generated from the Atlasent docs source (site/concepts/what-can-atlasent-authorize.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## AtlaSent authorizes consequential actions before they happen.
+
+**One authorization model can govern deployments, business-system changes,
+clinical actions, identity changes, and AI-agent execution.**
+
+The action is authorized against the organization's current rules and evidence,
+and the resulting [permit](/concepts/permit) is bound to the exact execution
+plan. AtlaSent authorizes **the specific plan about to run** — not the vendor,
+not the tool, not "deployments in general."
+
+Each surface below is governed by a **canonical action that already exists**.
+Adding a new system of record does not add a new action; it adds context and
+evidence on an existing one. The catalog stays small; the plan drives the policy.
+
+<CardGroup cols={2}>
+  <Card title="Production Deploy" icon="rocket">
+    Gate a CI/CD deployment of code, configuration, or infrastructure behind a
+    signed, single-use permit bound to the exact release.
+    <br />`CANON-000001 · production.deploy`
+  </Card>
+  <Card title="Salesforce Configuration" icon="cloud">
+    Gate a permission-set, profile, flow, or config change — deployed as a change
+    set — before it lands in a production org.
+    <br />`CANON-000001 · production.deploy` · *illustrative scenario*
+  </Card>
+  <Card title="NetSuite Financial Configuration" icon="calculator">
+    Gate a role, workflow, or SuiteScript change — packaged as an SDF project —
+    that alters financial controls.
+    <br />`CANON-000001 · production.deploy` · *illustrative scenario*
+  </Card>
+  <Card title="Clinical Trial Unblinding" icon="flask">
+    Gate planned and emergency unblinding with dual authorization or requester-MFA
+    — an auditable, 21 CFR Part 11-aligned record of who authorized the reveal.
+    <br />`CANON-000018 · trial.unblinding.execute` · `CANON-000020 · trial.unblinding.emergency`
+  </Card>
+  <Card title="Identity & Access Changes" icon="key">
+    Gate access grants, privileged-identity grants, and break-glass overrides with
+    verified authority before the change executes.
+    <br />`CANON-000007 · access.grant` · `CANON-000025 · identity.privileged.grant` · `CANON-000009 · control.override`
+  </Card>
+  <Card title="Database Schema Changes" icon="database">
+    Gate a production migration — the schema change that can corrupt or expose data
+    — behind an authorization permit and state snapshot.
+    <br />`CANON-000032 · database.migrate`
+  </Card>
+  <Card title="Infrastructure Changes" icon="server">
+    Gate a change to cloud or platform infrastructure — the destructive plan, the
+    IAM change, the state operation — at execution time.
+    <br />`CANON-000033 · infrastructure.change`
+  </Card>
+  <Card title="AI Agent Actions" icon="robot">
+    Gate the AI-agent tool calls you route through AtlaSent — verify a real
+    identity, evaluate policy, and permit before the action runs. Fail-closed.
+    <br />`CANON-000026 · agent.tool.invoke`
+  </Card>
+</CardGroup>
+
+## One action, many systems of record
+
+Look closely at the first three cards. **Production Deploy**, **Salesforce
+Configuration**, and **NetSuite Financial Configuration** all resolve to the
+**same** canonical action — `CANON-000001 · production.deploy`. The interception
+point is identical: *execute the authorized change or deployment plan.* A
+Salesforce change set and a NetSuite SDF project are change plans, exactly like a
+CI/CD release is a change plan. See
+Change-plan execution for how one action
+covers them all without claiming that every execution is source-code deployment.
+
+## How to read the labels
+
+<CardGroup cols={3}>
+  <Card title="Shipped" icon="circle-check">
+    A surface with live runtime enforcement. The AI-agent guard ships in the SDK
+    and the MCP server.
+  </Card>
+  <Card title="Canon" icon="book">
+    A canonical action defined in AtlaSent's authorization model. Runtime maturity
+    varies by domain — see each product area for its current state.
+  </Card>
+  <Card title="Illustrative scenario" icon="pen-ruler">
+    A reference design showing how an existing action applies to a system of
+    record. **Not production-proven at a customer, and no customer is
+    represented.**
+  </Card>
+</CardGroup>
+
+<Note>
+  Every surface on this page maps to a **canonical action that already exists** in
+  AtlaSent's authorization model — no new action was minted to cover any of them.
+  The Salesforce and NetSuite scenarios are illustrative reference designs, not
+  claims of a deployed customer integration.
+</Note>
+
+## The contract, everywhere
+
+```
+request → evaluate → permit → verify → execute → audit
+```
+
+Fail-closed. Offline-verifiable proof. The same six-step contract governs a
+production deploy, a business-system change plan, a clinical unblinding, an
+identity change, and an AI-agent tool call. Start with the
+[Runtime flow](/concepts/runtime-flow), or see what a governed change plan looks
+like end to end in Change-plan execution.

@@ -1,0 +1,122 @@
+---
+title: "Protected Actions"
+description: "A protected action is any operation whose effect is real, external, and hard to reverse. These are the actions that require authorization before they run."
+sidebarTitle: "Protected Actions"
+---
+{/* Generated from the Atlasent docs source (site/protected-actions.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# Protected Actions
+
+A **protected action** is any operation whose effect is real, external, and hard to reverse. Protected actions require explicit authorization from AtlaSent before they execute.
+
+The test: _if this action ran without authorization, would it cause a problem that couldn't be undone by refreshing the page?_
+
+| Action | Protected? |
+|---|---|
+| Deploy code to production | Yes |
+| Delete a database record | Yes |
+| Send an email to a customer | Yes |
+| Call an external payments API | Yes |
+| Export customer records | Yes |
+| Fetch a read-only web page | No |
+| Read a database record | No |
+| Generate text (no external effect) | No |
+
+## The `action_type` field
+
+Every protected action has an `action_type` — a string that names the operation. This is what AtlaSent evaluates against your policies.
+
+```ts
+{
+  action_type: 'production.deploy',   // deployment to production
+  actor_id: 'agent:copilot',          // who is acting
+  environment: 'production',          // where
+  context: { commit: 'abc123' }       // what
+}
+```
+
+`action_type` is yours to define. Convention: `<domain>.<verb>` for organization, `agent.<domain>.<verb>` for AI agent actions.
+
+## Example action types
+
+Some of the slugs below are canonical entries in the Protected Action Canon — `production.deploy`, `production.rollback`, `infrastructure.change`, `database.migrate`, `data.delete`, and `reconciliation.certify`. The others are illustrative names you might define for your own organization.
+
+### Deployment
+
+| Action type | Risk |
+|---|---|
+| `production.deploy` | High |
+| `production.rollback` | High |
+| `staging.deploy` | Medium |
+| `infrastructure.change` | High |
+
+### Data
+
+| Action type | Risk |
+|---|---|
+| `customer.data.export` | High |
+| `database.execute_sql` | High |
+| `database.migrate` | High |
+| `data.delete` | High |
+
+### Financial
+
+| Action type | Risk |
+|---|---|
+| `vendor.payment.release` | High |
+| `reconciliation.certify` | High |
+| `budget.approve` | Medium |
+
+### AI Agent
+
+| Action type | Risk |
+|---|---|
+| `agent.db.write` | High |
+| `agent.db.delete` | High |
+| `agent.api.post` | High |
+| `agent.code.execute` | High |
+| `agent.email.send` | Medium |
+| `agent.fs.write` | Medium |
+| `agent.search.web` | Low (usually allowed) |
+
+## Adding custom action types
+
+A custom `action_type` must be lowercase, dot-separated segments (it is validated against `/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/`; malformed values return `400 invalid_action_type`). Add it to your policy and it becomes protected. The rule below is schematic — see [Policy authoring](/concepts/policy) for the exact rule format:
+
+```yaml
+rules:
+  - id: require-approval-for-patient-data
+    when:
+      action_type: ehr.patient.record.export
+    require:
+      manual_approval: true
+    on_fail: deny
+```
+
+Actions that don't appear in any policy are **denied by default**. Unknown = denied.
+
+## The evaluation context
+
+When an action is evaluated, pass arbitrary context that policies can inspect:
+
+```ts
+{
+  action_type: 'agent.db.delete',
+  actor_id: 'agent:cleanup-bot',
+  context: {
+    table: 'audit_log',
+    rows_affected: 50000,
+    triggered_by: 'ai_agent',
+    reason: 'periodic cleanup',
+  }
+}
+```
+
+A policy can reject this call if `rows_affected > 10000` or `triggered_by === 'ai_agent'` and require manual approval instead.
+
+## Next steps
+
+- [AI Agent Governance](/ai-agent-governance) — full context for AI agent actions
+- [Policy authoring](/concepts/policy) — how to write rules for your actions
+- [Deploy Gate](/deploy-gate) — authorization specifically for deployments
+- Protected Actions Catalog (extended) — full catalog with domain examples

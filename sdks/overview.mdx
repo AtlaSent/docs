@@ -1,48 +1,48 @@
 ---
-title: "Atlasent SDKs: client libraries for every language"
-sidebarTitle: "Overview"
-description: "Atlasent provides SDKs for TypeScript, Python, and Go. Each wraps the same REST API with typed models, automatic retries, and fail-closed error helpers."
+title: "SDKs"
+description: "Official AtlaSent client libraries for TypeScript and Python, with Go in preview."
 ---
+{/* Generated from the Atlasent docs source (site/sdks/overview.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Atlasent provides official client libraries for TypeScript, Python, and Go. All three SDKs target the same underlying REST API and share identical authorization semantics — if you understand how `protect()` works in Python, you already understand how it works in TypeScript. The only differences are idiomatic naming conventions and language-specific packaging.
+First-party SDKs for TypeScript and Python wrap the same REST API and expose typed models, retry/backoff, and fail-closed error helpers. A Go SDK is in preview and not yet published.
 
 <CardGroup cols={3}>
-  <Card title="TypeScript" icon="js" href="/sdks/typescript">
-    Node.js 18+, Bun, Deno, and edge runtimes. `@atlasent/sdk` — not yet on npm; contact support for early access.
+  <Card title="TypeScript"  icon="js"     href="/sdks/typescript">
+    Node.js + edge runtimes. `@atlasent/sdk`.
   </Card>
-  <Card title="Python" icon="python" href="/sdks/python">
-    Python 3.9+, sync and async. Install with `pip install atlasent`.
+  <Card title="Python"      icon="python" href="/sdks/python">
+    3.9+. `pip install atlasent`.
   </Card>
-  <Card title="Go" icon="golang" href="/sdks/go">
-    Go 1.21+. Install with `go get github.com/atlasent-systems-inc/atlasent-sdk-go`. Currently in Beta.
+  <Card title="Go"          icon="golang" href="/sdks/go">
+    Preview. Not yet published.
   </Card>
 </CardGroup>
 
-## Method name consistency
+## What the SDKs do for you
 
-All three SDKs expose the same logical operations. The table below shows the method name for each operation per language so you can navigate the reference without surprises.
+- **Auth plumbing.** Sends your key as `Authorization: Bearer <key>`, rotation hooks.
+- **Retries.** Respect `Retry-After`; exponential backoff on transient errors.
+- **Fail-closed helpers.** Typed `AtlaSentDeniedError`, `AtlaSentError`, `RateLimitError`.
+- **Typed models.** Generated from the same `openapi.yaml` this site renders.
+- **Audit iterators.** Cursor pagination handled automatically.
 
-| Action | TypeScript | Python | Go |
-|---|---|---|---|
-| Fail-closed gate | `protect()` | `protect()` | `WithGate()` |
-| Scoped permit | `withPermit()` | `with_permit()` | — |
-| Explicit permit consume | `requirePermit()` | `require_permit()` | — |
-| Raw evaluation | `evaluate()` | `evaluate()` | `Evaluate()` |
-| Verify by ID | `verifyPermitById()` | `verify_permit_by_id()` | — |
+## What they don't do
 
-<Note>
-  The Go SDK uses `WithGate()` in place of `protect()` and `withPermit()`. A future release will add `Protect` and `WithPermit` aliases to bring Go into full naming parity with the TypeScript and Python SDKs. The authorization contract is identical today.
-</Note>
+- **Cache permits.** One permit = one action. Caching is unsafe.
+- **Swallow errors.** If the API is down, your agent halts. That's the point.
+- **Ship a policy DSL.** Policies are JSON; compose them however you like.
 
-## What SDKs do for you
+## Consistency
 
-- **Wrap the HTTP API.** Every SDK handles request serialization, response deserialization, and typed models generated from the Atlasent OpenAPI spec.
-- **Enforce permit consumption.** The fail-closed primitives (`protect()`, `withPermit()`, `WithGate()`) evaluate and verify a permit atomically — you cannot accidentally skip the verify step.
-- **Propagate errors as typed exceptions.** Denial, expiry, rate limiting, and transport failures each surface as a distinct, catch-able error type so you can handle them precisely.
-- **Retry transient failures.** All SDKs respect the `Retry-After` header and apply exponential backoff on transient errors.
+The TypeScript and Python SDKs follow the same method names:
 
-## What SDKs do not do
+| Operation | Method |
+|---|---|
+| Evaluate an action      | `client.evaluate(...)` |
+| Verify a permit         | `client.verify_permit_by_id(...)` / `verifyPermitById` |
+| Revoke a permit         | `client.revoke_permit_by_id(...)` / `revokePermitById` |
+| Fail-closed end-to-end  | `client.protect(...)` (Python) / `client.protect({...})` (TS) |
+| Resolve approval        | `client.approve_hitl_escalation(...)` / `approveHitlEscalation` (and `reject_hitl_escalation` / `rejectHitlEscalation`) |
+| Export audit            | `client.create_audit_export(...)` / `createAuditExport` |
 
-- **Change the authorization decision.** The Atlasent runtime is the single source of truth. The SDK cannot make a denied action permitted.
-- **Make network calls before you call them.** No background polling, no pre-fetching, no startup handshake — the first network call happens exactly when your code calls an SDK method.
-- **Store permits across requests.** One permit is valid for exactly one action. The SDKs never cache or reuse permits; doing so would break the audit chain.
+Same names, idiomatic casing per language. Explicit permit consumption is operator-tier and is not part of the standard SDK guard flow — see the [operator runbook](/runbooks/governed-close-operations).

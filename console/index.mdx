@@ -1,0 +1,110 @@
+---
+title: "Console User Guide"
+sidebarTitle: "Console overview"
+description: "Learn how to navigate the signed-in AtlaSent Console, interpret its fields, and complete the core authorization workflow."
+---
+{/* Generated from the Atlasent docs source (site/console/index.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+The AtlaSent Console is the signed-in control plane for configuring protected actions, reviewing authorization decisions, managing permits and approvals, and exporting evidence. The runtime makes authorization decisions; the Console lets people configure and inspect that activity.
+
+<Note>
+  Access to this guide and the Console requires sign-in. The pages, controls, and records you can see depend on your organization, role, plan, and enabled features.
+</Note>
+
+## The authorization lifecycle
+
+Use this lifecycle to understand where every Console screen fits:
+
+1. **Intent** — a person, agent, workflow, or service proposes an action.
+2. **Authority** — the organization defines who or what may act and under what scope.
+3. **Policy** — rules evaluate the exact request and its context.
+4. **Evaluation** — the runtime returns `allow`, `deny`, `hold`, or `escalate`.
+5. **Permit** — an `allow` may issue a bounded, short-lived authorization artifact.
+6. **Verification** — the execution boundary checks the permit before acting.
+7. **Execution** — the connected system performs the action; AtlaSent does not perform the underlying business action.
+8. **Evidence** — records link the request, decision, policy, permit, verification, and reported outcome.
+
+<Warning>
+  An `allow` decision does not prove that execution occurred. Verification proves that a permit check succeeded; execution evidence must come from the execution boundary or connected system.
+</Warning>
+
+## Primary navigation
+
+The reduced signed-in workspace contains 13 primary screens.
+
+| Screen | Use it to |
+|---|---|
+| [Dashboard](/console/screens-and-fields#dashboard) | Review authorization activity, alerts, and coverage at a glance. |
+| [Protected Actions](/console/screens-and-fields#protected-actions) | Define the consequential actions that require authorization. |
+| [Decisions](/console/screens-and-fields#decisions) | Inspect `allow`, `deny`, `hold`, and `escalate` results. |
+| [Permits](/console/screens-and-fields#permits) | Track issued permits, expiry, revocation, and proof linkage. |
+| [Verification History](/console/screens-and-fields#verification-history) | Review execution-boundary verification attempts and outcomes. |
+| [Holds & Approvals](/console/screens-and-fields#holds-and-approvals) | Resolve requests waiting for authorized human review. |
+| [Audit Trail](/console/screens-and-fields#audit-trail) | Follow evidence, proof-chain, and governance events. |
+| [Reports & Evidence](/console/screens-and-fields#reports-and-evidence) | Prepare review and audit packages. |
+| [Policies](/console/screens-and-fields#policies) | Define, test, bundle, and activate authorization rules. |
+| [Protected Systems](/console/screens-and-fields#protected-systems) | Review the systems and connectors whose actions can be governed. |
+| [Users & Roles](/console/screens-and-fields#users-and-roles) | Manage membership and role-based access. |
+| [API Keys](/console/screens-and-fields#api-keys) | Create scoped credentials for SDKs and integrations. |
+| [Settings](/console/screens-and-fields#settings) | Manage your profile, organization, security, billing, and related controls. |
+
+Additional advanced and administrative screens may appear for owners and administrators. They are intentionally outside the primary pilot navigation and should be used only when the relevant feature is enabled.
+
+## A good first session
+
+<Steps>
+  <Step title="Confirm who you are acting for">
+    Read **Acting for: Organization** in the organization switcher before making changes or interpreting records. Membership, authority, billing, and evidence are tenant-bound.
+  </Step>
+  <Step title="Review Protected Actions">
+    Confirm the action type, enforcement mode, and authority scope for the operation you want to govern.
+  </Step>
+  <Step title="Review the active policy bundle">
+    A draft policy is not runtime authority. Confirm that the intended bundle and version are active before relying on results.
+  </Step>
+  <Step title="Inspect Decisions and Permits">
+    Open a decision, read the matched policy and reason, then follow its permit and verification links when present.
+  </Step>
+  <Step title="Export evidence">
+    Use Audit Trail or Reports & Evidence to prepare the evidence required for your review process.
+  </Step>
+</Steps>
+
+## Team members and external collaborators
+
+A person can belong to more than one organization. The organization switcher
+selects the one authority boundary for the current action; it does not combine
+data or authority across organizations.
+
+In **Users & Roles**, invite an internal team member or a time-bounded external
+consultant. External access is labeled, requires an end date, and cannot hold
+the organization-owner role. The relationship label does not itself grant
+authority: roles, policy, delegation, approvals, and per-request evaluation
+still apply.
+
+Learn the full model in Organizations and memberships.
+
+## Common controls
+
+| Control | Meaning |
+|---|---|
+| Search | Matches visible records. A blank result may also reflect your role, organization, filters, or retention window. |
+| Filter | Narrows the current list without changing the underlying records. |
+| Environment | Separates test activity from live activity. Always confirm it before evaluating an action or creating a key. |
+| Status badge | Shows the current lifecycle state, not necessarily the final business outcome. |
+| Record ID | Stable identifier used to correlate decisions, permits, verifications, and evidence. |
+| Timestamp | Server-recorded event time. Review the displayed time zone before comparing external records. |
+| Export | Creates a point-in-time artifact; it does not change the source records. |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Screen and field reference" icon="table-list" href="/console/screens-and-fields">
+    Understand what every primary screen and field means.
+  </Card>
+  <Card title="Accounting Demo" icon="calculator">
+    Run the signed-in access-authorization lab in the isolated demo organization.
+  </Card>
+</CardGroup>
+
+If you are integrating through the API, continue to the [Quickstart](/quickstart/overview) after you understand the Console workflow.

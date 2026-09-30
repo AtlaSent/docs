@@ -1,0 +1,500 @@
+---
+title: "Governed close operations"
+description: "End-to-end runbook for AtlaSent gating accounting close: evaluate → permit → verify → execute → consume → audit, with worked examples for journal-entry posting, vendor master changes, period lock/unlock, approval escalation, and emergency override with tamper-evident evidence."
+---
+{/* Generated from the Atlasent docs source (site/runbooks/governed-close-operations.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+How AtlaSent gates a close-cycle action from intent to audit.
+Operators can follow the steps in order on a real org and see the
+full chain on one page.
+
+## Who this runbook is for
+
+Controllers, FP&A leads, finance ops engineers, and audit reviewers
+running an accounting close where AI agents (or humans, or scheduled
+jobs) interact with the GL, vendor master, sub-ledgers, or close
+checklists.
+
+The runbook reads top-to-bottom in three passes:
+
+- **Operational pass** — what each step does to your close calendar.
+- **Wire pass** — the exact API requests / responses behind each step.
+- **Evidence pass** — what the auditor sees when they ask "show me
+  every agent action in the period."
+
+The same primitive applies to any action class your team registers.
+The worked examples below use close-cycle actions.
+
+## Scenarios this runbook supports
+
+Each scenario maps to a runnable example in
+[`atlasent-examples/accounting-close/`](https://github.com/Atlasent/atlasent-examples/tree/main/accounting-close).
+
+| Scenario | Runbook section | Example |
+|---|---|---|
+| **Journal entry posting** with approval-threshold escalation | [§ 2 Evaluate](#2-evaluate-the-proposed-action), [Worked example: JE approval](#worked-example-journal-entry-approval) | `main.py` (cases 3, 7) |
+| **Vendor master changes** with separation-of-duties enforcement | [Worked example: vendor master](#worked-example-vendor-master-mutation) | `vendor-master.py` |
+| **Close-period lock / unlock** with all-tasks-complete gate | [Worked example: period close](#worked-example-period-close) | `main.py` (cases 6, 7) |
+| **Approval escalation during close** (named-human signoff) | [§ 3 Verify the permit](#3-verify-the-permit-before-execution), [Worked example: JE approval](#worked-example-journal-entry-approval) | `main.py` (case 3) |
+| **Emergency override** of a locked period with tamper-evident evidence | [§ Reversibility, overrides, and tamper-evident evidence](#reversibility-overrides-and-tamper-evident-evidence), [Worked example: emergency override](#worked-example-emergency-override-of-a-locked-period) | `emergency-override.py` |
+
+## The flow
+
+```
+proposed action
+   │
+   ▼
+POST /v1/evaluate              ──► allow │ deny │ hold │ escalate
+   │
+   │  (allow only)
+   ▼
+permit issued                  pt.v4.…  default TTL 1 h, Ed25519-signed
+   │
+   ▼
+POST /v1/permits/{id}/verify   ──► still valid? not consumed?
+   │
+   ▼
+execute the action             your system of record (ERP / GL / vendor master)
+   │
+   ▼
+POST /v1/permits/{id}/consume  ──► binds execution to the permit
+   │
+   ▼
+proof row written              audit_hash chained, signed
+   │
+   ▼
+GET /v1/proofs/export          self-contained, offline-verifiable bundle
+```
+
+Every step is durable. Decisions are written to the audit chain
+*before* the response returns; permits are single-use and TTL-bound;
+consume is idempotent and binds the executed payload back into the
+proof.
+
+## Vocabulary
+
+| Term | Meaning |
+|---|---|
+| **Protected Action** | An action class registered with AtlaSent that requires evaluation before execution. e.g. `journal_entry.approve`. |
+| **Evaluate** | The decision call. Returns `allow`, `deny`, `hold`, or `escalate`. |
+| **Permit** | A short-lived, single-use, signed token issued only with `allow`. |
+| **Verify** | Checks a permit is unconsumed, unexpired, and signed by a trusted key. |
+| **Consume** | Marks the permit as used and binds the executed payload into the proof. |
+| **Audit** | The per-org append-only proof chain. See [Proof verification](/concepts/proof-verification). |
+| **Hold** | Decision deferred (e.g. waiting for an approval signal). Not allowed, not denied. |
+| **Escalate** | Decision routes to a human reviewer queue. |
+| **Override** | A scoped, time-bound permit that allows one specific action inside an otherwise-blocked state (e.g. a locked period). Always requires named multi-party approval. |
+
+## 1. Register the action class
+
+A close-cycle org typically registers:
+
+- `journal_entry.approve` — author / approve a JE before it posts
+- `journal_entry.post` — write the JE to the GL (separate from approval; can be in a locked period)
+- `reconciliation.certify` — sign off on a sub-ledger reconciliation
+- `account_balance.adjust` — manual adjustment to an account balance
+- `vendor_master.update` — change vendor data; high-risk fields gated separately
+- `subledger.lock` / `period.close` — lock the period for write
+- `period.emergency_override` — controlled, time-bound unlock with multi-party approval
+
+Each is a Protected Action with its own constraints (amount
+thresholds, required approver roles, ticket linkage, time-of-day
+windows, materiality assessment). Register once via the console or
+`POST /v1/action-classes`.
+
+## 2. Evaluate the proposed action
+
+The agent or operator's proposed action is sent to `/v1/evaluate`
+*before* any state changes in your system of record:
+
+```bash
+curl -X POST "$ATLASENT_API_URL/v1/evaluate" \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_type": "journal_entry.approve",
+    "actor_id": "user_jane@example.com",
+    "actor_type": "user",
+    "context": {
+      "environment": "production",
+      "target": {
+        "id": "je_2026Q1_0421",
+        "type": "journal_entry",
+        "amount_usd": 84200,
+        "period": "2026-04"
+      },
+      "ticket": "JIRA-12450",
+      "approver_count": 1,
+      "client_ip": "10.0.4.7"
+    },
+    "request_id": "evt_2026-05-06T10:00:00Z_je_0421"
+  }'
+```
+
+The response is one of four decisions:
+
+| Decision | What happens | Permit issued | Operational meaning |
+|---|---|---|---|
+| `allow` | Action is authorized. | Yes — `permit_token` returned | Proceed with the post. |
+| `deny` | Action is blocked, reason returned. | No | Hard stop. The ERP is not touched. Surface the reason to the operator. |
+| `hold` | Decision deferred (waiting on an approval signal). | No, until released | Queue for the named approver. The agent waits. |
+| `escalate` | Routed to a human reviewer queue. | No, until released | Same shape as `hold`, with explicit reviewer routing. |
+
+Example `allow` response:
+
+```json
+{
+  "decision": "allow",
+  "authorization_state": {
+    "permit_requirement": "required",
+    "permit_status": "present",
+    "verification_status": "not_verified"
+  },
+  "permit_token": "pt.v4.g6EBOKGBWCC4wNi5vZmZzZXQ...",
+  "request_id": "evt_2026-05-06T10:00:00Z_je_0421",
+  "mode": "live",
+  "human_approval_required": false,
+  "human_approval_status": "not_required",
+  "expires_at": "2026-05-06T10:15:00Z",
+  "permit_expires_at": "2026-05-06T10:15:00Z",
+  "risk_score": 21
+}
+```
+
+A `deny` carries `deny_code` (short machine code) and `deny_reason`
+(operator-readable). A `hold` or `escalate` returns no permit; the
+caller must wait for the human reviewer or approval signal to
+release the decision.
+
+The audit row for this decision is written *before* the response
+returns. Denials and holds are part of the proof chain — they
+cannot be omitted, edited, or reordered without invalidating the
+chain.
+
+## 3. Verify the permit before execution
+
+Before changing state in your subledger, verify the permit. This
+catches clock skew, replay, and revocation in the window between
+issue and execute:
+
+```bash
+curl -X POST "$ATLASENT_API_URL/v1/permits/pt.v3..../verify" \
+  -H "Authorization: Bearer $ATLASENT_API_KEY"
+```
+
+`200` ⇒ still valid. `410` ⇒ expired or consumed; do not proceed.
+
+In the SDKs:
+
+<CodeGroup>
+
+```typescript TypeScript
+import { AtlaSentClient } from "@atlasent/sdk";
+const client = new AtlaSentClient({ apiKey });
+const verified = await client.verifyPermitById(permit.id);
+```
+
+```python Python
+from atlasent import AtlaSentClient
+client = AtlaSentClient(api_key=api_key)
+client.verify_permit_by_id(permit.id)
+```
+
+</CodeGroup>
+
+## 4. Execute the action
+
+This is the only step AtlaSent does not perform. Your system of
+record applies the journal entry, posts the reconciliation, locks
+the subledger, mutates the vendor master.
+
+Capture the executed payload's hash (the same canonical
+JSON-Canonicalization-Scheme hash described in
+[Proof verification](/concepts/proof-verification)). You'll hand it
+back to consume.
+
+## 5. Consume the permit
+
+Single call. Binds the executed payload to the issued permit:
+
+```bash
+curl -X POST "$ATLASENT_API_URL/v1/permits/pt.v3..../consume" \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "payload_hash": "sha256:..." }'
+```
+
+A mismatch between the bound payload at issue time and the supplied
+`payload_hash` returns `409 payload_binding_mismatch`. Use this as
+your "someone changed the JE between approval and posting" signal.
+
+On success, the linked proof row is updated:
+
+- `execution_status` → `executed`
+- `execution_hash` → the supplied payload hash
+- `executed_at` → server time
+
+The proof's `audit_hash` and `signature` were written at evaluate
+time and are unchanged.
+
+## 6. Replay & audit visibility
+
+Two surfaces:
+
+- **Console.** Every decision is visible at `/audit` and on the
+  action's detail page, with the full canonical decision object,
+  the matched policy version, and the linked permit and execution.
+- **Programmatic.** `GET /v1/proofs/export` returns a self-contained
+  bundle that an auditor can verify offline using the public keys
+  embedded in the bundle. See
+  [Proof verification](/concepts/proof-verification) for the
+  algorithm.
+
+For a single decision, `GET /v1/decisions/{id}` returns the canonical
+decision object with its proof linkage.
+
+## Reversibility, overrides, and tamper-evident evidence
+
+Three principles every controller and audit reviewer should
+internalise:
+
+### Permits are single-use and TTL-bound
+
+A permit authorises **one** execution, within a **named time window**,
+against a **specific resource**. Replays return `410`. Expired
+permits cannot be revived. There is no "save the permit for later"
+path; if the action doesn't run inside the TTL, the operator must
+re-evaluate.
+
+### Locked periods stay locked unless a controlled override is issued
+
+<Note>
+The period lock, the `PERIOD_LOCKED` denial, and the automatic re-lock
+described in this section are implemented by the reference example
+scripts together with your policy and system of record. They are not a
+built-in AtlaSent runtime feature. AtlaSent evaluates each request,
+issues and verifies the permit, and records the outcome in the audit
+chain.
+</Note>
+
+In the reference example, `period.close` writes a lock row. Once the lock is in place, every
+`journal_entry.post` against that period denies with `PERIOD_LOCKED`
+— including agent attempts, scheduled job attempts, and operator
+attempts. There is no "force post" flag.
+
+The only path through is a `period.emergency_override`, which:
+
+- requires **two named approver roles** (e.g. CFO + audit committee
+  chair). One human cannot self-approve.
+- requires an **`audit_reference`** (e.g. internal-audit ticket ID)
+  on the request body.
+- requires a **`materiality_assessment`** in plain language. Stored
+  on the decision row, not in Slack.
+- issues a permit that is **single-use, TTL-bound (typically 60–120
+  minutes), scoped to a specific JE or set of JEs**. The permit
+  cannot be reused for a different JE in the same period.
+- after TTL expiry, the example **re-locks the period**. There is
+  no manual "leave the door open" path.
+
+### The audit chain is tamper-evident and offline-verifiable
+
+Every event — denials, holds, the override request, both approvals,
+the issued permit, the executed JE, the consume, the auto re-lock —
+is appended to a SHA-256 hash-linked Ed25519-signed chain. An
+auditor walks the chain offline using only the published public key.
+Tampering is detectable; omission is detectable; reordering is
+detectable.
+
+What an auditor **cannot** do: edit the chain, omit the override
+request, or claim the period was never unlocked. The full chain of
+custody is preserved.
+
+What an auditor **can** do: download a self-contained export bundle
+and verify it years later, with no need to trust AtlaSent's server
+at audit time.
+
+## What close-operations teams get
+
+- **Execution-time authorization.** Every protected action is
+  evaluated *before* the ERP / GL is touched. Denied requests never
+  reach the system of record.
+- **Separation of duties.** Roles + named approvers are policy
+  primitives, not conventions. An AP clerk cannot do a controller's
+  job; one controller cannot self-approve.
+- **Deterministic gate.** Same inputs, same policy version, same
+  decision. Replayable for diligence.
+- **Single-use, TTL-bound permits.** Replays are rejected, not
+  retried. Expired permits cannot be revived.
+- **Tamper-evident audit.** The proof chain detects after-the-fact
+  edits, reorderings, or omissions without trusting AtlaSent at
+  audit time.
+- **Operator-shaped escalation.** `hold` and `escalate` route to a
+  reviewer queue with the full action context and the policy reason.
+- **Reversibility on overrides.** Override permits are scoped and
+  time-bound; the reference example re-locks the period when the TTL
+  elapses.
+- **Controlled overrides with tamper-evident evidence.** Overrides do not
+  hide the original deny. The audit chain shows lock → unlock-under-
+  override → re-lock with the full approver provenance.
+- **Offline replay.** An exported bundle is valid evidence years
+  later with only the public key.
+
+## Worked timeline
+
+```
+10:00:00.000  controller proposes journal_entry.approve (JE-0421, $84,200)
+10:00:00.214  POST /v1/evaluate            decision=allow, permit=pt_a1
+10:00:00.215  proof row eval_… written, signed, chained
+10:00:01.330  POST /v1/permits/pt_a1/verify    200
+10:00:01.580  subledger posts JE-0421
+10:00:01.605  POST /v1/permits/pt_a1/consume   {payload_hash: …}
+10:00:01.612  proof updated: execution_status=executed, execution_hash=…
+…
+17:00 (next day, audit) GET /v1/proofs/export
+                        controller's reviewer verifies bundle offline,
+                        signature + chain link both pass.
+```
+
+## Worked example — journal entry approval
+
+A $250,000 JE crosses the controller's $100,000 delegation threshold.
+
+```
+T+0    controller submits journal_entry.approve, $250,000, period=2026-04
+T+0    POST /v1/evaluate
+       → decision=hold
+         deny_code=DELEGATION_EXCEEDED
+         reason="JE amount $250,000 exceeds controller delegation ($100,000); requires CFO sign-off."
+       proof row eval_… written
+T+1m   CFO opens the hold queue, reviews the JE, approves
+       → decision released to allow, permit=pt_b2 issued, TTL 15 min
+T+1m   POST /v1/permits/pt_b2/verify    200
+T+1m   GL posts JE
+T+1m   POST /v1/permits/pt_b2/consume   {payload_hash: ...}
+       proof updated, audit_hash chained
+```
+
+The audit row for the hold is part of the chain — the full provenance
+("controller proposed, CFO approved, then posted") is preserved.
+
+Run this scenario:
+
+```bash
+git clone https://github.com/Atlasent/atlasent-examples
+cd atlasent-examples/accounting-close
+python main.py    # case 3
+```
+
+## Worked example — vendor master mutation
+
+AP clerk and controller both attempt to change the bank routing
+number on vendor V-7821. Bank routing is a high-risk field
+(separation-of-duties policy applies).
+
+```
+T+0    AP clerk u_alice submits vendor_master.update (bank_routing)
+       → decision=deny, reason="AP clerks cannot change bank_routing.
+                                  Required role: controller or above."
+       proof row eval_001 written
+T+1m   Controller u_bob resubmits, no secondary approver named
+       → decision=hold, reason="Vendor master change to bank_routing
+                                  requires a named secondary approver."
+       proof row eval_002 written
+T+5m   Controller u_bob resubmits with CFO u_carol as secondary approver
+       → decision=allow, permit=pt_c3 issued
+       proof row eval_003 written
+T+5m   ERP applies the change (V-7821 bank_routing → 026009593)
+T+5m   POST /v1/permits/pt_c3/consume
+       proof updated, audit_hash chained
+```
+
+Run this scenario:
+
+```bash
+cd atlasent-examples/accounting-close
+python vendor-master.py
+```
+
+## Worked example — emergency override of a locked period
+
+Q1 2026 was closed on May 5. On May 10, internal audit discovers a
+$50,000 misclassification. The reclass JE has to post inside the
+already-locked period.
+
+```
+T+0    agent:close-bot attempts journal_entry.post against 2026-Q1
+       → decision=deny, deny_code=PERIOD_LOCKED
+       proof row eval_001 written. GL not touched.
+
+T+1m   Controller u_dave submits period.emergency_override (CFO only)
+       → decision=hold, reason="Missing approver role: audit_committee_chair"
+       proof row eval_002 written
+
+T+3m   Controller resubmits with CFO + audit committee chair
+       request body includes audit_reference=IA-2026-014,
+                              materiality_assessment="Below SOX 5%
+                              materiality threshold; not restate-worthy."
+       → decision=allow, permit=pt_or1 issued, TTL=120m,
+         scoped to je:2026Q1-RECLS-0042 only
+       proof row eval_003 written, signed by both approvers
+
+T+3m   agent:close-bot re-posts the reclass JE with override_permit
+       → decision=allow, permit=pt_je2 issued
+       proof row eval_004 written
+T+3m   GL commits the reclass JE
+T+3m   Both permits consumed; payload hashes bound
+
+T+2h   System auto-re-locks the period (TTL elapsed)
+       proof row eval_005 written ("Override TTL elapsed; period re-locked")
+```
+
+The auditor sees seven hash-linked rows: original deny, override
+request, hold, both approvals, override grant, JE post, both
+consumes, auto re-lock. The override does not hide the deny; it
+sits next to it in the chain.
+
+Run this scenario:
+
+```bash
+cd atlasent-examples/accounting-close
+python emergency-override.py
+```
+
+## Worked example — period close
+
+End-of-month / end-of-quarter close.
+
+```
+T+0    Controller submits period.close for 2026-04
+       → decision=deny, reason="3 close tasks remain incomplete: bank rec
+                                   for 1100-Cash, AP cutoff, FX revaluation."
+       proof row eval_001 written
+T+30m  Tasks completed; controller resubmits
+       → decision=hold, reason="period.close requires CFO sign-off."
+       proof row eval_002 written
+T+45m  CFO opens hold queue, signs off
+       → decision=allow, permit=pt_pc1 issued
+T+45m  System writes the period.lock row (the period is now closed for write)
+T+45m  POST /v1/permits/pt_pc1/consume
+       proof updated, audit_hash chained
+```
+
+After this point, in the reference example, every `journal_entry.post`
+against 2026-04 denies with `PERIOD_LOCKED`. To post inside the locked period, the
+operator must use the emergency-override path (above).
+
+Run this scenario:
+
+```bash
+cd atlasent-examples/accounting-close
+python main.py    # case 7
+```
+
+## Related
+
+- Examples: [`atlasent-examples/accounting-close/`](https://github.com/Atlasent/atlasent-examples/tree/main/accounting-close) — runnable scripts for every scenario above
+- [Quickstart → Evaluate an action](/quickstart/first-evaluation)
+- [Quickstart → Verify a permit](/quickstart/verify-permit)
+- [Proof verification](/concepts/proof-verification)
+- [Audit chain](/concepts/audit-chain)
+- [Glossary](/concepts/glossary)

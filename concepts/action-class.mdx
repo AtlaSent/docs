@@ -1,0 +1,42 @@
+---
+title: "Action class"
+description: "The typed action an agent requests authorization for."
+---
+{/* Generated from the Atlasent docs source (site/concepts/action-class.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+An **action class** is the `type` field on an `action`. It's the key AtlaSent uses to match against the policy's rule set.
+
+```json
+{
+  "actor":  { "id": "agent-001", "type": "ai_agent" },
+  "action": { "id": "act-7f3c", "type": "healthcare.record.amend" },
+  "target": { "id": "patient-42", "type": "ehr_record", "environment": "production" }
+}
+```
+
+The action class in this request is `healthcare.record.amend`.
+
+## Naming convention
+
+Lowercase, dot-separated segments: `<domain>.<verb>` or `<domain>.<object>.<verb>`. The v1 API validates `action_type` against `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`, so at least one dot is required and colons are rejected. Where one exists, use the canonical action slug. Examples:
+
+| Class | Meaning |
+|---|---|
+| `healthcare.record.amend` | Amend (not overwrite) a healthcare record |
+| `data.modify` | Create or modify records in a regulated system |
+| `data.export` | Export data out of the regulated system |
+| `production.deploy` | Deploy a change to production |
+| `trial.unblinding.execute` | Unblind a clinical trial |
+| `agent.tool.invoke` | Invoke a tool on behalf of an AI agent |
+
+<Tip>
+  Keep classes coarse (10s, not 1000s). Policy rules are what make them fine-grained — the class only needs to distinguish actions that plausibly have different decisions.
+</Tip>
+
+## `target.environment`
+
+`production`, `staging`, `dev`. Policies often have stricter rules for `production` (for example, `escalate` in prod, `allow` in staging).
+
+## Not the same as "tool name"
+
+The action class is about **regulatory meaning**, not framework plumbing. `healthcare.record.amend` is the class whether the agent uses LangChain, LlamaIndex, or a raw HTTP call. The tool name is implementation; the class is what the FDA or EMA cares about.

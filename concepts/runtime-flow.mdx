@@ -1,148 +1,233 @@
 ---
-title: "Runtime authorization flow: evaluate, permit, verify"
-sidebarTitle: "Runtime Flow"
-description: "A detailed walkthrough of Atlasent's four-hop request lifecycle, the fail-closed matrix, and the trust boundary between the platform and your code."
+title: "Runtime flow"
+description: "How AtlaSent moves from a proposed consequential action through organizational authority, authorization, Permit verification, execution, and evidence."
 ---
+{/* Generated from the Atlasent docs source (site/concepts/runtime-flow.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Atlasent's runtime model is a single execution boundary: no protected action runs without a verified permit returned by the server. Your code triggers the flow by calling `protect()` or `with_permit()`; the SDK handles the two wire calls (`/v1/evaluate` and `/v1/permits/{id}/verify`) and raises immediately if anything goes wrong. You control what runs inside the permit scope — Atlasent controls every step of the decision path that gets you there.
+AtlaSent provides **authorization for consequential computational actions**.
+The runtime model connects three independent questions: *did a qualified organizational source authorize this exact consequence; can the consequence currently be withheld across every reachable same-effect path; and what native effect was independently established?*
 
-## The trust boundary
+**Evidence boundary:** the first question is implemented by the current authorization/Permit runtime. Whole-topology protection continuity, atomic execution admission, and independent native-effect establishment are architecture requirements with bounded preview work; they must not be described as universally available until the corresponding acceptance evidence is current and complete.
 
+The core lifecycle is:
+
+`Intent → Authority → Policy → Evaluation → Permit → Verification → Execution → Evidence`
+
+The important rule is that these stages are **not interchangeable**. An Approval
+is not final Authorization. An `allow` Decision is not Execution. A Permit is not
+Evidence.
+
+## End-to-end flow
+
+```text
+Caller / proposed Action
+        ↓
+identity resolution → Actor / Execution Principal
+        ↓
+Action Type + Resource/Target + Environment + Context
+        ↓
+trusted Assertions / required Approval
+        ↓
+current organizational Authority
+        ↓
+reachable same-effect topology / practical control
+        ↓
+Policy / active Policy Bundle
+        ↓
+POST /v1/evaluate
+        ↓
+Decision: allow | deny | hold | escalate
+        ↓ allow only
+Permit (`permit_token` on the current evaluate response)
+        ↓
+Gate at the actual execution boundary
+        ↓
+POST /v1-verify-permit
+        ↓
+Verification + single-use/replay enforcement
+        ↓
+Execution admission / execution
+        ↓
+Native Effect
+        ↓
+Evidence / Proof
 ```
-                              ┌─── trust boundary ───┐
-                              │                      │
-  caller            SDK       │   /v1/evaluate        │   policy engine
-  ──────► intent ──► protect()├──── evaluate ────────►│──► decision: allow
-                              │                      │    mint permit (pt_…)
-                              │                      │    write audit entry
-                              │                      │
-                              │   /v1/permits/        │
-                              │   {id}/verify         │
-                    protect() ├──── verify ──────────►│──► check signature + TTL
-                              │                      │    check not consumed/revoked
-                              │                      │    bind into audit chain
-                              └──────────────────────┘
-                    permit (verified) ◄───────────────
-                    │
-                    ▼
-            action executes (your code)
-                    │
-                    ▼
-            store permit_id alongside your record
+
+The diagram is the **target end-to-end invariant**, not a claim that every connected path currently implements every stage. A specific accepted path may only be described as topology-complete, atomically admitted, or independently effect-terminalized when that exact path has acceptance evidence proving it.
+
+## 1. Resolve the action and actor
+
+The request identifies the Action being attempted and the Resource/Target it may
+affect. The runtime must distinguish the boundary **Caller** from the resolved
+**Actor**, and where relevant from the **Execution Principal** that will actually
+attempt the native effect.
+
+The Action Type identifies what kind of action is being attempted. The
+organization-specific Action Class configures governance for that Action Type.
+Those are related but different concepts.
+
+## 2. Establish current organizational context
+
+The Authorization determination can consume trusted inputs such as:
+
+- organizational Authority and delegation;
+- current Policy / Policy Bundle;
+- required Approval;
+- separation-of-duties or quorum results;
+- verified Assertions;
+- Resource/Target state;
+- environment and transaction context;
+- timing and other current conditions.
+
+A technically capable Caller cannot manufacture organizational Authority by sending favorable context. Nor can an upstream IAM/PAM allow, policy-engine result, approval artifact, risk score, or scoped credential become positive Authority unless its source is independently qualified for the exact organizational proposition.
+
+## 3. Evaluate
+
+The public decision operation is:
+
+```http
+POST /v1/evaluate
 ```
 
-Nothing on the caller side authorizes the action. The boundary is server-issued: only a permit that the server has minted and verified lets execution proceed. The SDK is a thin orchestrator over the two wire calls — it is not a policy engine, not a decision cache, and not a verifier.
+Evaluation returns a Decision:
 
-## The four hops
+| Decision | Runtime meaning |
+|---|---|
+| `allow` | The request satisfies the evaluated Authorization conditions; a Permit may be issued. |
+| `deny` | The request is not authorized under the evaluated conditions. |
+| `hold` | A required condition or evidence item remains outstanding. |
+| `escalate` | Additional authority, review, or evidence is required. |
 
-<Steps>
+Only a positive Authorization can produce the Permit needed for a permit-gated
+execution path.
 
-<Step title="Intent → SDK">
-  You express intent by calling one of the canonical surfaces with `actor`, `action`, and `context`:
+The current wire response exposes the Permit on the flat response surface (for
+example `permit_token`) rather than the old nested Permit shape shown in some
+historical documentation.
 
-  - **`protect()`** — returns the verified permit as a value.
-  - **`with_permit()` / `withPermit()`** — invokes the action body with the verified permit and returns the body's result.
-  - **`require_permit()` / `requirePermit()`** — same contract, using a `ProtectedAction` descriptor with `resource_id` and `environment`.
+## 4. Verify at the Gate
 
-  All three resolve to the same two wire calls. There is no caller-side policy evaluation and no caching of decisions.
-</Step>
+A **Gate** is an enforcement point with practical ability to withhold or constrain the native effect on a particular route. Gateway placement is not proof of whole-effect control. The architecture requires protection status to account for the reachable same-effect topology, including alternate actuators, bypass, break-glass, stale, and unknown routes. **Current topology coverage is path-specific and evidence-bounded; do not infer whole-effect control from a single governed route.**
 
-<Step title="Evaluate — mint permit">
-  The SDK posts to `/v1/evaluate`. The policy engine:
+The public verification operation is:
 
-  1. Resolves the action type and loads the active published bundle for your org.
-  2. Evaluates the bundle's rules against the actor, action, target, and context.
-  3. Returns one of `allow` / `deny` / `hold` / `escalate`.
-  4. On `allow`, mints a permit (`pt_…`) with a 15-minute TTL, signs it with the per-tenant Ed25519 key, and writes both the decision and the issued permit to the audit chain.
+```http
+POST /v1-verify-permit
+```
 
-  Anything other than `allow` raises an `AtlaSentDeniedError` at the SDK boundary. The action does not proceed, and you cannot bypass this — `protect()` has no `permitted=false` return path.
-</Step>
+Verification checks the Permit for the actual execution attempt, including the
+applicable validity, binding, expiry, revocation, and replay requirements. The
+current permit-gated path enforces single-use consumption semantics as part of
+this boundary.
 
-<Step title="Verify — bind">
-  The SDK immediately posts the permit to `/v1/permits/{id}/verify`. The server:
+> **Do not execute merely because an earlier Evaluation or an external gateway returned allow. Gate the native effect on successful Permit Verification and whatever practical-control evidence the specific accepted path requires.**
 
-  1. Verifies the Ed25519 signature.
-  2. Confirms the permit is `ISSUED` — not `EXPIRED`, `CONSUMED`, or `REVOKED`.
-  3. Binds the verification into the audit chain.
+The verification binding should be derived from the original request/execution
+context required by the current contract; do not expect the evaluate response to
+invent or echo every binding field.
 
-  This step closes the window between mint and execute. Between mint and verify, the policy could change, an operator could revoke the permit, or the TTL could elapse — verify catches all three. A verify failure also raises `AtlaSentDeniedError`; the action does not proceed.
+## 5. Execute
 
-  <Warning>
-    Verify is **single-use at the server**. A second verify on the same permit returns `verified: false` and the SDK raises. This guarantees one permit authorizes one execution and nothing more.
-  </Warning>
-</Step>
+The **target invariant** is that successful Verification and execution admission/consumption form an atomic, replay-safe boundary before the native system attempts the Action. Do not describe the current runtime generally as providing atomic admission unless the exact execution path has acceptance evidence showing the verify/consume-to-operation handoff is atomic for that path.
 
-<Step title="Execute + audit linkage">
-  Control returns to your code with a verified permit. You execute the action and store the `permit_id` next to your own record:
+AtlaSent does not become the underlying deployment system, financial system,
+clinical system, database, or agent framework. It governs the authorization
+boundary; the native system performs the effect.
 
-  ```python
-  permit = protect(actor="user_123", action="ehr.write", context={...})
-  record = db.patients.update(
-      "patient-42",
-      payload,
-      atlasent_permit_id=permit.permit_id,  # the two-way audit link
-  )
-  ```
+Execution is a distinct state. It is possible for an Action to be authorized and never execute, or for a native system to return a failure after Authorization. A provider, workflow, connector, gateway, or PEP reporting success does not alone establish the native effect. Independent terminal effect establishment is a target architecture requirement and is only a current capability claim for paths with current profile-qualified evidence; otherwise ambiguity remains explicit.
 
-  The permit ID is the link that makes the audit chain two-way navigable. You can retrieve the Atlasent decision for any record in your system, and vice versa.
-</Step>
+## 6. Preserve Evidence / Proof
 
-</Steps>
+The evidence model should correlate:
 
-## Fail-closed matrix
+- the proposed Action and normalized context;
+- Actor / Execution Principal identity context;
+- applicable Authority and Policy;
+- required Assertions and Approval evidence;
+- Evaluation and Decision;
+- Permit issuance;
+- Verification / replay outcome;
+- reachable same-effect routes and their current governed/bypassable/stale/unknown state **where topology evidence exists**;
+- exact admission/consumption identity **where the path implements the atomic-admission invariant**;
+- native execution reference and provider result;
+- versioned, profile-qualified Native Effect evidence **where an effect-establishment profile is implemented and accepted**;
+- unresolved or indeterminate outcome state when evidence is insufficient;
+- conformance between the authorized and executed action; and
+- invalidation caused by Authority or topology drift.
 
-The execution-boundary contract is fail-closed by construction. There is no configuration that opens it.
+Use **tamper-evident** for hash-linked evidence history unless a stronger storage
+property is independently supported. **Proof** means cryptographically
+verifiable Evidence, not an arbitrary log entry.
 
-| Failure mode | What the SDK does | Does the action run? |
-|---|---|---|
-| Policy `deny` | Raises `AtlaSentDeniedError` | No |
-| Policy `hold` or `escalate` | Raises `AtlaSentDeniedError` | No |
-| Permit signature invalid | Raises `AtlaSentDeniedError` | No |
-| Permit `EXPIRED`, `CONSUMED`, or `REVOKED` at verify | Raises `AtlaSentDeniedError` | No |
-| API 5xx | Raises `AtlaSentError` | No |
-| Request timeout | Raises `AtlaSentError` | No |
-| Auth failure (invalid API key) | Raises `AtlaSentError` | No |
-| Network or DNS failure | Raises `AtlaSentError` | No |
-| Missing policy bundle (`fail_mode: closed`) | Raises `AtlaSentDeniedError` | No |
+## Enforcement posture
 
-The action runs only when `protect()` returns (or when `with_permit()` invokes its body). There is no "allow on error" fallback and no caller-side override. If you need a break-glass path, use a signed override — that also writes to the audit chain.
+Not every AtlaSent-connected path should be described as production-blocking.
+AtlaSent can be introduced through modes such as shadow/advisory evaluation and
+later moved into bounded enforcement after the customer and execution topology
+are ready.
 
-## Key invariants
+Where a specific path is configured and tested as **fail-closed and
+permit-gated**:
 
-These properties hold for every protected action in every Atlasent deployment:
+> **No valid Permit means no execution through that governed path.**
 
-1. **Audit record is written before Atlasent returns a response** — you always have a record, even if the caller crashes immediately after receiving the decision.
-2. **Permit is single-use** — consumed once and never reusable. Replay attempts raise an error.
-3. **Network failure, timeout, or malformed response blocks execution** — uncertainty is never resolved in the caller's favor.
-4. **`fail_mode: closed`** — missing policy bundles default to deny. There is no implicit allow.
-5. **Permits expire after 15 minutes (900 seconds)** — plan your execution path to consume the permit well inside that window.
+Do not apply that claim to non-enforcing, shadow, historical, or merely observed
+paths. Topology incompleteness still prevents a whole-topology claim, but it does
+not negate the tested behavior of a specific governed route.
 
-## Execution-boundary authorization vs SDK guard ergonomics
+## Why this is different from workflow
 
-These are two distinct layers. Do not conflate them.
+A workflow can collect a request and an Approval. It may sequence steps before
+or after the action. That does not by itself establish that the exact action is
+organizationally authorized at the execution boundary.
 
-| Layer | What it is | Examples |
-|---|---|---|
-| **Execution-boundary authorization** | The contract that no action runs without a verified permit. Identical across languages, identical across surfaces, identical on the wire. Non-negotiable, non-bypassable, audit-bearing. | `protect()`, `with_permit()` / `withPermit()`, `require_permit()` / `requirePermit()` |
-| **SDK guard / helper ergonomics** | Convenience surfaces layered on top — framework decorators, middleware, integration wrappers. Bypassable by removing the wrapper, so they must always delegate to the execution-boundary surface above. | `@atlasent_guard` (Flask / FastAPI), `withLangChainGuard`, browser guards, MCP server guards |
+AtlaSent's model keeps the workflow input and the runtime determination separate:
 
-Helpers exist to make the canonical surface ergonomic in a given framework. They do not relax the contract. Any helper that does not internally call one of the execution-boundary surfaces is not an Atlasent execution-boundary call.
+```text
+workflow / IAM / system-of-record facts
+        ↓ trusted inputs
+organizational Authority + Policy
+        ↓
+per-request Authorization
+        ↓
+Permit
+        ↓
+Gate / Verification
+        ↓
+Execution
+```
 
-<Tip>
-  During a security review, pin all enforcement claims to the execution-boundary layer. Pin ergonomics claims to the helper layer.
-</Tip>
+## Why this is different from a policy engine
 
-## What lives outside this flow
+A policy engine can evaluate expressions. AtlaSent's current accepted runtime contract connects evaluation to a bounded Permit and Verification/Evidence for governed paths. The broader architecture extends that linkage toward whole-topology protection continuity, atomic execution admission, and independently established native-effect truth; those later capabilities remain evidence-bounded until their acceptance records support a current capability claim.
 
-These operations exist for advanced use cases and are not part of the standard `protect()` / `with_permit()` flow:
+## Controlled distinctions
 
-- **`evaluate()`** — the raw decision primitive. Returns the four-value decision without issuing or verifying a permit. Use this only when you need to inspect `hold` or `escalate` at the call site — for example, to route to an approval queue. If you use `evaluate()` directly, you must call `verify_permit_by_id()` / `verifyPermitById()` yourself before executing.
-- **`verify()`** — the explicit verify call. Use this when a permit has crossed a process boundary and the receiving side wants to re-confirm it before acting.
-- **`consume()`** — an operator-tier lifecycle action. Most callers never need it directly; the verify step in the audit chain is the binding record.
+- **Caller ≠ Actor ≠ automatically the Execution Principal**
+- **Action Type ≠ Action Class**
+- **Authority ≠ Authorization**
+- **Authority ≠ Approval**
+- **Approval ≠ Decision**
+- **Decision ≠ Permit**
+- **Permit ≠ Evidence**
+- **`allow` ≠ Execution**
+- **Gate ≠ Policy**
+- **External allow ≠ organizational Authority**
+- **Gateway placement ≠ whole-effect control**
+- **Provider/PEP success ≠ terminal Native Effect**
+- **Proof ≠ generic log**
 
-## Related
-
-- [Permit](/concepts/permit) — the artifact: lifecycle, signing, single-use semantics.
-- [Policy](/concepts/policy) — how rules are evaluated and why bundles are immutable.
-- [Audit Chain](/concepts/audit-chain) — how decisions and verifications are recorded and made tamper-evident.
-- [Deny Codes](/concepts/deny-codes) — every code the engine can return, with handling examples.
+<CardGroup cols={2}>
+  <Card title="Execution-time authorization" icon="shield-check" href="/concepts/execution-time-authorization">
+    The mechanism at the execution boundary.
+  </Card>
+  <Card title="Organizational authority" icon="shield" href="/concepts/organizational-authority">
+    The standing organizational right evaluated as part of Authorization.
+  </Card>
+  <Card title="Permit" icon="ticket" href="/concepts/permit">
+    The bounded runtime artifact used at the Gate.
+  </Card>
+  <Card title="Proof verification" icon="link" href="/concepts/proof-verification">
+    How the evidence chain can be independently verified.
+  </Card>
+</CardGroup>

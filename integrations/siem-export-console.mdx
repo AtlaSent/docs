@@ -1,0 +1,121 @@
+---
+title: "SIEM Export Console"
+description: "Configure Splunk, Elastic, or generic webhook destinations for AtlaSent audit events from the Console UI."
+---
+{/* Generated from the Atlasent docs source (site/integrations/siem-export-console.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+The SIEM Export Console lets org admins configure and manage outbound audit event streams without writing any code.
+
+<Info>
+  For the audit event schema and alerting patterns, see [SIEM export](/integrations/siem-export). This page covers the Console UI and destination management.
+</Info>
+
+## Supported destinations
+
+| Destination | Transport | Auth method |
+|---|---|---|
+| Splunk HEC | HTTPS POST to `/services/collector/event` | HEC token (Bearer) |
+| Elastic (Elasticsearch / Elastic Cloud) | HTTPS POST to `/_bulk` | API key |
+| Generic webhook | HTTPS POST, configurable | Bearer token or HMAC-SHA256 signature |
+
+## Opening the SIEM Export settings
+
+Navigate to **Settings → SIEM Export** in the AtlaSent Console (`/siem-export`). Only org admins can view or modify this page.
+
+---
+
+## Adding a destination
+
+1. Click **Add destination**.
+2. Select the destination type: **Splunk HEC**, **Elastic**, or **Generic webhook**.
+3. Fill in the required fields:
+
+   | Field | Required | Description |
+   |---|---|---|
+   | **Destination name** | Yes | A label for your own reference — not sent to the endpoint. |
+   | **Endpoint URL** | Yes | The full HTTPS URL of the receiving endpoint. |
+   | **Auth token** | Yes | HEC token (Splunk), API key (Elastic), or Bearer token (generic). Stored encrypted at rest. |
+   | **Event types** | Yes | Which audit event types to forward. Select one or more: `evaluation`, `permit`, `override`, `escalation`, `policy_change`, or `all`. |
+   | **Request timeout** | No | Per-request timeout in seconds. Default: `10`. Maximum: `30`. |
+   | **TLS verification** | No | Enabled by default. Disable only for internal endpoints with self-signed certificates. |
+
+4. Click **Test Connection** to validate reachability and authentication before saving (see below).
+5. Click **Save**.
+
+---
+
+## Test Connection
+
+The **Test Connection** button sends a single synthetic audit event to the configured endpoint and waits up to 10 seconds for a 2xx response. The test payload is clearly marked:
+
+```json
+{
+  "source": "atlasent.audit",
+  "type": "siem_export_test",
+  "ts": "...",
+  "message": "AtlaSent SIEM export connectivity test — not a real audit entry."
+}
+```
+
+A green confirmation message appears on success. On failure, the raw HTTP status and error body are shown inline so you can diagnose the issue before saving.
+
+<Warning>
+  A destination can be saved without a successful test, but deliveries to a failing endpoint will accumulate in the export job history as `failed`. Fix the endpoint configuration before events pile up.
+</Warning>
+
+---
+
+## Event types
+
+| Event type | Triggered when |
+|---|---|
+| `evaluation` | Any call to `/v1/evaluate` completes. |
+| `permit` | A permit is issued, consumed, or expired. |
+| `override` | An org admin issues an emergency override. |
+| `escalation` | A decision is escalated for human approval. |
+| `policy_change` | A policy is created, updated, or deleted. |
+| `all` | All of the above. |
+
+Select only the event types your SIEM team needs to minimize egress volume.
+
+---
+
+## Export job history
+
+Below the destination list, the **Export job history** table shows the last 7 days of delivery attempts for each destination:
+
+| Column | Description |
+|---|---|
+| **Timestamp** | When the export attempt occurred (UTC). |
+| **Event type** | The event type that triggered the export. |
+| **Status** | `delivered`, `failed`, or `retrying`. |
+| **HTTP status** | The response code from the destination endpoint. |
+| **Latency** | Round-trip time to the endpoint in milliseconds. |
+| **Error** | Error detail on `failed` or `retrying` entries. |
+
+Failed deliveries are retried with exponential backoff. An entry that exhausts its retries is not lost from the AtlaSent audit chain, only from the SIEM export stream.
+
+---
+
+## Editing or deleting a destination
+
+Click the **…** menu on any destination row to **Edit** or **Delete** it. Deleting a destination stops all future exports to that endpoint immediately. In-flight retries are cancelled.
+
+---
+
+## Security
+
+- Auth tokens are encrypted at rest using AES-256-GCM and are never returned in plaintext after the initial save. To rotate a token, click **Edit** and enter the new value.
+- For generic webhooks, optionally enable **HMAC-SHA256 signature** in destination settings. AtlaSent signs the request body with a shared secret and includes the signature in the `X-AtlaSent-Signature-256` header.
+
+---
+
+## Comparison: Console SIEM export vs. signed audit bundle
+
+| | SIEM export | [Signed audit bundle](/quickstart/audit-export) |
+|---|---|---|
+| Purpose | Operational visibility, real-time alerting | Regulatory evidence, tamper-evident proof |
+| Delivery | Best-effort, with retry | On-demand, cryptographically signed |
+| Use in inspections | Supplementary | Canonical — use this for FDA/EMA |
+
+SIEM export is a convenience layer on top of the audit chain, not a replacement for it.

@@ -1,95 +1,41 @@
 ---
-title: "EU GMP Annex 11 computerized systems compliance guide"
-sidebarTitle: "EU Annex 11"
-description: "Map Atlasent primitives to EU GMP Annex 11 requirements for computerized systems in regulated pharmaceutical manufacturing environments."
+title: "EU Annex 11"
+description: "EMA guideline for computerized systems in GMP — which clause maps to which AtlaSent primitive."
 ---
+{/* Generated from the Atlasent docs source (site/compliance/eu-annex-11.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-EU GMP Annex 11 is the EMA guideline governing **computerized systems** in regulated GMP environments, including pharmaceutical manufacturing, batch release, and clinical data management. When AI agents process GMP data, batch records, or regulated manufacturing records, Annex 11 applies. Atlasent satisfies Annex 11's core requirements through an append-only, hash-linked audit chain, policy-based access controls, and tamper-evident permit tokens that serve as the electronic authorization record for each regulated action.
+EU Annex 11 is the **EMA guideline for computerized systems** in regulated GMP environments. It applies to AI agents processing GMP data, clinical trial data, and regulated manufacturing records.
 
-## Framework mapping
+## Requirement-to-primitive mapping
 
-The table below maps each relevant Annex 11 clause to the specific Atlasent primitive that satisfies it.
-
-| Annex 11 clause | Requirement | Atlasent primitive |
+| Clause | Requirement | AtlaSent primitive |
 |---|---|---|
-| Clause 4.3 | Supplier and service provider assessment | VQP package, vendor qualification |
-| Clause 4.7 | Record of all events affecting a system | Append-only audit chain, policy version tracking |
-| Clause 7.1 | Data integrity — protected from modification | Hash-linked entries, fail-closed on error |
-| Clause 9 | Electronic signatures | Permit tokens, actor attribution in audit |
-| Clause 12.1 | Audit trail — all GxP data modifications | Evaluation audit chain, all decisions recorded |
-| Clause 12.4 | Review of audit trails | Audit export API, Console audit viewer |
-| Clause 14 | Disaster recovery | RPO 5 minutes, RTO 1 hour |
+| 7.1  | Data integrity | [Audit chain](/concepts/audit-chain) is append-only + hash-linked; permits bind records to authorizations. |
+| 9    | Audit trails | Every `/evaluate` call produces a timestamped, attributed chain entry. |
+| 12.1 | Security — physical / logical controls restricting access | Scoped [API keys](/api-reference/authentication#scopes); [policy](/concepts/policy) restricts agent action classes; policy-based authorization + fail-closed API. |
+| 13   | Incident management | Deny events surface in the Console deviation queue. |
+| 14, 15 | Electronic signature; batch release | Ed25519-signed [permit tokens](/concepts/permit) as the authorization record. |
+| 17   | Archiving | [Signed audit bundle export](/quickstart/audit-export) — verifiable long after retrieval. |
 
-<Note>
-  Clause 4.3 requires a formal supplier assessment before placing Atlasent into a validated GMP system. Request the **Vendor Qualification Package (VQP)** from [compliance@atlasent.io](mailto:compliance@atlasent.io) — it provides the structured mapping your Quality team needs to complete supplier qualification.
-</Note>
-
-## Starter policy rules
-
-The following policy rules implement the core Annex 11 data-integrity and access-control requirements. Deny rules for data deletion and audit modification are mandatory for GMP use.
+## Starter policy
 
 ```json
 [
-  { "action_type": "batch.read",    "decision": "allow" },
-  { "action_type": "batch.write",   "decision": "allow" },
-  { "action_type": "batch.release", "decision": "require_approval" },
-  {
-    "action_type": "batch.delete",
-    "decision": "deny",
-    "deny_code": "DENY_POLICY",
-    "message": "EU Annex 11 Clause 7.1: GMP data must not be deleted"
-  },
-  {
-    "action_type": "audit.modify",
-    "decision": "deny",
-    "deny_code": "DENY_POLICY",
-    "message": "EU Annex 11 Clause 12.1: Audit trails must not be modified"
-  },
-  {
-    "action_type": "access.bypass",
-    "decision": "deny",
-    "deny_code": "DENY_POLICY",
-    "message": "EU Annex 11 Clause 4.3: Access controls must not be circumvented"
-  }
+  { "action_type": "batch:read",            "decision": "allow" },
+  { "action_type": "batch:write",           "decision": "allow" },
+  { "action_type": "batch:release",         "decision": "hold" },
+  { "action_type": "batch:delete",          "decision": "deny",  "reason": "Annex 11 §7.1: data must not be deleted" },
+  { "action_type": "audit:modify",          "decision": "deny",  "reason": "Annex 11 §9: audit trails must not be modified" },
+  { "action_type": "access:bypass",         "decision": "deny",  "reason": "Annex 11 §12.1: access controls must not be circumvented" },
+  { "action_type": "export:unvalidated",    "decision": "deny",  "reason": "Annex 11 §17: archived data must be checked for accessibility, readability and integrity" }
 ]
 ```
 
-<Warning>
-  `batch.release` uses `require_approval` rather than a direct `allow`. This routes the action through the Atlasent operator approval queue before a permit is issued. You must configure an approval workflow in the Console before deploying agents that perform batch release operations.
-</Warning>
-
 ## Implementation checklist
 
-Complete the following steps before deploying agents into a validated GMP environment.
-
-<Steps>
-  <Step title="Request the VQP">
-    Email [compliance@atlasent.io](mailto:compliance@atlasent.io) to receive the Vendor Qualification Package. Include the package in your Computerized Systems Validation (CSV) documentation to satisfy Clause 4.3.
-  </Step>
-  <Step title="Import the EU Annex 11 preset">
-    Import the `eu_annex_11` framework preset in the Console under **Policies → Presets**. Review each rule and adapt action type names to match your system's vocabulary.
-  </Step>
-  <Step title="Assign unique actor IDs">
-    Assign a unique, human-readable `actor_id` to each AI system component. This ID appears in every audit entry and enables Clause 12.4 audit trail reviews.
-  </Step>
-  <Step title="Store permit IDs with records">
-    Store the `permit_id` returned by each `allow` decision alongside the batch record modification in your system. This provides the authorization evidence required by Clause 9.
-  </Step>
-  <Step title="Route deny events to your QMS">
-    Configure the Atlasent webhook to push `deny` decisions into your QMS deviation workflow. Each deny event is a Clause 12.1 audit finding that may require investigation.
-  </Step>
-  <Step title="Archive signed audit bundles">
-    Export and archive signed audit bundles for the required GMP retention period — typically 5 to 15 years depending on the product lifecycle stage.
-  </Step>
-</Steps>
-
-## Related resources
-
-<CardGroup cols={2}>
-  <Card title="21 CFR Part 11" icon="flask" href="/compliance/21-cfr-part-11">
-    FDA electronic records and electronic signature requirements — closely related to Annex 11 for dual FDA/EMA regulated environments.
-  </Card>
-  <Card title="GxP Change Control" icon="code-branch" href="/compliance/gxp-change-control">
-    Enforce EU Annex 11 §10 and Annex 15 §10 change-control gates for modifications to validated computerized systems.
-  </Card>
-</CardGroup>
+- [ ] Import the EU Annex 11 starter policy from `gxp-starter` (not yet publicly available).
+- [ ] Assign a unique `actor.id` per AI system component.
+- [ ] Store `permit_id` with every batch record modification.
+- [ ] Route deny events into your QMS deviation workflow (Clause 13).
+- [ ] Include AtlaSent in your Computerized Systems Validation (CSV) documentation.
+- [ ] Archive signed audit bundles for the required retention period (typically 5–15 years).

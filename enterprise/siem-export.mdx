@@ -1,0 +1,142 @@
+---
+title: "SIEM Export (Enterprise)"
+description: "Schedule audit event exports to Splunk, Datadog, or Elastic from the AtlaSent Enterprise control center."
+---
+{/* Generated from the Atlasent docs source (site/enterprise/siem-export.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Note>
+  Scheduled SIEM export is an **Enterprise** plan feature. **Status: deployed; customer validation pending** — it runs in production but has not yet been validated against a customer's own SIEM (see [Enterprise overview](/enterprise)). The on-demand console SIEM integration available to all plans is documented at [Integrations → SIEM export](/integrations/siem-export-console).
+</Note>
+
+Enterprise SIEM export adds **scheduled, high-volume delivery** of the full AtlaSent audit chain to your SIEM. Instead of relying on best-effort real-time delivery, you configure a delivery schedule and AtlaSent batches and ships all events since the last successful delivery.
+
+## Supported vendor formats
+
+| Vendor | Format | Delivery endpoint |
+|---|---|---|
+| **Splunk** | HEC JSON events (one event per line) | `https://<host>:8088/services/collector/event` |
+| **Datadog** | Datadog log intake JSON | `https://http-intake.logs.datadoghq.com/api/v2/logs` |
+| **Elastic** | Elasticsearch `_bulk` API (NDJSON) | `https://<host>:9200/_bulk` |
+
+Each vendor format serializes the same underlying audit entry to the shape those platforms expect natively — no transformation pipeline needed at the receiving end.
+
+### Splunk event shape
+
+```json
+{
+  "time": 1746700931.112,
+  "source": "atlasent:audit",
+  "sourcetype": "atlasent:evaluation",
+  "index": "atlasent",
+  "event": {
+    "audit_id": "aud_01HX6Z8...",
+    "actor": { "id": "agent-close-bot", "type": "ai_agent" },
+    "action": { "type": "ledger:post-journal-entry" },
+    "decision": "allow",
+    "policy_id": "pol_je_prod_v2",
+    "prev_hash": "b6f9a1e8c4...",
+    "entry_hash": "41d73c8b2e..."
+  }
+}
+```
+
+### Datadog log shape
+
+```json
+{
+  "ddsource": "atlasent",
+  "ddtags": "env:production,decision:allow",
+  "hostname": "api.atlasent.io",
+  "service": "atlasent-audit",
+  "message": "Evaluation allow — agent-close-bot → ledger:post-journal-entry",
+  "atlasent": {
+    "audit_id": "aud_01HX6Z8...",
+    "actor_id": "agent-close-bot",
+    "decision": "allow",
+    "policy_id": "pol_je_prod_v2",
+    "entry_hash": "41d73c8b2e..."
+  }
+}
+```
+
+### Elastic bulk document shape
+
+```json
+{ "index": { "_index": "atlasent-audit", "_id": "aud_01HX6Z8..." } }
+{ "@timestamp": "2026-05-07T14:32:11Z", "actor.id": "agent-close-bot", "action.type": "ledger:post-journal-entry", "decision": "allow", "policy_id": "pol_je_prod_v2", "entry_hash": "41d73c8b2e..." }
+```
+
+---
+
+## Configuring a scheduled export
+
+1. Navigate to **Enterprise → SIEM Export** in the AtlaSent Console.
+2. Click **Add destination**.
+3. Select the vendor format (**Splunk**, **Datadog**, or **Elastic**).
+4. Fill in the destination fields:
+
+   | Field | Required | Notes |
+   |---|---|---|
+   | **Destination name** | Yes | Internal label. |
+   | **Endpoint URL** | Yes | Full HTTPS URL including port if non-standard. |
+   | **API token / HEC token** | Yes | Stored AES-256-GCM encrypted. Never returned in plaintext after save. |
+   | **Splunk index** | Splunk only | Defaults to `atlasent`. |
+   | **Elastic index** | Elastic only | Defaults to `atlasent-audit`. |
+   | **Datadog site** | Datadog only | `datadoghq.com`, `datadoghq.eu`, etc. |
+   | **Event types** | Yes | `all` or a subset: `evaluation`, `permit`, `override`, `escalation`, `policy_change`. |
+
+5. Configure the **delivery schedule**:
+
+   | Schedule | Delivery window |
+   |---|---|
+   | **Continuous** (default) | Events delivered within ~60 s of creation. |
+   | **Hourly** | Batched and delivered at the top of each hour. |
+   | **Every 6 hours** | Batched deliveries at 00:00, 06:00, 12:00, 18:00 UTC. |
+   | **Daily** | Delivered once per day at a configurable UTC time. |
+
+6. Click **Test Connection** to send a synthetic event and confirm delivery.
+7. Click **Save**.
+
+---
+
+## Schedule configuration details
+
+Scheduled export uses a **cursor-based delivery model**: AtlaSent records the `audit_id` of the last successfully delivered event. On the next scheduled run, it queries all events since that cursor and ships them in batches of up to 10,000 events per HTTP request.
+
+If a delivery fails:
+- AtlaSent retries the delivery with exponential backoff.
+- If the retries are exhausted, the run is marked `abandoned` and the cursor does **not** advance — the next scheduled run will re-attempt the same window.
+- All retry attempts and their HTTP status codes are visible in **Enterprise → SIEM Export → Job history**.
+
+---
+
+## Job history
+
+The **Job history** table shows all delivery attempts for the last 30 days:
+
+| Column | Description |
+|---|---|
+| **Timestamp** | When the delivery run started (UTC). |
+| **Events shipped** | Number of audit entries in this batch. |
+| **Status** | `delivered`, `retrying`, `failed`, or `abandoned`. |
+| **HTTP status** | Response code from the destination. |
+| **Latency** | Total delivery time in milliseconds. |
+| **Cursor** | The `audit_id` the cursor advanced to (on success). |
+
+---
+
+## Security notes
+
+- All tokens are stored **AES-256-GCM encrypted** and are never returned in plaintext after initial save. Rotate via **Edit → Token**.
+- Requests carry `User-Agent: atlasent-siem-export/2.0` and a `X-AtlaSent-Org-Id` header for destination-side filtering.
+- For Splunk, use a dedicated HEC token scoped to the `atlasent` index only.
+- For Datadog, use an API key with the `logs_write` scope only.
+- For Elastic, use an API key with `index` privilege on the target index only.
+
+---
+
+## SIEM export vs. signed audit bundle
+
+SIEM export is a **convenience integration** — it gives your SOC real-time or near-real-time visibility. It is not a replacement for the [signed audit bundle](/quickstart/audit-export), which is the canonical, cryptographically verifiable record for regulatory inspections.
+
+For FDA, EMA, or SOC 2 purposes, always provide the signed bundle — not a SIEM export.

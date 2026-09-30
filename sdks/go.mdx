@@ -1,113 +1,28 @@
 ---
-title: "Go SDK for Atlasent execution-time authorization (Beta)"
-sidebarTitle: "Go"
-description: "Install atlasent-sdk-go, configure the client, gate actions with WithGate(), inspect the four-value decision with Evaluate(), and handle typed errors in Go."
+title: "Go SDK"
+description: "The AtlaSent Go SDK is in preview and not yet published."
 ---
-
-The Atlasent Go SDK (`github.com/atlasent-systems-inc/atlasent-sdk-go`) requires Go 1.21 or later. Every SDK method accepts a `context.Context`, which means you can propagate deadlines, cancellation signals, and OpenTelemetry trace spans without any extra plumbing.
-
-<Note>
-  The Go SDK is currently in **Beta**. The authorization contract is stable and safe to use in production, but minor changes to the request and response shapes may occur before the GA release. A 3-month deprecation notice will accompany any breaking change.
-</Note>
-
-## Installation
-
-```bash
-go get github.com/atlasent-systems-inc/atlasent-sdk-go
-```
-
-## Client setup
-
-Create a client by passing your API key. The client is safe for concurrent use and should be shared across goroutines rather than created per-request.
-
-```go
-package main
-
-import (
-    "os"
-    atlasent "github.com/atlasent-systems-inc/atlasent-sdk-go"
-)
-
-func main() {
-    client := atlasent.NewClient(os.Getenv("ATLASENT_API_KEY"))
-}
-```
-
-## WithGate() — fail-closed gate
-
-`WithGate()` is the canonical execution-boundary primitive in the Go SDK. It evaluates the request, verifies the resulting permit, and invokes your function only if both steps succeed. On deny, hold, escalate, or transport error, the function is never called.
-
-```go
-err := client.WithGate(ctx, atlasent.Request{
-    Actor:  atlasent.Actor{ID: "user_123", Role: "engineer"},
-    Action: atlasent.Action{Type: "production.deploy"},
-    Target: atlasent.Target{ID: "my-service", Environment: "production"},
-    Context: map[string]interface{}{
-        "git_sha": os.Getenv("GITHUB_SHA"),
-    },
-}, func(permit *atlasent.Permit) error {
-    return deploy(ctx)
-})
-if err != nil {
-    log.Fatal("Deploy blocked:", err)
-}
-```
-
-<Note>
-  `WithGate()` is the Go equivalent of `protect()` in the TypeScript and Python SDKs. A future release will add `Protect` and `WithPermit` aliases to complete cross-SDK naming parity. The wire contract and authorization semantics are identical today.
-</Note>
-
-## Error model
-
-Use `errors.Is()` to branch on typed sentinel errors. `WithGate()` wraps the underlying error, so `errors.Is()` traverses the chain correctly.
-
-```go
-err := client.WithGate(ctx, req, fn)
-
-switch {
-case errors.Is(err, atlasent.ErrDenied):
-    log.Fatal("Policy denied / verify-fail:", err)
-case errors.Is(err, atlasent.ErrRateLimit):
-    time.Sleep(atlasent.RetryAfter(err))
-    // retry
-case errors.Is(err, atlasent.ErrTransient):
-    log.Fatal("Fail-closed: authorization unavailable")
-case err != nil:
-    log.Fatal("Unexpected error:", err)
-}
-```
+{/* Generated from the Atlasent docs source (site/sdks/go.mdx). Do not edit here: this file is overwritten on every publish. */}
 
 <Warning>
-  When you receive `atlasent.ErrTransient`, always treat it as a denial. Never fall back to permitting the action if the authorization service is unreachable — that defeats the fail-closed guarantee.
+  **The Go SDK is in preview and not yet published.** The Go module has no tagged,
+  installable release yet, so no supported `go get` command exists. Earlier versions of this page pointed at a repository
+  that no longer exists; that command does not work.
 </Warning>
 
-## Four-value decision with Evaluate()
+## What to use today
 
-`WithGate()` collapses `deny`, `hold`, and `escalate` into `atlasent.ErrDenied`. If you need to inspect the specific outcome — for example, to route a `hold` to an approval queue — use the raw `Evaluate()` primitive.
+- **The REST API.** Any Go HTTP client can call AtlaSent directly. See the
+  [API reference](/api-reference/introduction) for evaluate and
+  permit verification.
+- **The [TypeScript SDK](/sdks/typescript)** (`@atlasent/sdk`) or the
+  **[Python SDK](/sdks/python)** (`atlasent`), if your service can use either.
 
-```go
-result, err := client.Evaluate(ctx, atlasent.Request{
-    Actor:  atlasent.Actor{ID: "user_123", Role: "engineer"},
-    Action: atlasent.Action{Type: "production.deploy"},
-    Target: atlasent.Target{ID: "my-service", Environment: "production"},
-    Context: map[string]interface{}{},
-})
-if err != nil {
-    log.Fatal(err)
-}
+Whichever you choose, keep the same execution boundary: evaluate the
+action, execute **only** after the returned [Permit](/concepts/permit)
+verifies, and treat any error, timeout, or non-`allow` decision as a stop.
+See [Runtime flow](/concepts/runtime-flow) for the full lifecycle and the
+fail-closed matrix.
 
-switch result.Decision {
-case atlasent.DecisionAllow:
-    fmt.Println("Permit:", result.Permit.Token)
-case atlasent.DecisionDeny:
-    fmt.Println("Denied:", result.DenyCode)
-case atlasent.DecisionHold:
-    fmt.Println("On hold")
-case atlasent.DecisionEscalate:
-    fmt.Println("Needs approval")
-}
-```
-
-<Warning>
-  `Evaluate()` does not verify the permit for you. If the decision is `DecisionAllow`, you must call `VerifyPermit()` before executing the action. Skipping verification is audit-weak and bypassable — use `WithGate()` whenever possible.
-</Warning>
+This page will carry install instructions and examples once the Go
+module has a tagged release.

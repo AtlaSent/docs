@@ -1,0 +1,62 @@
+---
+title: "The thesis"
+description: "Why execution-time authorization is the piece the market is missing."
+---
+{/* Generated from the Atlasent docs source (site/biotech/thesis.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## The problem, as your Quality team sees it
+
+AI agents are now being introduced into regulated biotech workflows — clinical data entry, batch documentation, trial monitoring, regulatory submission drafting. The vendors pitching them point at model accuracy and SOC 2. Your Quality team asks a simpler question:
+
+> "Can I prove, to an FDA inspector, who authorized this specific action, against what policy, and that the policy was active at that moment?"
+
+Today, the honest answer from most AI vendors is **no**. They give you:
+
+- Training-data provenance (orthogonal — it's about the model, not the action).
+- Prompt / output logs (evidence of *what was asked*, not *what was authorized*).
+- Access control on the UI (keeps people out — doesn't apply to the agent itself).
+
+None of these answer the auditor's question. They all collapse the moment the agent is wrong — and agents are wrong constantly.
+
+## The missing layer
+
+21 CFR Part 11, EU Annex 11, and ICH E6 GCP were written before AI agents existed, but their requirements translate cleanly:
+
+- **§11.10(e) — secure, computer-generated audit trails** on all record changes.
+- **§11.10(g) — authorized signatories only** for electronic signatures.
+- **§11.50 — signature manifestation** linked to the record inseparably.
+
+The regulation calls for a layer between the agent and the record that:
+
+1. Decides whether the agent is authorized to take each action.
+2. Produces a signed, attributable authorization record.
+3. Preserves the record tamper-evidently.
+4. Makes the record retrievable on demand, verifiable offline.
+
+That is what AtlaSent is.
+
+## The shape of the fix
+
+<Steps>
+  <Step title="Policy as code">
+    Your Quality team authors a RACI policy in JSON. Actions an agent might take (`healthcare.record.amend`, `data.export`, `trial.unblinding.execute`) map to `allow`, `deny`, `hold`, or `escalate` with a reason citing the governing regulation. Policies are versioned; an active version is not edited in place, and a change publishes a new version.
+  </Step>
+  <Step title="Authorization at execution time">
+    The agent calls AtlaSent **before** it takes the action. The decision is returned in milliseconds — one of `allow` (permit issued), `deny` (action cannot proceed), `hold` (waits for an external signal — typically an approval webhook), or `escalate` (routed to a human reviewer queue). On `hold` / `escalate`, an approver resolves it; the original evaluation then becomes either `allow` or `deny`.
+  </Step>
+  <Step title="Evidence by construction">
+    Every decision writes a tamper-evident, hash-linked, Ed25519-signed audit entry. The chain exports as a self-contained bundle. FDA inspectors can verify it on an air-gapped machine with our source-open CLI — no AtlaSent staff involved, no dependency on our uptime.
+  </Step>
+</Steps>
+
+## Why "execution time" matters
+
+You can have a policy document. You can have a design review. You can have a model eval. None of those answer the auditor's question about a specific action taken on a specific Tuesday. Only a decision **at the moment of execution**, recorded tamper-evidently, does.
+
+This is the distinction AtlaSent is built around. The rest of the product (the Console, the SDKs, the MCP server, the GitHub Action) is just convenience — the core is the pre-execution decision and the signed record.
+
+## Next
+
+- [21 CFR Part 11 — requirement-to-primitive mapping](/compliance/21-cfr-part-11)
+- Claims matrix
+- Vendor Qualification Package

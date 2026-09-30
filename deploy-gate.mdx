@@ -1,0 +1,160 @@
+---
+title: "Deploy Gate"
+description: "Fail-closed authorization for every production deployment — whether triggered by a human, CI/CD pipeline, or AI agent."
+sidebarTitle: "Deploy Gate"
+---
+{/* Generated from the Atlasent docs source (site/deploy-gate.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# Deploy Gate
+
+Deploy Gate is the pipeline step behind **Production Change Protection**, AtlaSent's Enterprise product for production deploys and infrastructure changes. You can also use it on its own from the developer plans.
+
+Deploy Gate places a fail-closed authorization check in front of every production deployment. Before any code reaches production — whether triggered by a human, a CI/CD pipeline, or an AI agent — AtlaSent evaluates the request against your policies and either issues a single-use permit or blocks the action.
+
+**If the evaluation returns anything other than `allow`, the deployment does not run.**
+
+This is different from a CI approval gate. An approval gate checks whether a PR was approved before merge. Deploy Gate checks whether _this specific deployment, at this moment, by this actor_ is authorized to execute. The distinction matters for AI agents, after-hours deploys, and high-risk targets.
+
+## The flow
+
+```
+CI pipeline / AI agent / human
+        │
+        ▼
+  [POST /v1-evaluate]
+        │
+        ▼
+  AtlaSent policy engine
+  (active bundle, versioned)
+        │
+   ─────┼──────────────────────
+   allow│           deny / hold
+        ▼                ▼
+  permit issued    blocked — action does not run
+        │
+        ▼
+  deploy executes
+        │
+        ▼
+  [POST /v1-verify-permit]
+        │
+        ▼
+  audit record (hash-linked, Ed25519-signed)
+```
+
+No permit = no deploy. On network error, timeout, or any unexpected response, the action fails closed.
+
+## Setup
+
+### GitHub Actions
+
+```yaml
+permissions:
+  contents: read
+  id-token: write   # production.deploy uses a verified GitHub OIDC workload identity
+
+steps:
+  - name: Authorization gate
+    id: gate
+    uses: Atlasent/atlasent-action@v1
+    env:
+      ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+      ATLASENT_BASE_URL: ${{ secrets.ATLASENT_BASE_URL }}
+    with:
+      action: production.deploy
+      environment: production
+      target-id: ${{ github.repository }}
+      context: |
+        { "commit": "${{ github.sha }}" }
+
+  - name: Deploy
+    if: steps.gate.outputs.verified == 'true'
+    run: ./deploy.sh
+```
+
+If the policy allows the deployment and the permit verifies, the gate step passes and sets `verified` to `true`. If not, it fails with the denial reason. Gate the deploy step on `verified`, not on `decision`.
+
+### TypeScript SDK
+
+```ts
+import { withPermit } from '@atlasent/sdk';
+
+await withPermit(
+  {
+    actor:  { id: 'ci:github-actions',  type: 'agent' },
+    action: { id: `deploy-${sha}`,      type: 'production.deploy' },
+    target: { id: 'svc-checkout',       type: 'service', environment: 'production' },
+    context: { commit: sha, branch: 'main' },
+  },
+  async () => {
+    await deployToProduction(); // only reachable on allow + verified permit
+  }
+);
+```
+
+### Python SDK
+
+```python
+from atlasent import protect
+
+protect(
+    agent="ci-deploy-bot",
+    action="production.deploy",
+    context={"commit": commit_sha, "environment": "production"},
+)
+run_deploy()  # only reachable on allow + verified permit
+```
+
+## What policies can require
+
+- **Approval count** — minimum number of PR approvals before a deploy is permitted
+- **Change window** — restrict deploys to business hours or a scheduled maintenance window
+- **Manual approval for high-risk** — route AI-triggered or high-blast-radius deploys to a human reviewer
+- **Quorum requirements** — multi-party approval for critical infrastructure changes
+
+See [Policy authoring](/concepts/policy) for the full rule syntax.
+
+## Why this matters for AI agents
+
+AI coding assistants and autonomous agents can trigger deployments. An agent with write access to a CI system can push a commit and trigger a workflow run without a human approving the deploy step.
+
+Deploy Gate intercepts that trigger before it reaches production:
+
+```ts
+// Inside an AI agent
+const decision = await authorize({
+  action_type: 'production.deploy',
+  actor_id:    'agent:copilot-workspace',
+  environment: 'production',
+});
+
+if (decision.decision !== 'allow') {
+  return `Blocked: ${decision.reason}`;
+}
+await triggerDeploy();
+```
+
+A policy can require `manual_approval: true` for any deploy where the actor is an AI agent, so no agent ships to production unilaterally regardless of what the CI configuration says.
+
+## Audit trail
+
+Every Deploy Gate call produces a tamper-evident audit record:
+
+| Field | Value |
+|---|---|
+| `action_type` | `production.deploy` |
+| `actor_id` | `ci:github-actions` |
+| `decision` | `allow` |
+| `policy_bundle_id` | `bndl_abc123` |
+| `policy_version` | `v3` |
+| `permit_token` | `pt.v2.…` (consumed on verify) |
+| `audit_hash` | SHA-256 hash chain |
+| `signature` | Ed25519-signed on export |
+
+The chain is append-only and hash-linked, so any change to a recorded decision after the fact is detectable.
+
+## Next steps
+
+- [GitHub Action reference](/integrations/github-action)
+- [AI Agent Governance](/ai-agent-governance) — broader context for AI agent authorization
+- Audit verification — verify the signed export offline

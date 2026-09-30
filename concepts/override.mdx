@@ -1,0 +1,43 @@
+---
+title: "Override"
+description: "A break-glass path for when the policy says deny but a human says yes."
+---
+{/* Generated from the Atlasent docs source (site/concepts/override.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+Overrides are AtlaSent's formal break-glass mechanism. They exist because regulated environments sometimes have legitimate emergencies (for example, a patient safety event) where the policy's `deny` is wrong in the specific moment.
+
+Overrides are:
+
+- **Authorized by role.** Only users with the `approver` or `admin` role can issue one.
+- **Time-boxed.** Default TTL: 5 minutes. Configurable per org.
+- **Reason-required.** Free text, stored in the audit chain alongside the override.
+- **Attributed.** The human who authorized the override is named in the audit chain.
+- **Counted.** The console surfaces override frequency per policy — an override that fires every day is a policy that needs rewriting.
+
+## Shape
+
+```json
+{
+  "override_id": "ovr_01HX7...",
+  "issued_by": "user_sarah@acmebio.com",
+  "reason": "Patient safety event — emergency amendment to trial record, reviewed by PI",
+  "valid_until": "2026-04-19T14:12:00Z",
+  "applies_to": {
+    "action_type": "ehr:amend",
+    "target_id": "patient-42"
+  }
+}
+```
+
+## Not a bypass
+
+An override does not silence the audit chain. The chain records both:
+
+1. The original `deny` decision from policy evaluation.
+2. The override that superseded it, with the human's identity and reason.
+
+An inspector can always reconstruct: "policy said no → human Sarah said yes at 14:07 for reason X → action executed."
+
+## When not to use
+
+If you find your team issuing overrides regularly for the same action class, that's a sign the policy is wrong — rewrite the rule and version the policy, don't override your way through it.

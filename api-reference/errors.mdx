@@ -1,113 +1,107 @@
 ---
-title: "Atlasent API error codes and how to handle each one"
-sidebarTitle: "Errors"
-description: "Every Atlasent API error uses the same JSON envelope. Reference each error code, its HTTP status, its meaning, and SDK patterns for each failure type."
+title: "Errors"
+description: "Error codes returned by the AtlaSent API and how to recover from each."
 ---
+{/* Generated from the Atlasent docs source (site/api-reference/errors.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Every Atlasent API error response uses a consistent JSON envelope with three fields: a machine-readable `error` code, a human-readable `message`, and the HTTP `status` code mirrored in the body for convenience. Your error handling should branch on the `error` field, not on the `message` text — message text may be refined over time, but error codes are stable.
-
-## Error envelope
+All errors use standard HTTP status codes and a consistent JSON body:
 
 ```json
 {
-  "error": "policy_not_found",
-  "message": "No active policy bundle found for action type 'production.deploy'",
+  "error": "not_found",
+  "message": "Permit not found",
   "status": 404
 }
 ```
 
-Rate-limited responses (`429`) extend the envelope with a `retry_after_ms` field that gives millisecond-precision backoff guidance:
+| Field | Type | Description |
+|---|---|---|
+| `error` | string | Machine-readable error code (e.g. `"rate_limited"`). Branch on this, not on `message`. |
+| `message` | string | Human-readable description of the error. May be refined over time. |
+| `status` | integer | HTTP status code, mirrored in the body for convenience. |
+
+Some responses add extra top-level fields. For example, a rate-limited
+evaluate or verify call carries `retry_after_ms`:
 
 ```json
 {
-  "error": "rate_limited",
-  "message": "Too many requests",
+  "error": "unavailable",
+  "message": "Runtime cannot decide right now; retry shortly",
   "status": 429,
-  "retry_after_ms": 5000
+  "retry_after_ms": 60000
 }
 ```
 
-The `Retry-After` response header is also set on every `429`, in seconds, for compatibility with standard HTTP client libraries.
-
-## Error code reference
-
-| Status | Error code | Meaning |
-|---|---|---|
-| 400 | `bad_request` | Malformed request body |
-| 401 | `unauthenticated` | Missing or invalid API key |
-| 403 | `forbidden` | API key lacks required scope |
-| 404 | `not_found` | Resource not found |
-| 404 | `policy_not_found` | No active policy for this action type |
-| 409 | `permit_consumed` | Permit already consumed |
-| 409 | `permit_expired` | Permit has expired (15-min TTL) |
-| 409 | `permit_revoked` | Permit was explicitly revoked |
-| 422 | `invalid_action_type` | Action type format is invalid |
-| 429 | `rate_limited` | Request rate exceeded |
-| 500 | `internal_error` | Unexpected server error |
-| 503 | `unavailable` | Service temporarily unavailable (fail-closed) |
-
-## deny_reason closed enum
-
-When `POST /v1/evaluate` returns a non-`allow` decision, the response includes a `deny_reason` field. This field is a **closed enum** — your code should switch on exact string equality, not substring matching, because the human-readable `message` field may be refined without notice.
-
-| `deny_reason` value | Meaning |
-|---|---|
-| `unauthenticated` | The request credential is missing or cannot be validated |
-| `unauthorized` | The credential is valid but the caller lacks permission for this action |
-| `policy` | An explicit policy rule denied the action |
-| `precondition` | A required precondition (e.g. approval count, change window) was not met |
-| `replay` | The permit token has already been consumed (replay attempt) |
-| `unavailable` | The authorization service is temporarily unable to evaluate |
-| `clock_skew` | The request timestamp is too far from server time |
-| `unknown_action` | The action type is not registered in any active policy bundle |
-| `internal_error` | An unexpected error occurred server-side |
+<Note>
+  **Previous error shape removed.** The `{ error: { code, details } }` nested
+  envelope and the bare `{ code, details }` shape are no longer returned by any
+  endpoint. All error paths use `{ error, message, status }`.
+</Note>
 
 <Note>
-  `deny_reason` values are stable across API releases. The `message` field that accompanies each `deny_reason` is human-readable and may be refined over time — do not parse or match on `message` text.
+  **A policy denial is not an HTTP error.** When `/v1/evaluate` reaches a
+  `deny`, `hold`, or `escalate` decision, it returns HTTP `200` with the
+  decision, `deny_code`, and `deny_reason` in the body — see
+  [Deny codes](/concepts/deny-codes). Likewise, `/v1-verify-permit` reports an
+  expired, revoked, already-consumed, or mismatched permit in its response body
+  (`valid: false` with a `verify_error_code` such as `PERMIT_EXPIRED` or
+  `PERMIT_ALREADY_USED`). In both cases the protected action must not run.
 </Note>
+
+## Code reference
+
+| HTTP | `error` | What happened | Recovery |
+|---|---|---|---|
+| 400 | `bad_request`         | Missing or malformed field | Fix the request payload; don't retry as-is. |
+| 401 | `unauthorized`        | Missing / invalid / expired credential | Refresh token or rotate key. |
+| 403 | `forbidden` / `insufficient_scope` | Valid credential but it lacks the scope or role this endpoint requires | Use a key with the right scope. |
+| 404 | `not_found`           | Unknown policy / permit / approval | Check the ID. |
+| 409 | `conflict`            | Request conflicts with current state | Re-read the resource state before retrying. |
+| 422 | `validation_error`    | Schema validation failed | Fix the request per `message`. |
+| 429 | `rate_limited`        | Quota exhausted (`/v1/evaluate` and `/v1-verify-permit` report this as `unavailable` with status 429) | Back off; honor `retry_after_ms` when present. See [Rate limits](/api-reference/rate-limits). |
+| 500 | `internal_error`      | AtlaSent-side bug | Retry with backoff; open a support ticket. |
+| 503 | `service_unavailable` | Maintenance / partial outage | Retry with backoff; treat sustained 503 as **deny**. |
 
 ## Fail-closed rule
 
-If you receive a `5xx` response or a network error from `POST /v1/evaluate`, treat the call as a denial — never as a default allow. This is the fail-closed contract that makes Atlasent safe for regulated deployments.
+If you get 5xx or a network error from `/v1/evaluate`, your agent must treat the call as **deny** — never as "allow by default." This is non-negotiable for regulated deployments.
 
-<Warning>
-  A `503 unavailable` response means the authorization service is temporarily down. Your agent must halt the action, not proceed. Surface a clear error to the operator and retry with exponential backoff. For sustained `503` responses, contact support.
-</Warning>
-
-## SDK error handling
-
-The Atlasent SDKs map each error code to a typed exception so you can catch specific failure modes without parsing the `error` string yourself.
+## Handling in the SDKs
 
 <CodeGroup>
+
 ```typescript TypeScript
-import { AtlaSentDeniedError, AtlaSentError } from '@atlasent/sdk';
+import { AtlaSentDeniedError, AtlaSentError } from "@atlasent/sdk";
 
 try {
-  await client.protect({ ... }, async () => { ... });
-} catch (err) {
-  if (err instanceof AtlaSentDeniedError) {
-    console.error('Denied:', err.decision, err.denyCode);
-    // Outcomes: err.isRevoked, err.isExpired, err.isConsumed, err.isNotFound
-  } else if (err instanceof AtlaSentError) {
-    // Fail-closed: network error or timeout
-    console.error('Authorization unavailable — action blocked');
-  }
+  const r = await client.evaluate({ ... });
+} catch (e) {
+  if (e instanceof AtlaSentDeniedError) return halt(e.reason);          // e.decision, e.evaluationId
+  if (e instanceof AtlaSentError && e.code === "rate_limited")
+    return await retryAfter(e.retryAfterMs);
+  if (e instanceof AtlaSentError) return halt("fail-closed: upstream unavailable");
+  throw e;
 }
 ```
+
 ```python Python
-from atlasent.exceptions import AtlaSentDeniedError, AtlaSentError
+from atlasent.exceptions import AtlaSentDeniedError, AtlaSentError, RateLimitError
 
 try:
-    with client.with_permit(...):
-        deploy()
+    r = client.evaluate(...)
 except AtlaSentDeniedError as e:
-    print(f"Denied: {e.decision}, code: {e.deny_code}")
-    # Predicates: e.is_revoked, e.is_expired, e.is_consumed, e.is_not_found
+    halt(e.reason)                     # e.decision, e.deny_code
+except RateLimitError as e:
+    time.sleep(e.retry_after or 1)     # seconds; None when not provided
 except AtlaSentError:
-    print("Authorization unavailable — action blocked")
+    halt("fail-closed: upstream unavailable")
 ```
-</CodeGroup>
 
-<Note>
-  The `permit_consumed`, `permit_expired`, and `permit_revoked` error codes map to the `isConsumed`, `isExpired`, and `isRevoked` predicates on `AtlaSentDeniedError`. Use these predicates to decide whether to re-evaluate (for expiry) or surface a permanent denial (for revocation).
-</Note>
+```go Go
+permit, err := client.Protect(ctx, req)
+if atlasent.IsDenied(err) { return halt(err.Error()) }
+var apiErr *atlasent.Error
+if errors.As(err, &apiErr) { return halt("fail-closed: " + apiErr.Code) }
+```
+
+</CodeGroup>

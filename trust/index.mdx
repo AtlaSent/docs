@@ -1,59 +1,212 @@
 ---
-title: "Atlasent Trust Center: security and compliance portal"
-sidebarTitle: "Trust Center"
-description: "The Atlasent Trust Center provides security documentation, compliance status, sub-processor list, and contacts for procurement and security teams."
+title: "AtlaSent Trust Portal"
+sidebarTitle: "Trust"
+description: "Security, compliance, legal, and operational evidence for AtlaSent customers and prospects — one URL to share with procurement."
 ---
-
-The Atlasent Trust Center is the single URL to share with your security team, procurement reviewers, or Quality lead when they ask "can we trust Atlasent with this data?" Every section cross-links to canonical evidence — compliance framework mappings, security architecture detail, legal documents, and sub-processor disclosures — so any question is one navigation step from its answer.
+{/* Generated from the Atlasent docs source (site/trust/index.mdx). Do not edit here: this file is overwritten on every publish. */}
 
 <Note>
-  Trust portal representations are accurate as of the document dates shown on each page. They are provided for informational purposes and are not warranties. They do not create contractual commitments and are superseded by the express terms of any executed agreement between Atlasent and your organization, including the MSA, DPA, BAA, SLA, AUP, and Order Form. Any inconsistency between this portal and the DPA is resolved in favor of the DPA.
+  **Status of this portal.** The contents of this portal are AtlaSent's
+  good-faith representations as of the *Last reviewed* date in the
+  "How we keep this portal honest" section below. They are not
+  warranties, do not create contractual commitments, and are
+  superseded by the express terms of any executed agreement between
+  AtlaSent and Customer (including the MSA, DPA, BAA, SLA, AUP, and
+  Order Form). AtlaSent's contractual commitments concerning security
+  controls are set out in the **DPA Annex II**. Any inconsistency
+  between this portal and the DPA is resolved in favor of the DPA.
+  Customers must independently verify any control they rely on.
 </Note>
 
-## What Atlasent is
+<Note>
+  This is the single URL to share with a buyer's security or procurement
+  team. Everything here cross-links to canonical evidence elsewhere in
+  this site (compliance claims matrix, security architecture, legal
+  documents) so the answer to "can we trust AtlaSent with this data?"
+  is one navigation step away from any question.
 
-Atlasent is execution-time authorization infrastructure. It sits in the execution path of high-impact automated actions — AI agents, CI/CD pipelines, and regulated workflows — and answers one question before any consequential action runs: is this actor authorized to take this action right now, against this target, in this context? Customer data is logically segregated by `organization_id` at the database row-level security layer. No cross-tenant access path exists at any layer of the stack.
+  Canonical home: [`trust.atlasent.io`](https://trust.atlasent.io).
+  Cross-document references in the merged legal document set resolve
+  here.
+</Note>
 
-## Explore the Trust Center
+## What AtlaSent is
+
+AtlaSent is execution-time authorization infrastructure. It sits in the
+execution path of high-impact automated actions — AI agents, CI/CD
+pipelines, regulated workflows — and answers one question before any
+consequential action runs: *is this actor authorized to take this action
+right now, against this target, in this context?*
+
+We operate AtlaSent as a multi-tenant SaaS service. Customer data is
+logically segregated by `organization_id` at the database row-level
+security layer. The canonical decision evidence is an immutable,
+append-only, hash-chained audit log (GA today). **Portable Ed25519-signed
+evidence bundles** assembled from that log for offline third-party
+verification are on the published roadmap; see
+[audit and evidence posture](#audit-and-evidence-posture) below for the
+explicit boundary between the two trust surfaces.
+
+AtlaSent does not, and has not in the preceding 12 months, sold or
+shared (as those terms are defined in the CCPA) Personal Information.
+Customer Personal Data submitted to the Service is governed by the
+DPA; AtlaSent does not use Customer Personal Data to train any
+general-purpose machine-learning or large-language model. See the
+Privacy Policy for details.
+
+See the compliance claims matrix for the canonical
+list of what AtlaSent is and isn't aligned with today.
+
+## At a glance
 
 <CardGroup cols={2}>
-  <Card title="Security Overview" icon="shield-check" href="/trust/security-overview">
-    Encryption in transit and at rest, tenant isolation, API key controls, audit chain integrity, fail-closed guarantees, and vulnerability disclosure.
+  <Card title="Security overview" icon="shield-check" href="/trust/security-overview">
+    Encryption in transit and at rest, identity and access controls, audit
+    chain integrity, fail-closed guarantees.
   </Card>
-  <Card title="Compliance Status" icon="clipboard-check" href="/trust/compliance-status">
-    Current frameworks — 21 CFR Part 11, EU Annex 11, ALCOA+, GDPR — alongside the SOC 2 and HIPAA BAA roadmap with target dates.
+  <Card title="Compliance status" icon="clipboard-check" href="/trust/compliance-status">
+    Current frameworks (21 CFR Part 11, EU Annex 11, ALCOA+, GDPR),
+    SOC 2 Type II roadmap, HIPAA BAA availability.
   </Card>
   <Card title="Sub-processors" icon="list-tree" href="/trust/subprocessors">
-    Every third party that processes Customer Personal Data on Atlasent's behalf, with their role, data handled, and location. Includes 30-day advance change notification.
+    Every third party that processes Customer Personal Data, with
+    locations and transfer mechanisms. 30-day customer change
+    notification for additions/replacements; 60-day notification for
+    material changes in scope or location.
+  </Card>
+  <Card title="Legal documents" icon="file-contract">
+    Terms of Service, Privacy Policy, DPA, BAA, MSA, AUP, SLA — current
+    status and how to obtain each.
+  </Card>
+  <Card title="Reliability and SLO" icon="gauge-high">
+    Uptime targets, current status, RPO / RTO, incident history.
+  </Card>
+  <Card title="Security disclosure" icon="bug">
+    Reporting a vulnerability, scope, response SLA. No bug bounty today.
+  </Card>
+  <Card title="Audit and assurance" icon="file-signature">
+    Penetration test summary access, SOC 2 progress, CAIQ pre-fill
+    availability, customer audit rights.
+  </Card>
+  <Card title="Vendor qualification (VQP + Deltas)" icon="file-shield">
+    Parent VQP plus the active Delta chain. Material changes between
+    annual refreshes are issued as Delta VQPs (ADR-013, Accepted
+    2026-05-18) within five business days of the trigger event
+    (operational target during the pre-pipeline period; see
+    [Vendor qualification chain](#vendor-qualification-chain) for the
+    contractual-status detail).
+  </Card>
+  <Card title="Government data requests" icon="scale-balanced">
+    AtlaSent challenges overbroad government data requests and
+    notifies affected Customers unless legally prohibited. See MSA
+    §13.14 and DPA §7.7.
   </Card>
   <Card title="Contact" icon="envelope" href="/trust/contact">
-    Routing table for security, privacy, legal, compliance, and procurement inquiries with response time expectations for each topic.
+    Security, compliance, privacy, and procurement contacts.
   </Card>
 </CardGroup>
 
-## Quick links for enterprise buyers
+Note: AtlaSent's immutable audit chain (available today, internal to
+AtlaSent) is distinct from portable signed evidence bundles (roadmap,
+externally verifiable offline). See
+[Audit and evidence posture](#audit-and-evidence-posture).
 
-The following artifacts are the ones enterprise procurement teams request most often. You can request all of them from [security@atlasent.io](mailto:security@atlasent.io) or [compliance@atlasent.io](mailto:compliance@atlasent.io).
+## Audit and evidence posture
 
-<Accordion title="Security questionnaire responses (CAIQ v4)">
-  Atlasent maintains a pre-filled CAIQ v4 (Consensus Assessment Initiative Questionnaire) that maps each question to the relevant control in the Atlasent security architecture. Request the latest version from [security@atlasent.io](mailto:security@atlasent.io). The pre-fill is updated quarterly.
-</Accordion>
+Two distinct trust surfaces. Procurement and Quality reviewers should not
+collapse them; the distinction is architectural and material.
 
-<Accordion title="Vendor Qualification Package (VQP)">
-  The VQP is a structured document for regulated-industry customers that maps Atlasent's controls to GxP framework requirements (21 CFR Part 11, EU Annex 11, ICH E6 GCP). It contains ten sections covering vendor profile, system description, control mapping, and contractual schedules. Request a copy from [compliance@atlasent.io](mailto:compliance@atlasent.io).
-</Accordion>
+<CardGroup cols={2}>
+  <Card title="Immutable audit chain — GA today">
+    Hash-chained, append-only ledger of every authorization decision and
+    every Console mutation. Permit tokens are bound into each entry by
+    cryptographic reference. The chain is internal to AtlaSent and
+    queryable in-place via the API. It provides event continuity,
+    append-only integrity, and runtime evidence lineage. Customer
+    verification today is API-mediated inspection of the chain.
+    **Available today.** Cryptographic primitives are documented in
+    DPA Annex II.1 (AtlaSent's contractual representation).
+  </Card>
+  <Card title="Portable signed evidence bundles — roadmap">
+    Detached, deterministic, Ed25519-signed packages assembled from the
+    audit chain for portable offline verification by third-party
+    auditors. Specification source is maintained in
+    `architecture/evidence-bundles-spec.md`. **This portal does not
+    represent portable signed evidence bundles as GA until the
+    corresponding customer-facing release and verification surface is
+    published and the trust documentation is updated. They are not
+    currently part of the Service committed under the MSA, DPA, or SLA,
+    and AtlaSent does not warrant availability on a particular date.**
+  </Card>
+</CardGroup>
 
-<Accordion title="Data Processing Agreement (DPA)">
-  Atlasent's standard DPA incorporates EU Standard Contractual Clauses (Modules 2 and 3) and the UK International Data Transfer Addendum. Request the current template from [privacy@atlasent.io](mailto:privacy@atlasent.io). Turnaround is 2 business days.
-</Accordion>
+The distinction will be preserved on this portal if and when the portable
+bundle surface reaches GA.
 
-<Accordion title="Responsible disclosure and penetration testing">
-  Report security vulnerabilities to [security@atlasent.io](mailto:security@atlasent.io) with the subject line `[Security]`. Atlasent acknowledges all reports within 2 business days and provides an initial triage assessment within 5 business days. The most recent third-party penetration test summary is available under NDA on request.
-</Accordion>
+## Vendor qualification chain
 
-## How Atlasent keeps this portal honest
+The parent VQP is the authoritative baseline; material changes between
+annual refreshes are issued as Delta VQPs bound to the parent commit
+(ADR-013, Accepted 2026-05-18).
+A customer's current qualification is the parent VQP plus the applicable
+Delta chain.
 
-- The compliance lead reviews every page in this portal on the first of every month.
-- Compliance claims on this portal must match the canonical claims table in [Compliance Overview](/compliance/overview), which is CI-gated against product copy.
-- Any change to the security posture requires a parallel update here before it goes live and a corresponding update to DPA Annex II.
-- If you find a discrepancy between this portal and any other Atlasent document, email [compliance@atlasent.io](mailto:compliance@atlasent.io) and the other copy will be corrected.
+- Parent VQP: 2026-04-19 (V1 docs gate)
+- Delta chain: available on request from `compliance@atlasent.io`
+- Latest Delta recorded on this portal: `2026-05-20.01` — trust subdomain cutover (announces canonical URL `trust.atlasent.io`; URL surface change only, no capability change). Prior Delta: `2026-05-18.02` (signatory completion supersession-in-part of `2026-05-18.01`).
+- **Operational target.** Deltas are targeted for issuance within five
+  business days of a trigger event. Until the automated Delta VQP
+  issuance pipeline is operational, this is an internal operational
+  target rather than a contractual commitment unless expressly
+  incorporated into an executed agreement.
+
+Until the Delta VQP issuance pipeline is operational, Deltas are issued
+as commits to `atlasent-docs/vqp/deltas/` and customer verification
+proceeds via commit SHA inspection against this repository. The portal
+does not represent the planned automated manifest, feed, or Console
+surfaces as currently available.
+
+## What buyers usually want first
+
+Based on procurement conversations:
+
+1. **CAIQ.** Pre-fill is maintained in source control and updated
+   quarterly. Email `compliance@atlasent.io` for the latest version.
+2. **SOC 2 report.** Type II is on roadmap for Q4 2026 (see
+   claims matrix). Type I report will be made
+   available on this portal upon completion of the audit period; the
+   Type II report will be available under NDA.
+3. **DPA.** Available on request from `legal@atlasent.io`. EU SCCs Module 2/3 and UK
+   IDTA are incorporated.
+4. **BAA.** Currently "Not yet available — contact sales" per the
+   claims matrix. The BAA status will not flip
+   to "Available" until AtlaSent has designated a HIPAA Privacy
+   Officer and Security Officer and operationally tested its
+   breach-notification workflow, in line with 45 C.F.R. §§
+   164.308(a)(2) and 164.530(a)(1)(i). Pilot customers requiring PHI
+   should reach `compliance@atlasent.io`.
+5. **Penetration test summary.** Most recent third-party report
+   available under NDA on request to `security@atlasent.io`. The NDA
+   carries the DTSA §1833(b) immunity notice required by 18 U.S.C.
+   §1833(b)(3).
+6. **Sub-processor list.** Public, with 30-day change notification
+   for additions/replacements and 60-day notification for material
+   changes in scope or location. See [Sub-processors](/trust/subprocessors).
+
+## How we keep this portal honest
+
+- **Last documentation review: 2026-08-21.** This date records a
+  customer-facing documentation review; it is not a security audit,
+  certification, or independent assurance opinion.
+- The portal is re-reviewed when a material security, compliance, legal,
+  or operational posture change requires the customer-facing record to
+  change. No page should rely on an unresolved placeholder as the basis
+  for a customer claim.
+- Compliance claims on this portal must match the canonical
+  claims matrix, which is CI-gated against
+  product copy.
+- Any change to the security posture (technical or organizational
+  measures) requires a parallel update here before it goes live and
+  a corresponding update to DPA Annex II.
+- Documents on this portal are versioned; historical versions are
+  accessible at `trust.atlasent.io/legal/archive/<doc>/<version>`.

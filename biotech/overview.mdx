@@ -1,0 +1,51 @@
+---
+title: "For Biotech CCOs"
+sidebarTitle: "Overview"
+description: "A short, honest read for Chief Compliance Officers and Quality leads at biotech and pharma companies evaluating AtlaSent."
+---
+{/* Generated from the Atlasent docs source (site/biotech/overview.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Note>
+  This section is written for Chief Compliance Officers, Heads of Quality, Validation Leads, and the people they forward URLs to. It assumes familiarity with GxP but **not** with AtlaSent or AI agents in general.
+</Note>
+
+Three things you probably want first:
+
+<CardGroup cols={3}>
+  <Card title="The thesis" icon="lightbulb" href="/biotech/thesis">
+    Why execution-time authorization is the piece the market is missing.
+  </Card>
+  <Card title="The VQP" icon="file-contract">
+    Our Vendor Qualification Package — same format your team already uses.
+  </Card>
+  <Card title="The pilot" icon="handshake">
+    30-day pilot scope and the application form.
+  </Card>
+</CardGroup>
+
+## What AtlaSent is, in one paragraph
+
+AtlaSent is **execution-time authorization for AI agents in GxP environments**. When an AI agent in your stack wants to take a consequential action — write to an EHR, release a batch, modify a trial record — it calls AtlaSent first. AtlaSent checks the action against a RACI policy your Quality team authored, returns one of the canonical four-value decisions (`allow` / `deny` / `hold` / `escalate`) in milliseconds, and writes a tamper-evident audit entry. Every decision is signed; the audit chain is exportable as evidence for FDA or EMA inspection.
+
+## What it isn't
+
+- **Not a medical device.** AtlaSent is a SaaS platform, not a medical device. Using it with medical-device software requires your own separate assessment.
+- **Not an AI model.** We do not train or fine-tune. AtlaSent has no access to patient data unless you explicitly log a target ID — and we strongly recommend you do not.
+- **Not a replacement for your QMS.** AtlaSent authorizes agent actions; your QMS still governs your SOPs, CAPAs, and deviation handling. AtlaSent feeds signals into both.
+
+## What we can honestly claim today
+
+The claims matrix is the canonical, dated record of what AtlaSent is aligned with, partially aligned with, or explicitly not aligned with. If a claim appears anywhere else that isn't reflected on that page, the other copy is wrong.
+
+Short version: **Aligned** for 21 CFR Part 11, EU Annex 11, ALCOA+, GxP change control. **Supported** for ICH E6 GCP, ISO 27001, GDPR. **On roadmap** for SOC 2 Type II. **Not yet available** for HIPAA BAA.
+
+## If you have 15 minutes
+
+Read in this order:
+
+1. [The thesis](/biotech/thesis) (5 min)
+2. [21 CFR Part 11 mapping](/compliance/21-cfr-part-11) (5 min)
+3. Claims matrix (3 min)
+4. Pilot (2 min)
+
+Then email [pilot@atlasent.io](mailto:pilot@atlasent.io) with the frameworks that matter to your program. We'll reply with the VQP pre-filled for your environment.

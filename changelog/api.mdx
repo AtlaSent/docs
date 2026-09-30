@@ -1,0 +1,39 @@
+---
+title: "API changelog"
+description: "Release notes for atlasent-api, synced from its customer-facing changelog."
+---
+{/* Generated from the Atlasent docs source (site/changelog/api.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Info>
+  This page is synced from `atlasent-api`'s customer-facing changelog (`CHANGELOG.public.md`). Do not hand-edit below the `{/* SYNC BEGIN */}` marker.
+</Info>
+
+{/* SYNC BEGIN */}
+## API reference 1.7.1 — 2026-09-26
+
+- Endpoints that are not yet part of the stable API are now labelled **Alpha** in the API reference. Their request and response shapes and error codes can change without a deprecation period; don't build production integrations on them yet.
+- Alpha today: execution results, post-evaluations, decision replay, safety metrics, policy drift, red-team runs, transparency anchoring, evidence exports, marketplace packs, AI gates, the decision stream, and SPIFFE validation.
+
+## 0.1.0 — 2026-05-01
+
+First stable release of the v1 API.
+
+**Authorization**
+
+- `POST /v1-evaluate` evaluates an action against your policies and returns one of four decisions: `allow`, `deny`, `hold`, or `escalate`. An `allow` includes a permit that is valid for one hour.
+- `POST /v1-verify-permit` verifies a permit before the action runs. A permit is consumed by its first successful verification, so it can't be used twice. Failed verifications return a stable `verify_error_code`, such as `PERMIT_EXPIRED`, `PERMIT_REVOKED`, `PERMIT_ALREADY_USED`, `ACTOR_MISMATCH` or `ACTION_TYPE_MISMATCH`, so your code can branch on the code instead of parsing a message.
+- Fail-closed by default: when an action class has no published policy, evaluation denies. When an API error, a timeout, a missing decision or a missing permit occurs, the action is treated as denied or not verified, never as allowed.
+
+**Audit and evidence**
+
+- Every decision is written to an append-only, hash-chained audit log.
+- Audit exports are signed with Ed25519 and can be verified offline. `POST /v1-verify-chain` verifies the chain.
+
+**Authentication**
+
+- Authenticate with a session token or an API key. API keys can be restricted to an IP allowlist, and expired keys are rejected.
+
+**Also stable in this release**
+
+- Policies and rollback, permits and revocation, holds, approvals and overrides, workflows, templates, action classes, API and signing keys, webhooks and replay, source-control webhooks (GitHub, GitLab, Bitbucket), reports, integrations, SIEM export, and health and status endpoints.
+{/* SYNC END */}

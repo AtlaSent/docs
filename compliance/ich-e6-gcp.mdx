@@ -1,97 +1,43 @@
 ---
-title: "ICH E6 GCP compliance for AI agents in clinical trials"
-sidebarTitle: "ICH E6 GCP"
-description: "Map Atlasent features to ICH E6(R2) Good Clinical Practice requirements. Satisfy ALCOA+ for AI agents handling clinical trial data and source records."
+title: "ICH E6 GCP"
+description: "International GCP for clinical trials — which section maps to which AtlaSent primitive."
 ---
+{/* Generated from the Atlasent docs source (site/compliance/ich-e6-gcp.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-ICH E6(R2) Good Clinical Practice (GCP) is the international guideline governing clinical trial conduct, data integrity, and sponsor oversight of electronic systems. When AI agents handle protocol data, subject records, adverse event reports, or trial master file documents, ICH E6 applies — and its ALCOA+ data quality framework applies to every record those agents touch. Atlasent satisfies ALCOA+ by design: every audit entry is written before the API responds, every action is attributed to a specific actor with a timestamp, and the append-only chain ensures no entry can ever be modified or deleted.
+ICH E6 is the international **Good Clinical Practice** guideline for clinical trials. It applies to AI agents handling protocol data, subject records, adverse events, and trial master files.
 
-## ALCOA+ mapping
+## Requirement-to-primitive mapping
 
-ALCOA+ stands for Attributable, Legible, Contemporaneous, Original, Accurate, plus Complete, Consistent, Enduring, and Available. The table below maps each ALCOA+ attribute to the Atlasent primitive that satisfies it.
+Section numbers below follow **ICH E6(R2)**. ICH E6(R3) renumbers these sections; map them to the current revision in your own validation documentation.
 
-| ALCOA+ attribute | Requirement | Atlasent primitive |
+| E6(R2) § | Requirement | AtlaSent primitive |
 |---|---|---|
-| Attributable | Who performed the action and when | Actor ID, timestamp in every audit entry |
-| Legible | Records must be readable | JSON audit entries, Console viewer |
-| Contemporaneous | Recorded at the time of the action | Audit written before API response returns |
-| Original | First-time recording of data | Append-only chain, no modification permitted |
-| Accurate | True record of what occurred | Deterministic rule engine, policy version pinned |
-| Complete (+C) | All required data captured | All decisions recorded regardless of outcome |
-| Consistent (+C) | Consistent with other data | Decision ID links evaluate, verify, and execute |
-| Enduring (+E) | Retained for required period | Configurable retention, 7-year minimum for GxP |
-| Available (+A) | Accessible when needed | Audit export API, offline bundle verification |
+| 2.10  | Source data must be attributable, legible, contemporaneous, original, accurate | [Permit tokens](/concepts/permit) attribute each AI action to a specific agent + timestamp; [ALCOA+ mapping](/compliance/alcoa-plus). |
+| 5.5.3 | Sponsor oversight of electronic systems | Policies are authored by the sponsor; activations are audit-logged. |
+| 5.5.4 | Access / audit trails | Immutable [audit chain](/concepts/audit-chain) on every evaluation. |
+| 6.4.9 | Data collection — authorized personnel only | RACI rules restrict which agents can collect / modify which data classes. |
+| 8.3   | Essential documents — evidence of actions | Permit IDs are the evidence; stored with the record in your eCRF. |
 
-<Note>
-  The "Contemporaneous" guarantee is architectural, not configurable. Atlasent writes the audit entry atomically with the authorization decision — the entry exists in the chain before your code receives the API response. You cannot disable this behavior for GxP-compliant use.
-</Note>
-
-## Starter policy for clinical data operations
-
-The following policy rules implement ICH E6 §5.5.4 access controls and data-retention requirements. Add these rules before deploying agents that operate on clinical trial data.
+## Starter policy
 
 ```json
 [
-  { "action_type": "subject.read",           "decision": "allow" },
-  { "action_type": "source.enter",           "decision": "allow" },
-  { "action_type": "query.discrepancy",      "decision": "allow" },
-  { "action_type": "ae.report",              "decision": "allow" },
-  {
-    "action_type": "data.modify_locked",
-    "decision": "deny",
-    "deny_code": "DENY_POLICY",
-    "message": "ICH E6 §5.5.4: Locked source data must not be modified without audit"
-  },
-  {
-    "action_type": "subject.delete",
-    "decision": "deny",
-    "deny_code": "DENY_POLICY",
-    "message": "ICH E6 §2.10: Source data must be retained"
-  },
-  {
-    "action_type": "trial.unblind",
-    "decision": "require_approval",
-    "message": "Unblinding requires manual procedure per protocol"
-  }
+  { "action_type": "subject:read",           "decision": "allow" },
+  { "action_type": "source:enter",           "decision": "allow" },
+  { "action_type": "query:discrepancy",      "decision": "allow" },
+  { "action_type": "ae:report",              "decision": "allow" },
+  { "action_type": "data:modify-locked",     "decision": "deny",  "reason": "E6(R2) §5.5.4: locked data must not be modified without audit" },
+  { "action_type": "subject:delete",         "decision": "deny",  "reason": "E6(R2) §2.10: source data must be retained" },
+  { "action_type": "trial:unblind",          "decision": "hold",  "reason": "Requires manual unblinding procedure" },
+  { "action_type": "randomization:access",   "decision": "deny",  "reason": "E6(R2) §2.10: access restricted to authorized personnel" }
 ]
 ```
 
-<Warning>
-  `trial.unblind` must route through the approval queue — never set it to `allow` without human confirmation. Configure the approval workflow in the Console and test it with your clinical operations team before deploying.
-</Warning>
-
 ## Implementation checklist
 
-Complete the following steps before deploying AI agents in a clinical trial environment.
-
-<Steps>
-  <Step title="Import the ICH E6 GCP preset">
-    Import the `ich_e6_gcp` framework preset in the Console under **Policies → Presets**. Map the action type names to match your eClinical system's vocabulary.
-  </Step>
-  <Step title="Set validated actor IDs">
-    Set `actor_id` to each AI system's validated identifier as it appears in the Trial Master File. The actor ID is the "who" in the ALCOA+ attributability requirement.
-  </Step>
-  <Step title="Store permit IDs with source data">
-    Store the `permit_id` with every source data entry your agent creates. Reference these IDs in your eCRF audit trails — they are the authorization evidence for ICH E6 §8.3 essential documents.
-  </Step>
-  <Step title="Export as part of TMF archiving">
-    Export Atlasent audit bundles as part of Trial Master File archiving at study close-out. Atlasent's 7-year minimum GxP retention satisfies standard regulatory retention requirements.
-  </Step>
-  <Step title="Document in the Data Management Plan">
-    Cite the Atlasent policy version in the study's Data Management Plan (DMP). Update the DMP if the policy version changes during the study.
-  </Step>
-  <Step title="Verify offline bundles">
-    Use `atlasent-audit-verify` to verify exported bundles independently of Atlasent infrastructure. This satisfies the ALCOA+ "Available" requirement for data accessible when needed.
-  </Step>
-</Steps>
-
-## Related resources
-
-<CardGroup cols={2}>
-  <Card title="21 CFR Part 11" icon="flask" href="/compliance/21-cfr-part-11">
-    For FDA-regulated clinical trials, 21 CFR Part 11 applies alongside ICH E6 GCP. Review the Part 11 mapping for electronic signature requirements.
-  </Card>
-  <Card title="EU Annex 11" icon="syringe" href="/compliance/eu-annex-11">
-    For EMA-regulated trials, EU Annex 11 computerized-system requirements apply in addition to ICH E6 GCP.
-  </Card>
-</CardGroup>
+- [ ] Import the ICH E6 GCP starter policy from `gxp-starter` (not yet publicly available).
+- [ ] Set `actor.id` to the AI system's validated identifier in the Trial Master File.
+- [ ] Store `permit_id` with every source data entry created by an AI agent.
+- [ ] Reference permit IDs in eCRF audit trails.
+- [ ] Export AtlaSent audit bundles as part of TMF archiving.
+- [ ] Cite AtlaSent policy version in the Data Management Plan.

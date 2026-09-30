@@ -1,0 +1,114 @@
+---
+title: "Verified Actor Identity"
+description: "How AtlaSent establishes who or what is acting without confusing identity with organizational authority."
+---
+{/* Generated from the Atlasent docs source (site/concepts/verified-actor-identity.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**Verified Actor Identity** means AtlaSent has established who or what the protected-action Actor is from an authoritative identity source or cryptographically verifiable workload proof.
+
+It answers:
+
+> **Who or what is actually acting?**
+
+It does **not** answer:
+
+> **Is this Actor organizationally authorized to perform this consequential action?**
+
+That second question is answered separately by AtlaSent's execution-time Authorization path.
+
+## Identity is an input to authorization
+
+The public model is:
+
+```text
+Authoritative identity source / workload proof
+        ↓
+Verified Actor Identity
+        ↓
+Organizational Authority + Policy + approvals + current facts
+        ↓
+Authorization Decision
+        ↓ allow only, when required
+Bounded Permit
+        ↓
+Permit Verification at the execution boundary
+```
+
+A trusted identity makes the Actor attributable. Identity verification does not grant organizational authority, and it does not produce an `allow` Decision by itself.
+
+## Humans, AI, services, and workloads
+
+The same semantic boundary applies across supported principal types:
+
+- **Human** — identity may be established through an enterprise IdP, SSO/OIDC, or another approved identity source.
+- **AI / agent / workload** — identity may be established through workload identity such as GitHub Actions OIDC or another cryptographically bound runtime identity mechanism.
+- **Service / automation** — identity may be established through the applicable service/workload credential and trusted issuer contract.
+- **Organization** — the Acting Organization is a separate tenant/authority boundary; organization membership or tenant selection does not itself grant protected-action Authority.
+
+## Why this matters
+
+A caller can always send a string such as:
+
+```text
+actor_id = github:alice
+```
+
+That string is a **claim**. It becomes trustworthy identity only when the applicable identity-verification path establishes it from an authoritative source and binds it to the relevant organization/workload/request context.
+
+AtlaSent therefore preserves:
+
+```text
+caller claim != verified identity != organizational authority != authorization
+```
+
+## What about the "identity broker"?
+
+**Identity Broker** is a technical architecture term for a service that validates an upstream identity credential or workload proof and produces a trusted AtlaSent identity assertion for downstream verification.
+
+It is implementation plumbing, not the customer outcome.
+
+Publicly, prefer:
+
+- **Verified Actor Identity**
+- **Authoritative Identity Verification**
+- **Identity verified from an authoritative source**
+
+The identity-broker component does not grant organizational authority and does not authorize the consequential action. The runtime evaluates the verified Actor under the organization's Authority, Policy, approvals, safeguards, and current request facts.
+
+## Actor is not necessarily the initiator
+
+Keep these roles distinct unless the governing policy explicitly permits them to coincide:
+
+- **Initiator** — starts the interaction;
+- **Caller** — presents the request to a system boundary;
+- **Actor** — resolved principal whose protected-action authority is evaluated;
+- **Requester** — asks that the action occur;
+- **Approver / Reviewer** — supplies eligible approval input;
+- **Executor** — attempts the native effect;
+- **Observer** — establishes what actually happened.
+
+For example, a human may click "run workflow," while the protected-action Actor is the GitHub Actions workload whose OIDC identity is verified. The human trigger is provenance; it does not impersonate the workload or automatically become the Actor whose authority is evaluated.
+
+## What verified identity does not prove
+
+Verified Actor Identity does not prove:
+
+- organization membership implies authority;
+- a public job title implies approval eligibility;
+- an Actor may perform every action it can technically reach;
+- an Approval exists;
+- the exact request is currently authorized;
+- a Permit was issued or verified;
+- execution occurred;
+- the intended effect occurred.
+
+Those are separate facts in the AtlaSent lifecycle.
+
+<CardGroup cols={2}>
+  <Card title="Authority vs. authorization" icon="arrows-left-right" href="/concepts/authority-vs-authorization">
+    See why identity, access, Authority, Approval, Authorization, Permit, Execution, and Proof are different concepts.
+  </Card>
+  <Card title="Execution-time authorization" icon="shield-check" href="/concepts/execution-time-authorization">
+    See how AtlaSent makes the fresh per-request authorization determination.
+  </Card>
+</CardGroup>

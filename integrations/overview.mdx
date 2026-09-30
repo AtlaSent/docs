@@ -1,52 +1,34 @@
 ---
-title: "Atlasent integrations: extend and connect your toolchain"
-sidebarTitle: "Overview"
-description: "Connect Atlasent to GitHub Actions, MCP-compatible AI agents, LangChain, LlamaIndex, Slack, and your SIEM — all from one organization."
+title: "Integrations"
+description: "Drop AtlaSent into LangChain, LlamaIndex, MCP, GitHub Actions, Slack, and your SIEM."
 ---
+{/* Generated from the Atlasent docs source (site/integrations/overview.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Atlasent integrates directly into the places where your agents and engineers act. Every integration calls the same `/v1/evaluate` API under the hood, so a single policy bundle governs deployments, agent tool calls, query engines, and human escalations without any duplication. You can run any combination of integrations from one Atlasent organization, with per-API-key scoping to limit what each surface can do.
+All integrations call the same [`/v1/evaluate`](/api-reference/introduction) API. You can ship all of them from one AtlaSent org, with per-key scoping.
 
 <CardGroup cols={2}>
-  <Card
-    title="GitHub Action"
-    icon="github"
-    href="/integrations/github-action"
-  >
-    Gate production deployments on a permit before your deploy step runs. Fails closed if the API is unreachable.
+  <Card title="GitHub Action"            icon="github"        href="/integrations/github-action">
+    Gate production deploys on a permit. Fail closed on outage.
   </Card>
-  <Card
-    title="MCP Server"
-    icon="plug"
-    href="/integrations/mcp-server"
-  >
-    Expose `atlasent_evaluate` and `atlasent_verify_permit` as MCP tools to Claude Desktop, Cursor, Windsurf, or any custom MCP host.
+  <Card title="GitHub App"               icon="github"        href="/integrations/github-app">
+    Create Check Runs on pull requests. Block merge until the evaluation passes.
   </Card>
-  <Card
-    title="LangChain"
-    icon="code-fork"
-    href="/integrations/langchain"
-  >
-    Wrap individual tools or add a callback handler to intercept every tool call in your LangChain agent loop.
+  <Card title="MCP server"               icon="plug"          href="/integrations/mcp-server">
+    Expose `evaluate` and `verify_permit` as MCP tools for Claude Desktop, Cursor, Windsurf, custom hosts.
   </Card>
-  <Card
-    title="LlamaIndex"
-    icon="code-branch"
-    href="/integrations/llamaindex"
-  >
-    Authorize tool calls and query engine requests using `AtlasentAgentStep` and `AtlasentQueryPostProcessor`.
+  <Card title="LangChain"                icon="code-fork"     href="/integrations/langchain">
+    Callback handler + agent step for the LangChain agent loop.
   </Card>
-  <Card
-    title="Slack Approval Bot"
-    icon="slack"
-    href="/integrations/slack-approval-bot"
-  >
-    Route `hold` and `escalate` decisions to a Slack channel for one-click human approval with full audit trail.
+  <Card title="LlamaIndex"               icon="code-branch"   href="/integrations/llamaindex">
+    Authorize-first tool wrappers for Python and TypeScript agents.
   </Card>
-  <Card
-    title="SIEM Export"
-    icon="satellite-dish"
-    href="/integrations/siem-export"
-  >
-    Stream permit, deny, override, and governance events to Splunk, Elastic, QRadar, or any HTTPS webhook destination.
+  <Card title="SIEM export"              icon="satellite-dish" href="/integrations/siem-export">
+    Stream the audit chain into Splunk, Sumo, Datadog, or any Syslog endpoint via the API.
+  </Card>
+  <Card title="SIEM Export Console"      icon="display"       href="/integrations/siem-export-console">
+    Configure Splunk HEC, Elastic, or generic webhook destinations from the Console UI.
+  </Card>
+  <Card title="Slack Approval Bot"       icon="slack"         href="/integrations/slack-approval-bot">
+    Route hold and escalate decisions to a Slack channel for one-click human approval.
   </Card>
 </CardGroup>

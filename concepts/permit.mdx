@@ -1,118 +1,161 @@
 ---
-title: "Permits: single-use tokens that authorize execution"
-sidebarTitle: "Permit"
-description: "How Atlasent permits work: single-use, Ed25519-signed tokens issued on allow decisions, with a 15-minute TTL and a five-step lifecycle."
+title: "Permit"
+description: "A Permit is the bounded runtime artifact that embodies a positive authorization and is verified at the execution boundary before the governed effect."
 ---
+{/* Generated from the Atlasent docs source (site/concepts/permit.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-A permit is the artifact Atlasent issues when an evaluation returns `allow`. It is a short-lived, single-use, Ed25519-signed token — identified by a `pt_…` ID — that says "this actor may take this action, exactly once, before this expiry." Your code receives the permit from the SDK, stores the `permit_id` alongside your own record, and uses that link to navigate the audit chain in both directions.
+A **Permit** is the current runtime/wire artifact implementing a positive
+Authorization for a bounded execution context.
 
-A permit is **not** a decision cache. One permit authorizes exactly one execution. If your caller retries or the action fails after execution, you call `/v1/evaluate` again to obtain a fresh permit.
+It is issued only after an Evaluation produces an `allow` Decision under the
+current Authority, Policy, Context, approvals/assertions, and other required
+conditions.
 
-## Permit state machine
+A Permit is **not**:
 
-A permit moves through the following states after it is issued:
+- standing organizational Authority;
+- an Approval;
+- a durable permission to act indefinitely;
+- proof that Execution occurred;
+- the Evidence record itself.
 
+The distinction matters because Authorization, Permit issuance, Verification,
+Execution, and Evidence are separate states.
+
+## Where the Permit sits
+
+```text
+Authority + Policy + Action + Resource + Context + Assertions/Approval
+        ↓
+Evaluation → Decision
+        ↓ allow only
+Permit issued
+        ↓
+Gate verifies Permit for this execution attempt
+        ↓
+Verification / single-use consumption
+        ↓
+Execution → Native Effect
+        ↓
+Evidence / Proof
 ```
-       evaluate ⇒ allow
-              │
-              ▼
-          ┌────────┐
-          │ ISSUED │
-          └────────┘
-               │
-    ┌──────────┼──────────┐
-    │          │          │
-    ▼          ▼          ▼
-┌──────────┐ ┌─────────┐ ┌─────────┐
-│ CONSUMED │ │ EXPIRED │ │ REVOKED │
-└──────────┘ └─────────┘ └─────────┘
-  (terminal)  (terminal)  (terminal)
+
+## Issue
+
+The public evaluation operation is:
+
+```http
+POST /v1/evaluate
 ```
 
-| State | How you reach it | Can the permit authorize execution? |
-|---|---|---|
-| `ISSUED` | `evaluate` returned `allow` | Yes — call verify before executing |
-| `CONSUMED` | `verify` succeeded and execution completed | No — terminal state |
-| `EXPIRED` | 15-minute TTL elapsed before verify | No — terminal state |
-| `REVOKED` | Out-of-band operator revocation | No — terminal state |
+On a positive Authorization, the current wire response carries the Permit on the
+flat response surface (for example `permit_token`, with related expiry metadata
+where applicable). New integrations should follow the current OpenAPI/SDK
+contract rather than older documentation that showed a fictional nested
+`permit: { ... }` object.
 
-## The five-step lifecycle
+A Permit is bound to the authorized execution context under the applicable
+contract. The exact binding fields and representation are wire-contract details;
+do not infer or reconstruct them from display labels.
 
-<Steps>
+## Verify before execution
 
-<Step title="Issued — evaluation returns allow">
-  When evaluation returns `allow`, Atlasent mints a permit and returns it in the response:
+The current public verification operation is:
 
-  ```json
-  {
-    "decision": "allow",
-    "evaluation_id": "eval_01j...",
-    "permit": {
-      "id": "pt_01j...",
-      "expires_at": "2026-05-06T10:15:00Z"
-    }
-  }
-  ```
+```http
+POST /v1-verify-permit
+```
 
-  The TTL is **15 minutes (900 seconds)**. Design your execution path so that verify and execute happen well inside that window. If your action might take longer, model it as a `hold` decision with a separate approval signal instead of relying on a long-lived permit.
-</Step>
+Verification occurs at the **Gate**, immediately before the governed execution
+attempt. The verification path checks the Permit against the execution context
+and applicable validity, expiry, revocation, binding, and replay requirements.
 
-<Step title="Verified — your code calls verify-permit">
-  The SDK calls `/v1/permits/{id}/verify` immediately before execution. The server confirms:
+In the current permit-gated flow, verification also enforces single-use
+consumption semantics so a Permit cannot authorize repeated execution attempts.
 
-  - The Ed25519 signature is valid.
-  - The permit state is `ISSUED` — not expired, consumed, or revoked.
-  - The permit belongs to your org.
+> **Gate on Verification, not on the earlier `allow` Decision alone.**
 
-  | Response | Meaning |
-  |---|---|
-  | `200` | Valid, unconsumed, unexpired, signature OK — proceed. |
-  | `404` | No permit with that ID in your org. |
-  | `410` | Expired or already consumed — do not proceed. |
+An `allow` Decision means the request satisfied the evaluated authorization
+conditions at that point. The Gate still has to establish that the Permit is
+valid for this execution attempt.
 
-  This step is what closes the window between issue and execute. Policy could change, an operator could revoke the permit, or the TTL could elapse in the time between mint and verify — this call catches all three.
-</Step>
+## Single-use and replay protection
 
-<Step title="Executed — protected action runs inside the permit scope">
-  Control returns to your code. The action runs. You capture and store the `permit_id` next to your own record so the audit trail is two-way navigable:
+A Permit is designed for a bounded execution, not as a reusable bearer
+permission.
 
-  ```typescript
-  const permit = await client.protect({ actor, action, context });
-  const record = await db.deployments.create({
-    ...deploymentPayload,
-    atlasent_permit_id: permit.permitId,  // the audit-chain link
-  });
-  ```
-</Step>
+Single-use semantics matter because they prevent one positive Authorization from
+silently authorizing multiple native effects. Replay protection also makes the
+evidence chain clearer: a Permit can be correlated to a specific governed
+execution attempt rather than becoming an open-ended capability.
 
-<Step title="Consumed — permit is marked used; replay attempts fail">
-  After execution, the permit transitions to `CONSUMED`. Any subsequent attempt to verify or re-use the same `pt_…` token returns an error and the SDK raises. This is the replay-prevention guarantee: one permit, one execution, no exceptions.
+If a Permit has expired, been revoked, already been consumed, or does not match
+the execution binding, the governed permit-gated path must not treat it as valid
+for a new execution.
 
-  <Warning>
-    If your code calls `protect()` or `with_permit()` a second time expecting to reuse the permit, it will fail. You must obtain a fresh permit by calling evaluate again.
-  </Warning>
-</Step>
+## Permit vs. Authority
 
-<Step title="Audited — both events are in the immutable audit chain">
-  The evaluate event and the verify event are each written to the immutable, hash-linked audit chain — before Atlasent returns a response for each call. You have a durable, tamper-evident record of the decision and the verification, linked by the `permit_id`, whether the action ultimately succeeded or not.
-</Step>
+**Authority** is standing and scoped. **Permit** is bounded and per execution.
 
-</Steps>
+A principal can have Authority for a class of changes without holding a valid
+Permit for every request in that class. Policy, context, separation of duties,
+required approvals, resource state, or other conditions can still make a
+particular request unauthorized.
 
-## Why permits are single-use
+## Permit vs. Approval
 
-Single-use enforcement solves two critical problems:
+An **Approval** can satisfy a policy condition. It does not itself become the
+Permit.
 
-1. **Non-repudiation.** A reused permit would make it ambiguous which execution it authorized. With single-use permits, there is exactly one execution per `pt_…` token — no ambiguity for auditors or incident investigators.
-2. **Revocability.** Between issue and consume, your policy could change, an actor's role could be updated, or an operator could flag an anomaly and revoke the permit. The verify step before execution means you can never act on stale authority — even if the permit was legitimately issued moments ago.
+The runtime re-evaluates the complete request/evidence package and may issue a
+Permit only if the current conditions satisfy Authorization. This prevents an
+old or mismatched approval from becoming an automatic execution credential.
 
-## Why permits are signed
+## Permit vs. Evidence / Proof
 
-The permit is the electronic authorization record for regulated environments. Atlasent's Ed25519-signed permit, paired with the per-org audit chain, satisfies the 21 CFR Part 11 §11.50 requirement that electronic records with electronic signatures must have the signature information linked to the record in a way that is not removable or editable — provided you store the `permit_id` alongside the action in your system of record.
+A Permit is used to control Execution. **Evidence** is the durable record of what
+was determined, issued, verified, executed, and observed. **Proof** is
+cryptographically verifiable Evidence.
+
+Do not describe the Permit itself as the complete audit trail or as proof that
+the native effect occurred.
+
+## Fail-closed usage
+
+Where an execution path is actually configured and tested as fail-closed and
+permit-gated:
+
+> **No valid Permit means no execution through that governed path.**
+
+Do not generalize that statement to shadow, advisory, historical, or otherwise
+non-enforcing paths.
+
+## Implementation guidance
+
+- Use the current SDK/OpenAPI response shape; do not rely on older nested-Permit
+  examples.
+- Preserve the original Action/Actor/Resource/Environment/Context information
+  needed for the verification binding; do not invent missing binding data from
+  the evaluate response.
+- Verify at the actual execution boundary, not minutes earlier in an unrelated
+  workflow step.
+- Treat replay, expiry, revocation, mismatch, malformed responses, and
+  verification failures according to the configured enforcement posture.
+- Persist Evidence that can correlate the Authorization, Permit, Verification,
+  and native execution outcome.
+
+<CardGroup cols={2}>
+  <Card title="Execution-time authorization" icon="shield-check" href="/concepts/execution-time-authorization">
+    Why the determination is made at the execution boundary.
+  </Card>
+  <Card title="Runtime flow" icon="route" href="/concepts/runtime-flow">
+    See the Permit in the full Action → Evidence lifecycle.
+  </Card>
+</CardGroup>
 
 ## Related
 
-- [Runtime Flow](/concepts/runtime-flow) — how the permit fits into the four-hop lifecycle.
-- [Audit Chain](/concepts/audit-chain) — how permit events are recorded and made tamper-evident.
-- [Deny Codes](/concepts/deny-codes) — codes returned when evaluation does not produce a permit.
-- [Glossary](/concepts/glossary) — canonical definitions for Permit, Verify, Consume, and Decision.
+- [Organizational authority](/concepts/organizational-authority)
+- [Authority vs. authorization vs. approval vs. access](/concepts/authority-vs-authorization)
+- [Quickstart → Verify a permit](/quickstart/verify-permit)
+- [Proof verification](/concepts/proof-verification)

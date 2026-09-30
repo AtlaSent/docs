@@ -1,0 +1,171 @@
+---
+title: "SCIM 2.0 Provisioning"
+description: "Configure and acceptance-test AtlaSent's enterprise SCIM 2.0 provisioning surface."
+---
+{/* Generated from the Atlasent docs source (site/enterprise/scim-admin.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Note>
+  **Current status.** AtlaSent has an implemented **enterprise SCIM 2.0 provisioning surface**. A specific customer must still configure and acceptance-test its IdP, mappings, lifecycle behavior, and security expectations before relying on the integration in production. Endpoint existence is not customer validation.
+</Note>
+
+SCIM manages **identity lifecycle**. It can create, update, deactivate, and group
+users according to the configured integration. It does **not** grant
+organizational Authority for consequential Actions. Authorization remains a
+separate execution-time determination.
+
+## Prerequisites
+
+- The SCIM capability is enabled for the target enterprise organization.
+- You are an AtlaSent organization administrator with permission to manage identity integrations.
+- The target IdP supports the required SCIM operations.
+- If the deployment also uses SSO, configure and acceptance-test that login path separately. See [SSO Setup](/guides/sso-setup).
+- Define the desired role/group mapping and deprovisioning behavior before activation.
+
+## 1. Generate a SCIM credential
+
+Use the AtlaSent Console's SSO/SCIM administration surface to create the
+credential used by the IdP.
+
+- Treat the credential as a secret.
+- Store it in the customer's approved secrets/password-management system.
+- Rotate it if exposure is suspected or when required by the customer's policy.
+- Do not paste a live token into tickets, screenshots, chat, or documentation.
+
+## 2. Configure the IdP
+
+Use the **current SCIM base URL and credential shown for the deployment** rather
+than copying an old URL or screenshot.
+
+Typical configuration includes:
+
+| Setting | Expected concept |
+|---|---|
+| Tenant / base URL | AtlaSent SCIM endpoint for the current deployment |
+| Authentication | Bearer credential issued for the organization |
+| User identifier | Email / `userName`, according to the accepted mapping |
+| Provisioning actions | Only the User/Group operations enabled and tested for the deployment |
+
+### Okta
+
+A typical Okta flow is:
+
+1. Open the AtlaSent application in Okta.
+2. Enable API/SCIM provisioning.
+3. Enter the current AtlaSent SCIM base URL and credential.
+4. Test API credentials.
+5. Enable only the provisioning operations included in the customer's acceptance scope.
+6. Assign a small test population before wider rollout.
+
+### Microsoft Entra ID
+
+A typical Entra flow is:
+
+1. Open the AtlaSent Enterprise Application.
+2. Configure automatic provisioning.
+3. Enter the current AtlaSent tenant URL and secret credential.
+4. Test the connection.
+5. Review user and group mappings.
+6. Start with a bounded assigned population and inspect the resulting AtlaSent identities before broad enablement.
+
+## 3. Supported resource surface
+
+AtlaSent's SCIM implementation includes User and Group provisioning routes and
+SCIM discovery/configuration surfaces in the enterprise integration layer.
+
+Do not treat this page as a frozen wire specification. Use the current product
+surface and integration test for the exact route set and response behavior in the
+target deployment.
+
+Common resource operations include:
+
+- list / retrieve users;
+- create users;
+- update or deactivate users;
+- list / manage groups;
+- update group membership;
+- SCIM schema/service-provider discovery where exposed by the deployment.
+
+## 4. Map identity facts deliberately
+
+At minimum, decide and acceptance-test:
+
+- the unique user identifier;
+- email normalization;
+- active/inactive lifecycle behavior;
+- role or entitlement mapping, if used;
+- group/team mapping, if used;
+- what happens to sessions and credentials on deprovisioning;
+- how failed or partial provisioning is surfaced to operators.
+
+Do not infer organizational Authority from a directory role. A user provisioned
+as an AtlaSent admin, operator, auditor, or member still requires the applicable
+Authority/Policy path for a consequential Action.
+
+## 5. Acceptance-test provisioning and deprovisioning
+
+Before relying on SCIM operationally, prove the customer-specific lifecycle with
+representative test identities:
+
+1. Create a user through the IdP and confirm the intended AtlaSent identity.
+2. Update attributes and confirm only the accepted fields change.
+3. Add/remove group or role mappings if those are in scope.
+4. Deactivate the user and confirm the expected AtlaSent access/session behavior.
+5. Confirm failures are visible and attributable.
+6. Record the IdP, environment, mappings, credential identifier (not secret), timestamps, and acceptance outcome.
+
+<Warning>
+  Do not promise a fixed propagation time, universal session-revocation cascade, API-key revocation cascade, or Permit invalidation behavior unless the current deployment's implementation and acceptance evidence prove that exact behavior.
+</Warning>
+
+## SCIM and execution-time authorization
+
+Identity provisioning and action authorization are separate layers:
+
+```text
+IdP / SCIM
+  → identity + lifecycle facts
+  → Actor resolution / Assertions
+  → organizational Authority
+  → Policy
+  → Evaluation
+  → Permit
+  → Verification at the Gate
+  → Execution
+  → Evidence
+```
+
+A SCIM provisioning event can change facts relevant to Authorization, but it does
+not itself issue a Permit or authorize a consequential Action.
+
+## Troubleshooting
+
+When provisioning fails, capture:
+
+- organization ID;
+- IdP/provider;
+- environment;
+- redacted request/correlation identifier;
+- timestamp;
+- resource type (User/Group);
+- operation attempted;
+- redacted error response.
+
+Do not include bearer credentials or other secrets.
+
+Common checks:
+
+- credential is current and correctly configured;
+- base URL is for the intended environment;
+- required user identifier is mapped;
+- the IdP assignment/provisioning service is enabled;
+- the requested operation is included in the accepted integration scope;
+- the resulting AtlaSent identity/role matches the organization's approved mapping.
+
+For persistent issues, contact [support@atlasent.io](mailto:support@atlasent.io).
+
+## Related
+
+- [SSO Setup](/guides/sso-setup)
+- Claims matrix
+- [Organizational Authority](/concepts/organizational-authority)
+- [Authority vs. Authorization vs. Approval vs. Access](/concepts/authority-vs-authorization)

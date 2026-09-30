@@ -1,17 +1,25 @@
 ---
-title: "Authorize LlamaIndex agent tool calls with Atlasent"
-sidebarTitle: "LlamaIndex"
-description: "Add Atlasent authorization to LlamaIndex agents and query engines using AtlasentAgentStep and AtlasentQueryPostProcessor in Python or TypeScript."
+title: "LlamaIndex"
+description: "Tool wrappers that inject AtlaSent authorization into LlamaIndex agents, in Python and TypeScript."
 ---
+{/* Generated from the Atlasent docs source (site/integrations/llamaindex.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-The Atlasent LlamaIndex integration wraps tool calls and query engine requests so every action passes through `/v1/evaluate` before it executes. Use `AtlasentAgentStep` to gate tool calls inside a `ReActAgent`, or use `AtlasentQueryPostProcessor` to authorize the query itself before the inner engine runs. Both Python and TypeScript are supported, and every evaluation is recorded in the Atlasent audit chain.
+The AtlaSent LlamaIndex integration wraps the functions behind your LlamaIndex tools with authorize-before-execute semantics: every call is evaluated against `/v1/evaluate`, its Permit is verified, and only then does the original function run. The wrappers have no dependency on LlamaIndex itself, so they work with any LlamaIndex version.
 
 ## Install
+
+<Warning>
+  **Not yet published.** `atlasent-llamaindex` is not yet on PyPI and `@atlasent/llamaindex` is not yet on
+  npm, so the install commands below do not work yet. Until a release is
+  published, install from source: [`python/atlasent_llamaindex`](https://github.com/Atlasent/atlasent-sdk/tree/main/python/atlasent_llamaindex)
+  and [`typescript/packages/llamaindex`](https://github.com/Atlasent/atlasent-sdk/tree/main/typescript/packages/llamaindex)
+  in the `atlasent-sdk` repository.
+</Warning>
 
 <CodeGroup>
 
 ```bash Python
-pip install atlasent-llamaindex
+pip install atlasent-llamaindex atlasent
 ```
 
 ```bash TypeScript
@@ -22,81 +30,39 @@ npm install @atlasent/llamaindex @atlasent/sdk
 
 ## Python
 
-### Agent step
-
-`AtlasentAgentStep` injects an authorization check into the `ReActAgent` execution loop. Add it via `extra_steps` and every tool call will be evaluated before LlamaIndex runs it. A denied call raises `DeniedError` before the tool executes.
+`with_llamaindex_guard` wraps a callable before you hand it to `FunctionTool.from_defaults`, `QueryEngineTool`, or any other LlamaIndex tool factory. The wrapped function keeps the original name, docstring, and signature.
 
 ```python
-from atlasent_llamaindex import AtlasentAgentStep
+import os
 
-protected_step = AtlasentAgentStep(
-    api_key=os.environ["ATLASENT_API_KEY"],
-    actor_id="agent_123",
-    action_type="model.agent.execute_tool",
+from atlasent import AtlaSentClient
+from atlasent_llamaindex import with_llamaindex_guard
+from llama_index.core.tools import FunctionTool
+
+client = AtlaSentClient(api_key=os.environ["ATLASENT_API_KEY"])
+
+def search(query: str) -> str:
+    """Search the knowledge base."""
+    return f"Results for: {query}"
+
+guarded_search = with_llamaindex_guard(
+    search,
+    client,
+    agent="service:knowledge-bot",
+    # agent.tool.invoke (the default action) requires `environment`
+    extra_context={"environment": "production"},
+    # Action classes require a state snapshot by default (SNAPSHOT_REQUIRED otherwise)
+    state_snapshot={"source": "knowledge-bot", "complete": True},
 )
 
-agent = ReActAgent.from_tools(
-    tools=tools,
-    step_executor=protected_step,
-)
+tool = FunctionTool.from_defaults(fn=guarded_search)
 ```
 
-### Query post-processor
-
-Use `AtlasentQueryPostProcessor` when the query itself is the action you want to authorize, rather than individual tool calls. It runs before the inner query engine and blocks the query if authorization is denied.
-
-```python
-from atlasent_llamaindex import AtlasentQueryPostProcessor
-
-query_engine = index.as_query_engine(
-    node_postprocessors=[AtlasentQueryPostProcessor(
-        api_key=os.environ["ATLASENT_API_KEY"],
-        actor_id="agent_123",
-    )]
-)
-```
-
-On deny, the processor returns a structured denial response — the LLM can observe the reason and adjust — rather than raising an unhandled exception.
-
-### Error handling
-
-Catch `DeniedError` to handle blocked actions without crashing the outer application:
-
-```python
-from atlasent.exceptions import DeniedError
-
-try:
-    response = agent.chat("Summarize patient 42's recent labs.")
-except DeniedError as e:
-    print(f"Agent action blocked: {e}")
-    # Surface to user or log for audit
-```
-
-Both `AtlasentAgentStep` and `AtlasentQueryPostProcessor` support async:
-
-```python
-response = await agent.achat("Summarize the patient records.")
-```
-
-The async Atlasent client is used automatically in async contexts.
+If the policy denies the call, `AtlaSentDeniedError` is raised before `search()` runs. For async tools, use `async_with_llamaindex_guard` with an `AsyncAtlaSentClient`.
 
 ## TypeScript
 
-### `withLlamaIndexGuard`
-
-`withLlamaIndexGuard` wraps an array of tool definitions with authorize-first semantics: `evaluate → verifyPermit → execute`. Only the real tool runs if both checks pass. The wrapper is duck-typed to match LlamaIndex's `BaseTool` and `FunctionTool` shapes with no `llamaindex` dependency in the wrapper itself.
-
-```typescript
-import { withLlamaIndexGuard } from '@atlasent/llamaindex';
-
-const guardedTool = withLlamaIndexGuard(deployTool, {
-  actionType: 'model.agent.execute_tool',
-  actorId: 'agent_123',
-  client,
-});
-```
-
-For multiple tools, pass an array and convert each result to a `FunctionTool`:
+`withLlamaIndexGuard` takes an array of tool definitions (LlamaIndex-style `metadata` plus an `execute` callback) and returns the same tools with `execute` replaced by an authorize-first version: evaluate, then verify the Permit, then execute.
 
 ```typescript
 import { AtlaSentClient } from "@atlasent/sdk";
@@ -119,63 +85,36 @@ const guarded = withLlamaIndexGuard(
       },
       execute: async ({ query }) => vectorStore.search(query),
     },
-    {
-      metadata: {
-        name: "upsert_document",
-        description: "Add or update a document in the knowledge base",
-        parameters: {
-          type: "object",
-          properties: { id: { type: "string" }, text: { type: "string" } },
-          required: ["id", "text"],
-        },
-      },
-      execute: async ({ id, text }) => vectorStore.upsert(id, text),
-    },
   ],
   client,
-  { agent: "service:knowledge-bot" },
+  {
+    agent: "service:knowledge-bot",
+    extraContext: { environment: "production" },
+    // Action classes require a state snapshot by default (SNAPSHOT_REQUIRED otherwise)
+    stateSnapshot: { source: "knowledge-bot", complete: true },
+  },
 );
 
 const tools = guarded.map((t) => FunctionTool.from(t.execute, t.metadata));
 ```
 
-By default, a denied call throws `AtlaSentDeniedError`. Set `onDeny: "tool-result"` to return a structured denial object instead:
+`agent`, `action`, `extraContext`, and `stateSnapshot` also accept a resolver function `(toolName, input) => value`, so you can set them per call.
 
-```typescript
-const guarded = withLlamaIndexGuard(tools, client, {
-  agent: "service:knowledge-bot",
-  onDeny: "tool-result",
-});
+## Denials
 
-// execute() returns on deny:
-// { denied: true, decision: "deny", evaluationId: "...", reason: "..." }
-```
-
-### Dynamic actor and context
-
-Pass a resolver function instead of a static string to set the actor ID or extra context dynamically per call:
-
-```typescript
-withLlamaIndexGuard(tools, client, {
-  agent: (toolName, input) => `user:${input.userId}`,
-  extraContext: (toolName, input) => ({ environment: "production", tool: toolName }),
-});
-```
-
-### Result annotation
-
-Object results from guarded tools are automatically annotated with permit metadata:
+By default a denial throws (`AtlaSentDeniedError`). Set `on_deny="tool-result"` in Python, or `onDeny: "tool-result"` in TypeScript, to return a structured denial instead, so the LLM sees the reason and can adjust. In Python that's a `DenialResult` object; in TypeScript it looks like:
 
 ```json
-{
-  "results": [],
-  "_atlasent_permit_id": "permit_abc123",
-  "_atlasent_audit_hash": "sha256:..."
-}
+{ "denied": true, "decision": "deny", "evaluationId": "...", "reason": "..." }
 ```
 
-Non-object results pass through unchanged.
+A failed Permit verification is treated as a denial. Object results from an authorized call are annotated with `_atlasent_permit_id` and `_atlasent_audit_hash`; other results pass through unchanged.
 
-<Tip>
-  Use stable action types — such as `data.query` or `ehr.write` — rather than tool function names when defining your policy mappings. Tool names change during refactors; action types are the identifiers your audit chain and compliance reviews depend on.
-</Tip>
+## Action class mapping
+
+When you don't pass an action, the wrappers evaluate the canonical `agent.tool.invoke` action and always send the tool's own name as `context.tool`, so policy can tell tools apart. That action class requires `environment` in context; the wrapper never invents one, so supply it through `extra_context` / `extraContext`. If you map tools to your own action classes instead, key them on stable action types rather than Python or TypeScript function names.
+
+## Related
+
+- [LangChain integration](/integrations/langchain)
+- [MCP server](/integrations/mcp-server) for host-side gating

@@ -1,115 +1,154 @@
 ---
-title: "Atlasent CLI: validate, test, and deploy policy bundles"
-sidebarTitle: "CLI"
-description: "Use atlasent-policy to validate policy files, run offline test suites, compare versions with diff, and deploy bundles to the Atlasent runtime from CI."
+title: "atlasent-policy CLI"
+description: "Keep AtlaSent policies as files in a repo: validate and test them offline, plan changes on pull requests, and apply on merge."
+---
+{/* Generated from the Atlasent docs source (site/sdks/cli.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+# atlasent-policy CLI
+
+`atlasent-policy` treats your authorization policies like code. Keep them
+as YAML or JSON files in a repo, review them in pull requests, see exactly
+what will change with `plan`, and publish on merge with `apply`.
+
+`validate`, `test`, `convert`, and `verify-bundle` run **without network
+access**, using the same rule engine the runtime uses. `plan`, `pull`, and
+`apply` talk to AtlaSent, and only `apply` writes.
+
 ---
 
-The `atlasent-policy` CLI lets you treat your authorization bundles exactly like application code: stored in a repository, reviewed in pull requests, validated in CI, and deployed on merge. The `validate` and `test` commands run entirely offline against the same rule engine the Atlasent runtime uses, so a test that passes locally passes in production.
+## Install
 
-## Installation
+<Note>
+  The CLI is **not published to npm.** `npm install -g @atlasent/cli`
+  returns a 404; don't use it. The CLI ships as one bundled file in the
+  public [Atlasent/atlasent-policies](https://github.com/Atlasent/atlasent-policies)
+  repository.
+</Note>
 
-Install the CLI globally or run it on demand with `npx`. Both the `atlasent` and `atlasent-policy` names resolve to the same binary.
+Nothing to install beyond Node 20 or later. Run it straight from the public
+repository, pinned to a release tag for reproducible runs:
 
-<CodeGroup>
-```bash npm
-npm install -g @atlasent/cli
+```sh
+npx github:Atlasent/atlasent-policies#v1 --help
+npx github:Atlasent/atlasent-policies#v1 validate policies
 ```
-```bash npx
-npx @atlasent/cli --help
-```
-</CodeGroup>
+
+The examples below write `atlasent-policy` for short; substitute
+`npx github:Atlasent/atlasent-policies#v1`.
+
+## Configuration
+
+| Variable | Default | Used by |
+|---|---|---|
+| `ATLASENT_API_KEY` | none | `plan` and `pull` need `policy:read`; `apply` needs `policy:write`. |
+| `ATLASENT_BASE_URL` | `https://api.atlasent.io/functions/v1` | All network commands. |
 
 ## Commands
 
-### validate — syntax-check a policy file
+| Command | Network | What it does |
+|---|---|---|
+| `validate [dir]` | no | Parse and lint every policy and test file. Unknown keys and operators are errors. |
+| `test [dir]` | no | Run `*.tests.yaml` / `*.tests.json` cases through the real rule engine. |
+| `plan [dir]` | read | Diff each policy against the live published version, with server-side validation. No writes. `--format markdown` prints a comment ready to post on a PR; `--detailed-exitcode` exits `2` when there are changes. |
+| `apply [dir]` | write | Publish every policy whose rules differ from what's live. Writes nothing if any file fails preflight. `--source-digest` and `--reason` record provenance. |
+| `pull [--out dir]` | read | Download live published policies, YAML by default. Use it to adopt policies first authored in the console. |
+| `convert [dir]` | no | Rewrite JSON policy and test files as YAML, or back with `--to json`. |
+| `verify-bundle <file>` | no | Offline check of a `/v1/export-audit` bundle. `--trusted-key <pem>` pins the signing key; exit `0` ok, `1` failure, `2` usage error. |
 
-`validate` performs structural validation of a policy file without making any network calls. It catches malformed JSON, missing required fields, unknown action types, type mismatches between the context schema and rule predicates, and circular references in layered bundles.
+`dir` defaults to `policies/`.
 
-```bash
-atlasent-policy validate --file policy.json
-# Output: ✓ policy.json is valid (3 rules)
+## A policy file
+
+One file per action type. `rules` is the same rule object the runtime
+evaluates:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Atlasent/atlasent-policies/main/schema/policy.schema.json
+action_type: production.deploy
+description: Two approvals, business hours only.
+rules:
+  change_window:
+    timezone: America/Los_Angeles
+    days_of_week: [1, 2, 3, 4]
+    hours: { start: "09:00", end: "17:00" }
+  require_approvals:
+    count: 2
+    exclude_actor: true
+  templates:
+    - decision: allow
 ```
 
-The command exits with code `0` on a clean result and code `1` with structured findings if any issue is detected.
+The action class must already exist in your organization; `plan` tells you
+if it doesn't.
 
-### test — run policy test cases offline
+## Tests
 
-`test` executes every test case in a test file against the specified policy file. Like `validate`, it runs entirely offline against the same rule engine the runtime uses — there is no class of "works locally but fails in production" policy evaluation bug.
+Put test cases next to the policy as `<action_type>.tests.yaml`. `now` fixes
+the clock, so tests are deterministic whenever they run:
 
-```bash
-atlasent-policy test --policy policy.json --tests tests.json
-# Output:
-# ✓ allow-normal-deploy (3ms)
-# ✓ deny-missing-reviews (2ms)
-# ✓ hold-friday-deploy (1ms)
-# 3 passed, 0 failed
+```yaml
+bundle: production.deploy
+tests:
+  - name: two recent approvals inside the window is allowed
+    actor_id: alice
+    now: "2026-04-14T18:00:00Z"
+    context:
+      approvers:
+        - { id: bob, role: security, timestamp: "2026-04-14T17:00:00Z" }
+        - { id: carol, role: engineering, timestamp: "2026-04-14T17:30:00Z" }
+    expect: allow
+  - name: Friday is outside the change window
+    actor_id: alice
+    now: "2026-04-17T18:00:00Z"
+    expect: deny
+    expect_deny_code: OUTSIDE_CHANGE_WINDOW
 ```
 
-Each test case in your test file specifies a named input and an expected decision:
-
-```json
-[
-  {
-    "name": "allow-normal-deploy",
-    "input": {
-      "actor": { "id": "user_123", "role": "engineer" },
-      "action": { "type": "production.deploy" },
-      "target": { "id": "service", "environment": "production" },
-      "context": { "review_count": 2, "branch": "main" }
-    },
-    "expected": { "decision": "allow" }
-  }
-]
+```sh
+atlasent-policy test policies
 ```
 
-The `name` field is used in test output and CI annotations. The `input` mirrors the shape of a `POST /v1/evaluate` request body. Set `expected.decision` to `allow`, `deny`, `hold`, or `escalate`.
-
-<Tip>
-  Add a `now` field to any test case to fix the evaluation clock for time-sensitive rules. This makes your test suite deterministic regardless of when it runs.
-</Tip>
-
-### diff — compare two policy versions
-
-`diff` compares two policy files and reports semantic differences — which rule vectors flip decisions, which gain or lose deny codes, and which produce different risk scores. Use it in pull request reviews to verify that a rule change actually produces the behavior the author intended.
-
-```bash
-atlasent-policy diff --from policy-v1.json --to policy-v2.json
-```
-
-Like `validate` and `test`, `diff` requires no network access.
-
-### deploy — push a policy bundle to Atlasent
-
-`deploy` is the only command that makes a network call. It publishes a validated, tested policy bundle to the Atlasent runtime. Requires an API key with the `bundles:publish` scope set in the `ATLASENT_API_KEY` environment variable or passed via `--api-key`.
-
-```bash
-atlasent-policy deploy \
-  --file policy.json \
-  --api-key $ATLASENT_API_KEY
-```
-
-Always run `validate` and `test` before `deploy`. The CLI does not enforce this order, but your CI pipeline should — see the example below.
+Local tests cover a policy's `rules`. They don't exercise action-class
+requirements such as MFA, verified actor identity, or human approval, which
+the runtime enforces separately, so a passing test isn't a guarantee of a
+live `allow`.
 
 ## CI integration
 
-Add `validate`, `test`, and `deploy` as a sequential step in your CI pipeline. The example below uses GitHub Actions and runs only when files inside the `policies/` directory change.
+The public repository also ships a GitHub Action that runs `plan` on pull
+requests and `apply` on merge:
 
 ```yaml
-- name: Validate and deploy policy
-  run: |
-    npx @atlasent/cli validate --file policy.json
-    npx @atlasent/cli test --policy policy.json --tests tests.json
-    npx @atlasent/cli deploy --file policy.json --api-key $ATLASENT_API_KEY
-  env:
-    ATLASENT_API_KEY: ${{ secrets.ATLASENT_API_KEY }}
+- uses: Atlasent/atlasent-policies/actions/policy@v1
+  with:
+    mode: plan                     # or: check (offline), apply
+    api_key: ${{ secrets.ATLASENT_POLICY_READ_KEY }}
 ```
 
-<Note>
-  The `validate` and `test` commands exit with code `1` on any failure, which causes the CI step to fail before `deploy` runs. This prevents a broken policy bundle from ever reaching the Atlasent runtime.
-</Note>
+Or run the offline checks directly:
 
-## What the CLI does not do
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+- run: npx --yes github:Atlasent/atlasent-policies#v1 validate policies
+- run: npx --yes github:Atlasent/atlasent-policies#v1 test policies
+```
 
-- **Run the audit chain verifier.** Audit chain verification is a separate tool (`atlasent-audit-verify`) that operates on audit export artifacts, not policy bundles.
-- **Mutate runtime state without `deploy`.** The `validate`, `test`, and `diff` commands are fully read-only. Only `deploy` writes to the runtime.
-- **Make authorization decisions.** The runtime is always the source of truth. The CLI lets you verify that your policy says what you meant — the runtime decides what actually happens.
+Use two keys: a `policy:read` key for pull-request plans and a
+`policy:write` key only on the apply job.
+
+## What this CLI doesn't do
+
+- **Decide for the runtime.** The runtime is always the source of truth for
+  authorization decisions. The CLI lets you check that the rules you wrote
+  say what you meant before you publish them.
+- **Bypass governed publishing.** `apply` publishes through the governed
+  path in the runtime. If an action class has an approval chain, the publish is
+  refused and the job exits `1` with the reason.
+
+## Source
+
+[Atlasent/atlasent-policies](https://github.com/Atlasent/atlasent-policies)
+holds the CLI source (Apache-2.0), starter policies with test suites, the
+policy JSON Schema, and the GitHub Action.

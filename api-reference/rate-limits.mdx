@@ -1,77 +1,84 @@
 ---
-title: "Atlasent API rate limits by plan, endpoint, and headers"
-sidebarTitle: "Rate Limits"
-description: "Atlasent enforces per-plan rate limits on every endpoint. Read response headers, handle 429s with exponential backoff, and configure SDK retry behavior."
+title: "Rate limits"
+description: "Per-org quotas and how to handle 429 responses."
 ---
+{/* Generated from the Atlasent docs source (site/api-reference/rate-limits.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Atlasent enforces per-organization rate limits on every endpoint. The limits are designed to protect service quality for all customers — hitting a rate limit does not indicate a problem with your integration, but sustained rate limit responses during normal operation are a signal to review your request volume or upgrade your plan.
+## Endpoint limits
 
-## Default limits by plan
+| Endpoint | Limit | Scope |
+|---|---|---|
+| `POST /v1-evaluate` (and `/v1/evaluate`) | **100 req/min** | Per org |
+| All other endpoints | Plan tier (see table below) | Per org |
 
-The `POST /v1/evaluate` and `POST /v1/verify-permit` endpoints carry the highest traffic and have their own per-plan limits. All other endpoints share a lower shared limit.
+## Plan tiers
 
-| Plan | /v1/evaluate | /v1/verify-permit | Other endpoints |
-|---|---|---|---|
-| Free | 100 req/min | 100 req/min | 60 req/min |
-| Pro | 500 req/min | 500 req/min | 300 req/min |
-| Enterprise | Custom | Custom | Custom |
+| Plan | Requests / minute | Burst |
+|---|---|---|
+| Community (free cloud allowance) | 100 | 150 |
+| Team       | Not yet published — contact [sales@atlasent.io](mailto:sales@atlasent.io) | — |
+| Business   | 1,000 | 2,000 |
+| Enterprise | Negotiated | — |
 
-Contact your account team to discuss custom limits for Enterprise plans.
+> Tier names updated 2026-08-15 to the current commercial model
+> (Community / Team / Enterprise as of 2026-09-27; the free cloud allowance was
+> called Sandbox until 2026-09-26, then Free until 2026-09-27, and its internal
+> plan key is still `free`).
+> This table previously listed "Pro"; Business is the current
+> purchasable tier that supersedes it (Pro is now grandfathered,
+> non-purchasable) and inherits its published request-rate figures.
+> Team's own request-rate figures were never published separately in
+> this table and are left unstated here rather than invented — check
+> with sales for the current value.
 
-## Rate limit response headers
+## Response headers
 
-Every API response includes these headers so you can monitor your usage in real time without waiting for a `429`.
+`/v1/evaluate` responses carry these headers:
 
-| Header | Value |
+| Header | Meaning |
 |---|---|
-| `X-RateLimit-Limit` | Total requests allowed in the current window |
-| `X-RateLimit-Remaining` | Requests remaining in the current window |
-| `X-RateLimit-Reset` | Unix timestamp when the current window resets |
-| `Retry-After` | Seconds to wait before retrying (only present on 429 responses) |
+| `X-RateLimit-Limit`     | Requests allowed per minute. |
+| `X-RateLimit-Remaining` | Requests left in the current window. |
+| `X-RateLimit-Reset`     | Unix seconds when the window resets. |
 
 ## 429 response body
 
-When you exceed your rate limit, the API returns a `429` response with the standard error envelope extended by a `retry_after_ms` field for millisecond-precision backoff:
+A 429 uses the standard error envelope. On `/v1/evaluate` and
+`/v1-verify-permit` it carries `retry_after_ms`:
 
 ```json
 {
-  "error": "rate_limited",
-  "message": "Too many requests",
+  "error": "unavailable",
+  "message": "Runtime cannot decide right now; retry shortly",
   "status": 429,
-  "retry_after_ms": 5000
+  "retry_after_ms": 60000
 }
 ```
 
-Use `retry_after_ms` for precise backoff in SDK integrations. Use the `Retry-After` header (seconds) for compatibility with standard HTTP client middleware.
+Other endpoints return `"error": "rate_limited"`. When `retry_after_ms` is
+present, use it for back-off; otherwise back off exponentially.
 
-## SDK retry configuration
+## Handling 429 responses
 
-Both the TypeScript and Python SDKs handle `429` responses automatically when you configure retry settings on the client. The SDK waits for the duration specified in `retry_after_ms` before re-attempting, then applies exponential backoff for subsequent retries.
+Respect the server's retry hint, then back off exponentially. The SDKs do this for you; if you're calling the API directly:
 
-<CodeGroup>
-```typescript TypeScript
-const client = new AtlaSentClient({
-  apiKey: process.env.ATLASENT_API_KEY,
-  retry: {
-    maxAttempts: 3,
-    backoffMs: 1000,
-  },
-});
+```python
+import time
+from atlasent import AtlaSentClient, RateLimitError
+
+client = AtlaSentClient(...)
+
+def evaluate_with_backoff(req, max_retries=4):
+    for attempt in range(max_retries):
+        try:
+            return client.evaluate(**req)
+        except RateLimitError as e:
+            if attempt == max_retries - 1:
+                raise
+            wait_s = e.retry_after if e.retry_after else (2 ** attempt)
+            time.sleep(wait_s)
 ```
-```python Python
-client = AtlaSentClient(
-    api_key=os.environ["ATLASENT_API_KEY"],
-    retry={"max_attempts": 3, "backoff_ms": 1000},
-)
-```
-</CodeGroup>
-
-## Best practices
-
-- **Read `X-RateLimit-Remaining` proactively.** If remaining drops below 10% of the limit during a burst, introduce a deliberate delay before your next request rather than waiting for a `429`.
-- **Do not retry `429` indefinitely.** For regulated deployments, a sustained `429` should be treated as a denial — halt the action and surface a clear error to the operator rather than spinning in a retry loop.
-- **Separate keys by workload.** Rate limits are scoped per organization, but using separate API keys for separate workloads makes it easier to attribute usage and tune limits independently.
 
 <Warning>
-  If your agent receives a sustained stream of `429` responses, it must halt rather than retry indefinitely. An agent that bypasses the rate limit by retrying without limit is behaving in a fail-open manner, which violates the Atlasent authorization contract.
+  Do not retry 429s indefinitely. For a regulated agent, a sustained 429 should be treated as **deny** — the agent halts and surfaces a clear error to the user.
 </Warning>
