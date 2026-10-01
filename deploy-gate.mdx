@@ -1,19 +1,19 @@
 ---
-title: "Deploy Gate"
+title: "The Deploy Gate Step"
 description: "Fail-closed authorization for every production deployment — whether triggered by a human, CI/CD pipeline, or AI agent."
-sidebarTitle: "Deploy Gate"
+sidebarTitle: "Deploy Gate Step"
 ---
 {/* Generated from the Atlasent docs source (site/deploy-gate.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-# Deploy Gate
+# The deploy gate step
 
-Deploy Gate is the pipeline step behind **Production Change Protection**, AtlaSent's Enterprise product for production deploys and infrastructure changes. You can also use it on its own from the developer plans.
+The deploy gate is the pipeline step of **Production Change Protection**, the AtlaSent Protection Pack for production deploys and infrastructure changes. You can also use it on its own from the developer plans.
 
-Deploy Gate places a fail-closed authorization check in front of every production deployment. Before any code reaches production — whether triggered by a human, a CI/CD pipeline, or an AI agent — AtlaSent evaluates the request against your policies and either issues a single-use permit or blocks the action.
+The deploy gate places a fail-closed authorization check in front of every production deployment. Before any code reaches production — whether triggered by a human, a CI/CD pipeline, or an AI agent — AtlaSent evaluates the request against your policies and either issues a single-use permit or blocks the action.
 
 **If the evaluation returns anything other than `allow`, the deployment does not run.**
 
-This is different from a CI approval gate. An approval gate checks whether a PR was approved before merge. Deploy Gate checks whether _this specific deployment, at this moment, by this actor_ is authorized to execute. The distinction matters for AI agents, after-hours deploys, and high-risk targets.
+This is different from a CI approval gate. An approval gate checks whether a PR was approved before merge. The deploy gate checks whether _this specific deployment, at this moment, by this actor_ is authorized to execute. The distinction matters for AI agents, after-hours deploys, and high-risk targets.
 
 ## The flow
 
@@ -118,7 +118,7 @@ See [Policy authoring](/concepts/policy) for the full rule syntax.
 
 AI coding assistants and autonomous agents can trigger deployments. An agent with write access to a CI system can push a commit and trigger a workflow run without a human approving the deploy step.
 
-Deploy Gate intercepts that trigger before it reaches production:
+The deploy gate intercepts that trigger before it reaches production:
 
 ```ts
 // Inside an AI agent
@@ -138,7 +138,7 @@ A policy can require `manual_approval: true` for any deploy where the actor is a
 
 ## Audit trail
 
-Every Deploy Gate call produces a tamper-evident audit record:
+Every deploy gate call produces a tamper-evident audit record:
 
 | Field | Value |
 |---|---|
