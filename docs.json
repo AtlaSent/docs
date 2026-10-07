@@ -11,7 +11,7 @@
   "logo": {
     "light": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
     "dark": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
-    "href": "https://atlasent.io"
+    "href": "https://atlasent.io/?utm_source=docs&utm_medium=docs"
   },
   "favicon": "https://media.brand.dev/6cdb6cd6-ca9b-4e45-b168-5d172d2b5554.jpg",
   "appearance": {
@@ -25,13 +25,13 @@
       },
       {
         "label": "Pricing",
-        "href": "https://console.atlasent.io/pricing"
+        "href": "https://console.atlasent.io/pricing?utm_source=docs&utm_medium=docs"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Start Free",
-      "href": "https://console.atlasent.io/auth/sign-up"
+      "href": "https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=docs"
     }
   },
   "search": {
