@@ -8,15 +8,16 @@ ICH E6 is the international **Good Clinical Practice** guideline for clinical tr
 
 ## Requirement-to-primitive mapping
 
-Section numbers below follow **ICH E6(R2)**. ICH E6(R3) renumbers these sections; map them to the current revision in your own validation documentation.
+Section numbers below follow **ICH E6(R3)** (Step 4, adopted 6 January 2025), which replaced E6(R2). R3 puts the operational requirements in Annex 1: section 1 covers the IRB/IEC, section 2 the investigator, section 3 the sponsor, and section 4 data governance. Essential records are in Appendix C.
 
-| E6(R2) § | Requirement | AtlaSent primitive |
+| E6(R3) location | Requirement | AtlaSent primitive |
 |---|---|---|
-| 2.10  | Source data must be attributable, legible, contemporaneous, original, accurate | [Permit tokens](/concepts/permit) attribute each AI action to a specific agent + timestamp; [ALCOA+ mapping](/compliance/alcoa-plus). |
-| 5.5.3 | Sponsor oversight of electronic systems | Policies are authored by the sponsor; activations are audit-logged. |
-| 5.5.4 | Access / audit trails | Immutable [audit chain](/concepts/audit-chain) on every evaluation. |
-| 6.4.9 | Data collection — authorized personnel only | RACI rules restrict which agents can collect / modify which data classes. |
-| 8.3   | Essential documents — evidence of actions | Permit IDs are the evidence; stored with the record in your eCRF. |
+| Annex 1 §2.12.2 | Source records are attributable, legible, contemporaneous, original, accurate and complete; changes are traceable through an audit trail | [Permit tokens](/concepts/permit) attribute each AI action to a specific agent and timestamp; [ALCOA+ mapping](/compliance/alcoa-plus). |
+| Annex 1 §4.2.2 | Relevant metadata, including audit trails | Immutable [audit chain](/concepts/audit-chain) on every evaluation. |
+| Annex 1 §4.2.4 | Data corrections are attributed to the person or system making them, and justified | Locked-data changes are denied or held for a named approver, with the reason captured in the signed record. |
+| Annex 1 §4.3.8 | Access controls limit system access to authorised users and keep actions attributable to an individual | RACI rules restrict which agents can collect or modify which data classes. |
+| Annex 1 §2.11, §4.1 | Unblinding only in accordance with the protocol; defined roles for access to unblinded information | Unblinding is held for the authorized human roles; randomisation-code access is denied to agents. |
+| Appendix C | Essential records | Permit IDs are the evidence, stored with the record in your eCRF. |
 
 ## Starter policy
 
@@ -26,10 +27,10 @@ Section numbers below follow **ICH E6(R2)**. ICH E6(R3) renumbers these sections
   { "action_type": "source:enter",           "decision": "allow" },
   { "action_type": "query:discrepancy",      "decision": "allow" },
   { "action_type": "ae:report",              "decision": "allow" },
-  { "action_type": "data:modify-locked",     "decision": "deny",  "reason": "E6(R2) §5.5.4: locked data must not be modified without audit" },
-  { "action_type": "subject:delete",         "decision": "deny",  "reason": "E6(R2) §2.10: source data must be retained" },
-  { "action_type": "trial:unblind",          "decision": "hold",  "reason": "Requires manual unblinding procedure" },
-  { "action_type": "randomization:access",   "decision": "deny",  "reason": "E6(R2) §2.10: access restricted to authorized personnel" }
+  { "action_type": "data:modify-locked",     "decision": "deny",  "reason": "E6(R3) Annex 1 §4.2.4: corrections must be attributed and justified" },
+  { "action_type": "subject:delete",         "decision": "deny",  "reason": "E6(R3) Annex 1 §4.2.7: trial data must be retained for the retention period" },
+  { "action_type": "trial:unblind",          "decision": "hold",  "reason": "E6(R3) Annex 1 §2.11: unblind only in accordance with the protocol" },
+  { "action_type": "randomization:access",   "decision": "deny",  "reason": "E6(R3) Annex 1 §4.1.2: access to unblinded information is limited to defined roles" }
 ]
 ```
 
