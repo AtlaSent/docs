@@ -101,6 +101,13 @@
             ]
           },
           {
+            "group": "Reference",
+            "pages": [
+              "reference/protected-action-canon",
+              "reference/concept-to-action-map"
+            ]
+          },
+          {
             "group": "SDKs",
             "pages": [
               "sdks/overview",

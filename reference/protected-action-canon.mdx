@@ -1,0 +1,735 @@
+---
+title: "Protected Action Canon"
+description: "The canonical set of consequential actions AtlaSent can govern — each with its stable identifier, slug, and the compliance obligations it helps satisfy."
+---
+{/* Generated from the Atlasent docs source (site/reference/protected-action-canon.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Info>
+  This reference is generated from the AtlaSent Action Canon and is updated whenever the Canon changes.
+</Info>
+
+{/* SYNC BEGIN */}
+
+A **protected action** is a consequential operation — one whose effect is real, external, and hard to reverse — that AtlaSent can require authorization for before it runs. The **Protected Action Canon** is the canonical, versioned set of those actions: the shared vocabulary the platform reasons about.
+
+The Canon currently defines **56 protected actions**. Each carries a stable `canon_id` (its permanent identifier), a `slug` (the action type used at the API), a name and description, a family, and the compliance obligations it helps satisfy.
+
+> This page defines *what can be governed* — the model. It is not a runtime status page, a deployment inventory, or a guarantee that any given action is enabled in a particular environment. See the [Concept-to-Action Map](/reference/concept-to-action-map) for how these actions relate to AtlaSent's authorization concepts.
+
+## Families
+
+| Family | Actions |
+|---|---|
+| `agent.execute` | 2 |
+| `clinical.trial` | 7 |
+| `data.access` | 4 |
+| `data.release` | 5 |
+| `finance.controllership` | 5 |
+| `finance.payment` | 2 |
+| `healthcare.record` | 1 |
+| `identity.access` | 1 |
+| `identity.grant` | 3 |
+| `industrial.control` | 2 |
+| `industrial.safety` | 1 |
+| `infrastructure.change` | 9 |
+| `people.operations` | 2 |
+| `privileged.operation` | 2 |
+| `production.deploy` | 7 |
+| `regulated.release` | 2 |
+| `security.exception` | 1 |
+
+## The Canon
+
+### `agent.execute`
+
+#### Agent Tool Invocation
+
+`agent.tool.invoke` · **CANON-000026**
+
+Authorization gate for an autonomous AI agent invoking a tool, function, or downstream action at execution time. The agent's asserted identity is not trusted on its own — a self-declared actor_id can be spoofed — so the request must carry a cryptographically verified actor identity before the tool runs. This is the flagship execution-time authorization surface: every agent action is gated, permitted, and audited before it touches a real system.
+
+**Helps satisfy:**
+
+- EU AI Act — EU AI Act Art. 14(4)(d)-(e) — Human Oversight (partial)
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-3 — Access Enforcement
+
+#### Model Promotion
+
+`model.promote` · **CANON-000027**
+
+Authorization gate for promoting an AI/ML model to a production-serving environment. Promoting a model is a consequential transition: an unvetted or tampered model can make autonomous decisions at scale. Promotion requires human approval, a verified actor, a bound snapshot of the exact model artifact, and a model-trust assertion establishing the base model and evaluation provenance before a permit is issued.
+
+**Helps satisfy:**
+
+- EU AI Act — EU AI Act Art. 9 — Risk Management System
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+
+### `clinical.trial`
+
+#### Clinical Trial Unblinding
+
+`trial.unblinding.execute` · **CANON-000018**
+
+Authorization gate for clinical trial unblinding — the irreversible act of revealing randomized treatment assignments to investigators, sponsors, and/or analysts. Unblinding compromises the statistical integrity of ongoing blinded trials and constitutes a regulated consequential transition requiring maximum controls: dual authorization, MFA, a verified human actor, and cryptographic proof of regulatory scope, actor identity, and explicit approval assertion. No AI system or automated process may execute unblinding. Regulatory basis: ICH E6(R2) §4.8.2, 21 CFR Part 11 §11.50/§11.300, EU Annex 11 §7.1.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.300 — Controls for Identification Codes
+- 21 CFR Part 11 — 21 CFR Part 11 §11.50 — Signature Manifestations
+- EU Annex 11 — EU Annex 11 §7.1 — Audit Trail
+- GxP — ICH E9 §6 — Trial Conduct Issues / Blinding
+- ICH E6(R2) — ICH E6(R2) §4.8.2 — Breaking the Blind
+
+#### Clinical Trial Blind Establishment
+
+`trial.blinding.setup` · **CANON-000019**
+
+Authorization gate for establishing the blind in a clinical trial — the act of sealing randomization codes, binding treatment assignments to subject IDs, and activating the blinded-data enforcement state in trial management systems (RTSM/IVRS). Blinding setup is the prerequisite that makes trial.unblinding.execute irreversible once executed; errors at setup time (wrong randomization list, incorrect stratum assignments) propagate through the entire trial. Only sponsor-designated blinding authority roles may authorize blind establishment. Requires a verified identity, supervisor review of the randomization specification, a cryptographic snapshot of the randomization list hash, and a complete audit trail per 21 CFR Part 11 §11.10(a) and EU Annex 11 §7.1. Machine callers may not execute blinding setup without explicit organizational override.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(a) — System Validation / Accurate and Complete Records
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Audit Trails for Blinded Data
+- EU Annex 11 — EU Annex 11 §7.1 — Audit Trail
+- ICH E6(R2) — ICH E6(R2) §5.13 — Record Access and Traceability for Blinding
+- ICH E9 — ICH E9 §3.2 — Methods of Randomization / Blinding
+
+#### Emergency Clinical Trial Unblinding
+
+`trial.unblinding.emergency` · **CANON-000020**
+
+Authorization gate for emergency single-patient unblinding in a clinical trial — the act of breaking the blind for a specific subject when knowledge of their treatment assignment is required for immediate medical decision-making (e.g., a Serious Adverse Event requiring the treating physician to know whether the patient received drug or placebo). Emergency unblinding is per-subject, not a full trial unblinding, and must be performed by the principal investigator or site physician responsible for the subject's safety. REQUESTER-AUTHORIZED: the act is authorized directly by the verified treating physician (the requester) — no approval artifact, approver, or quorum — with requester-bound MFA, a documented medical-necessity attestation, and an immediate audit record. The blind is broken for one subject only — other subjects remain blinded and the trial may continue. Regulatory basis: ICH E6(R2) §4.8.2–3, ICH E9 §6.5, 21 CFR Part 11 §11.300, EU Annex 11 §14.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.300 — Controls for Identification Codes and Passwords
+- 21 CFR Part 11 — 21 CFR Part 11 §11.50(a)(2) — Signature Manifestations / Approval Meaning
+- EU Annex 11 — EU Annex 11 §14 — Audit Trails for Emergency Events
+- ICH E6(R2) — ICH E6(R2) §4.8.2–3 — Breaking the Blind / SAE Reporting
+- ICH E9 — ICH E9 §6.5 — Unblinding at Interim Analysis / Emergency Unblinding Procedures
+
+#### Clinical Protocol Amendment
+
+`protocol.amend` · **CANON-000038**
+
+Authorization gate for amending the protocol of an active clinical trial — a regulated governance event, not a workflow step. A protocol amendment changes the governing document of a trial and cannot take effect without IRB/EC approval, sponsor authorization, and, for substantial amendments, regulatory notification or approval. It carries distinct authorization (independent, credentialed sign-off) and distinct evidence (the amendment, the approvals, the version) from any routine change. State snapshot binding captures the amendment's content and version so the permit is bound to exactly what was approved.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR 312.30 — IND Protocol Amendments
+- EU Annex 11 — EU Annex 11 §1 (Risk Management) / Clinical Trials Regulation substantial modifications
+- ICH E6(R2) — ICH E6(R2) §4.5 — Compliance with Protocol / §3.3 (IRB/IEC)
+
+#### Biomarker Result Reclassification Approval
+
+`trial.biomarker.reclassify` · **CANON-000043**
+
+Authorization gate for approving and releasing a corrected or reinterpreted biomarker result in a genomics-enabled clinical trial — a previously reported genomic or biomarker call being revised (e.g. a variant reclassified from VUS to pathogenic, a corrected HER2/EGFR status, or a re-adjudicated companion-diagnostic result). AtlaSent protects the AUTHORIZATION of the consequential change; it does not perform the scientific interpretation — the scientific basis comes from the laboratory method, the classification criteria, the protocol's context of use, and the designated authority. The gate requires authorized reviewers, supporting source evidence, a stated reason for change, the applicable study and laboratory criteria, and a traceable record of the prior and revised classification. A reported result is trial data of record; revising it can change a subject's eligibility, arm assignment, or safety profile, so it cannot be a silent overwrite. It must be attributable to a cryptographically verified qualified reviewer (a self-asserted actor_id from a LIS/LIMS is not sufficient), and no automated pipeline may reclassify a reported result on its own. Regulatory basis: 21 CFR Part 11 §11.10(b)/(e) (change-record and audit trail — not the scientific validity of the reclassification), ICH E6(R2) §5.5.3, ALCOA+, ICH E9 §5.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(b) — Accurate and Complete Copies
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Reason for Change
+- GxP — ICH E9 §5 — Data Handling / Integrity of Trial Results
+- ICH E6(R2) — ICH E6(R2) §5.5.3 — Electronic Data Handling / Audit Trail
+
+#### Biomarker Eligibility Override
+
+`trial.biomarker.eligibility.override` · **CANON-000044**
+
+Authorization gate for overriding biomarker-defined eligibility in a genomics-enabled clinical trial — enrolling or retaining a subject whose genomic or biomarker result does not meet the protocol's inclusion/exclusion criteria (e.g. enrolling an EGFR-negative subject into an EGFR-targeted arm, or waiving a companion-diagnostic cutoff). This is a protocol deviation, not a routine screening decision: it changes who receives an investigational product and can affect subject safety and the analysis population. An override requires a documented medical rationale, a cryptographically verified qualified authorizer (medical monitor or principal investigator — a self-asserted actor_id is not sufficient), and an approval; it may not be granted by an automated screening system. Regulatory basis: ICH E6(R2) §4.5 / §4.3, 21 CFR 312.66, ICH E9 §5.2.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR 312.66 — Assurance of IRB Review / Investigator Obligations
+- GxP — ICH E9 §5.2 — Analysis Sets / Protocol Deviations
+- ICH E6(R2) — ICH E6(R2) §4.5.3–4 — Compliance with Protocol / Deviations
+
+#### Trial Randomization Code Break
+
+`trial.randomization.break` · **CANON-000048**
+
+Authorization gate for breaking a clinical trial's randomization code for a single subject — revealing that one subject's treatment assignment (distinct from trial.unblinding.execute, CANON-000018, which reveals assignments trial-wide). A code break is typically triggered by a safety event and must be attributable to a named, verified approver, bound to the trial and subject, with an explicit reason.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.300 — Controls for Identification Codes
+- ICH E6(R2) — ICH E6(R2) §4.8 — Breaking the Blind (subject-level)
+
+### `data.access`
+
+#### Data Modification
+
+`data.modify` · **CANON-000004**
+
+Authorization gate for modifications to regulated, critical, or shared data. Data modifications have broad downstream effects — corrupted records in healthcare, financial, or compliance contexts can propagate silently and are difficult to reverse. State snapshot binding captures the pre-modification state, enabling rollback evidence and satisfying reason-for-change requirements under 21 CFR Part 11 §11.10(e).
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Audit Trails
+- GDPR — GDPR Art. 5(1)(d) — Accuracy Principle
+- HIPAA — HIPAA §164.312(c)(1) — Integrity Controls
+
+#### Data Import
+
+`data.import` · **CANON-000005**
+
+Authorization gate for ingesting external data into regulated or production systems — ETL pipelines, third-party data feeds, clinical trial data imports, financial data onboarding, and AI training data ingestion. Imported data can introduce corruption, malicious content, or unvalidated records into clean systems. State snapshot binding captures the source dataset hash, satisfying data provenance requirements under 21 CFR Part 11 and HIPAA.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10 — Controls for Closed Systems
+- GDPR — GDPR Art. 25 — Data Protection by Design and by Default
+- HIPAA — HIPAA §164.308(a)(1) — Security Management Process
+
+#### Data Deletion
+
+`data.delete` · **CANON-000006**
+
+Authorization gate for deletion of regulated, irreplaceable, or legally significant data. Deletions are irreversible in most systems; unauthorized deletion can result in permanent data loss, GDPR erasure obligation violations (proving deletion happened), and destruction of records required to be retained under SOX or HIPAA. State snapshot binding captures what existed at deletion time for erasure certificates and retention audits.
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 17 — Right to Erasure
+- HIPAA — HIPAA §164.530(j) — Retention Requirements
+- SOX — SOX §802 — Criminal Penalties for Altering Documents
+
+#### Sensitive Data Access
+
+`sensitive_data.access` · **CANON-000055**
+
+Authorization gate for a specific search, query, read, view, or unmasked reveal of personal, regulated, confidential, or otherwise sensitive data before any sensitive value is returned. The permit binds the declared purpose, data classification, target resource, requested fields, record or query scope, volume limit, initiating actor, and exact request-shape digest. This is not a standing entitlement: standing access to a data store remains identity.privileged.grant. It is also not data.export: permission to read never implies permission to transmit or release results to another destination. Routine least-privilege reads may be machine-executable under an active policy; direct identifiers, unusual volume, scope expansion, missing purpose, or unverified identity fail closed or route to separately configured human review.
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 5(1)(b)-(c) — Purpose Limitation and Data Minimisation
+- HIPAA — HIPAA Security Rule §164.312(a)(1) — Access Control
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-3 — Access Enforcement
+
+### `data.release`
+
+#### Bulk Data Export
+
+`data.export` · **CANON-000028**
+
+Authorization gate for exporting a bulk dataset out of a system of record — a data-egress transition with high privacy and compliance blast radius. A large export of personal data can breach residency obligations or consent scope. Export requires human approval and verified residency and consent assertions before a permit is issued, and direct-identifier fields are denied unless explicitly permitted.
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 20 — Right to Data Portability / Art. 44 — Transfers
+- HIPAA — HIPAA Security Rule §164.312(b) — Audit Controls
+
+#### Identifiable Genomic Data Release
+
+`genomic.data.release` · **CANON-000045**
+
+Authorization gate for releasing identifiable genomic data from a genomics-enabled trial — disclosing re-identifiable genomic or genetic data (whole-genome/exome sequences, variant call files, or genotype records tied to a subject) to a recipient such as an investigator, a treating clinician, a biobank, or a research collaborator. Genomic data is inherently re-identifiable and is special-category/genetic data under GDPR Art. 9, GINA, and HIPAA; a release is high-blast-radius and hard to recall. The gate requires a verified human authorizer, a verified consent assertion covering the disclosure, and an approved purpose before a permit is issued; a release outside the consented purpose or without a verified authorizer is denied. Regulatory basis: GDPR Art. 9 / Art. 6, HIPAA §164.508/§164.312(b), GINA (2008), 45 CFR 46.116 (informed consent).
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 9 — Special Categories / Art. 6 — Lawfulness
+- HIPAA — HIPAA §164.508 — Authorization / §164.312(b) — Audit Controls
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.15 — Logging / A.5.34 — Privacy & PII
+
+#### Cross-Border Genomic Data Export
+
+`genomic.data.export` · **CANON-000046**
+
+Authorization gate for exporting genomic data to another organization or jurisdiction in a genomics-enabled trial — transferring genomic or genetic data across an organizational or geographic/legal boundary (to a sponsor abroad, a central sequencing lab in another country, or a partner in a different data-protection regime). A cross-border transfer of genetic data implicates data-residency and international-transfer law on top of consent: GDPR Chapter V (Art. 44–49), data-localization statutes, and jurisdiction-specific genetic-data rules. The gate requires a verified human authorizer, a verified data-residency assertion proving the destination is a permitted jurisdiction with a valid transfer mechanism, a verified consent covering cross-border transfer, and an approved purpose before a permit is issued. A transfer to a disallowed jurisdiction or outside the consented purpose is denied. Regulatory basis: GDPR Art. 44–49, GDPR Art. 9, data-localization statutes, GINA (2008).
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 44–49 — Transfers of Personal Data to Third Countries
+- GDPR — GDPR Art. 9 — Special Categories (Genetic Data)
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.34 — Privacy & PII / A.8.15 — Logging
+
+#### External Communication Send
+
+`communication.external.send` · **CANON-000047**
+
+Authorization gate for sending a communication (email or equivalent message) to a recipient outside the organization's boundary — the same "release data beyond its original boundary" consequence as a bulk export, at the scale of a single message. An outbound email carrying sensitive or customer information to a new external recipient is functionally a data-egress event: once sent, it cannot be recalled. The permit is bound to the exact recipient and attachment content authorized; any change to either after approval invalidates it. Applies identically whether the send is composed by a person, a workflow, a script, or an AI agent — none of them gain independent authority to release data externally merely by holding a connector credential to the mail platform.
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 5(1)(f) — Integrity and Confidentiality / Art. 44 — Transfers
+- HIPAA — HIPAA Security Rule §164.312(e) — Transmission Security
+- SOC 2 — SOC 2 CC6.7 — Data Transmission and Disposal Controls
+
+#### External Submission
+
+`submission.submit` · **CANON-000056**
+
+Authorization gate for formally submitting an application or a regulatory, tax or legal filing to an outside authority on the organization's behalf — a grant, permit or licence application, a regulatory report, a tax return, a court or agency filing. A submission is a binding representation made in the organization's name: once the authority receives it, it cannot be recalled, only amended or withdrawn through the authority's own process, and it is attributed to the organization rather than to the person, workflow or AI agent that pressed submit. The permit is bound to the exact content, the recipient authority and the submitting entity; any change to any of them after authorization invalidates it. Applies identically whether the submission was prepared by a person, a script, a workflow or an AI agent — preparing the work confers no authority to commit the organization to it. AtlaSent does not prepare, review or file the submission and does not judge its content; it governs only whether this actor may submit this exact content, to this authority, for this entity, now.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Audit Trails for Electronic Records
+- NIST SP 800-53 — NIST SP 800-53 AC-3 — Access Enforcement
+- SOX — SOX §404 — Internal Control over Financial Reporting (filing authorization)
+
+### `finance.controllership`
+
+#### Journal Entry Posting
+
+`journal.post` · **CANON-000041**
+
+Authorization gate for posting a journal entry to the general ledger — a COMMIT of an immutable financial record, distinct from a data.modify (CANON-000004) value edit. A posted journal entry cannot be edited, only reversed by a new entry, and carries its own preparer/poster segregation of duties and SOX ICFR evidence demand. Independent approval (the preparer is not the poster) and a state snapshot binding the entry's content hash gate the action to a reviewed, identified posting, so the entry that lands in the ledger is the entry that was approved.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.3 — Segregation of duties
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-5 — Separation of Duties
+- SOX — SOX §404 — Management Assessment of Internal Controls (manual journal entries)
+
+#### Accounting Period Close
+
+`period.close` · **CANON-000042**
+
+Authorization gate for closing (locking) an accounting period — the state-changing COMMIT that freezes the general ledger for a fiscal period so no further entries post to it. This is an EXECUTION action, distinct from the attestations it consumes: reconciliation certification (compliance.certify) and journal-entry approval (workflow.approve) prove READINESS, but closing the period is the separately-authorized, separately-recorded operational act that has its own consequence. Merging it into the certification would collapse "the reconciliations are certified and approvals exist" into "the period is closed" — two different points in the control chain. The close cannot reach allow unless all reconciliations are certified and dual approval is on file, and it binds a state snapshot of the period's closing state, so the period that locks is the period whose readiness was authorized.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.3 — Segregation of duties
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-5 — Separation of Duties
+- SOX — SOX §404 — Management Assessment of Internal Controls (period-end financial reporting)
+
+#### Reconciliation — Certify
+
+`reconciliation.certify` · **CANON-000049**
+
+Authorization gate for certifying a period-end account reconciliation as complete and accurate — the officer certification step underlying SOX §302/§404. Allow requires the reviewer to have attested; runtime enforcement also requires a cryptographically resolvable, verified actor identity AND an issuer-scoped independent approver (the certifying approver cannot be the same identity as the requester) — a separation-of-duties gate.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.3 — Segregation of duties
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-5 — Separation of Duties
+- SOX — SOX §302 / §404 — Officer Certification of Internal Controls
+
+#### Journal Entry — Approve
+
+`journal_entry.approve` · **CANON-000050**
+
+Authorization gate for approving a manual journal entry above threshold — the decision that authorizes the entry for posting, distinct from journal.post (CANON-000041), which commits an already-approved entry to the ledger. Allow requires both journal_entry_id and approver_id to be present; runtime enforcement also requires a cryptographically resolvable, verified actor identity AND an issuer-scoped independent approver distinct from the preparer — the same segregation-of-duties gate as reconciliation.certify (CANON-000049).
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.3 — Segregation of duties
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-5 — Separation of Duties
+- SOX — SOX ITGC — Manual Journal Entry Segregation of Duties
+
+#### Variance Review — Escalate
+
+`variance_review.escalate` · **CANON-000051**
+
+Authorization gate for escalating a budget/close variance review to a named reviewer — a lower-stakes review-routing action, not a dual-control certification like reconciliation.certify (CANON-000049) or journal_entry.approve (CANON-000050). Allow requires both variance_id and reason to be present; the runtime does not require MFA, a verified actor identity, or an independent approver for this class — a deliberately lighter gate than its two SOX-certification siblings, matching its lower blast radius.
+
+**Helps satisfy:**
+
+- SOX — SOX §404 — Management Assessment of Internal Controls (close review)
+
+### `finance.payment`
+
+#### High-Value Payment Authorization
+
+`finance.payment.authorize` · **CANON-000021**
+
+Authorization gate for releasing a payment above an organization's auto-approval threshold — an ACH batch, card settlement, or ERP payment run. High-value payments carry direct financial-loss and fraud exposure, so release must be gated behind two-person integrity with separation of duties: the caller who initiates a payment cannot be the caller who approves it. Every release binds a tamper-evident permit to the amount, counterparty, and account, giving auditors a machine-checkable four-eyes record. Regulatory basis: SOX §404, PCI DSS v4.0, NIST SP 800-53 AC-5.
+
+**Helps satisfy:**
+
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-5 — Separation of Duties
+- PCI DSS — PCI DSS v4.0 Req. 7 — Restrict Access by Business Need to Know
+- SOX — SOX §404 — Management Assessment of Internal Controls
+
+#### High-Value Wire Transfer
+
+`finance.wire.transfer` · **CANON-000022**
+
+Authorization gate for releasing a high-value or cross-border wire (SWIFT / Fedwire). Wires are fast and irreversible, making them the highest-consequence money movement an organization performs and a prime target for business-email-compromise fraud. Release must be gated behind two-person integrity, phishing-resistant MFA for the releasing caller, and a cryptographically verified actor identity — a self-asserted actor_id is not sufficient. The permit binds the beneficiary and amount so the authorization cannot be reused for a different payee. Regulatory basis: SOX §404, SWIFT CSP v2024, NIST SP 800-53 IA-2/AC-5.
+
+**Helps satisfy:**
+
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 IA-2 — Identification and Authentication
+- SOX — SOX §404 — Internal Controls Over Financial Reporting
+- SWIFT CSP — SWIFT CSP v2024 Control 5.1 — Logical Access Control / 2FA
+
+### `healthcare.record`
+
+#### Patient Health Record Amendment
+
+`healthcare.record.amend` · **CANON-000024**
+
+Authorization gate for amending a finalized (signed) patient health record in an EHR — an addendum or correction to a closed encounter note. A finalized clinical record is a legal document; amending it must preserve the original, attribute the change to a verified clinician with a treatment relationship, and capture the reason. The gate requires a cryptographically verified actor (a self-asserted actor_id from a hospital system is not sufficient), human approval, and a state snapshot that preserves the pre-amendment record. Regulatory basis: HIPAA Security Rule §164.312, 21 CFR Part 11 §11.10(e), ISO 27799.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Audit Trails
+- HIPAA — HIPAA Security Rule §164.312(c)(1) — Integrity
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.15 — Logging
+
+### `identity.access`
+
+#### Privileged Access Grant
+
+`identity.privileged.grant` · **CANON-000025**
+
+Authorization gate for granting privileged or administrative access — writing an elevated entitlement into an IdP, PAM vault, or directory. Privileged access can dissolve every other control, so the grant itself is a governed action: it requires human approval, phishing-resistant MFA for the approver, and a cryptographically verified actor. The grant is time-boxed via the permit so it can auto-revert on expiry. Regulatory basis: NIST SP 800-53 AC-6, ISO/IEC 27001 A.8.2, SOC 2 CC6.1.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.2 — Privileged Access Rights
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-6 — Least Privilege
+- SOC 2 — SOC 2 CC6.1 — Logical Access Controls
+
+### `identity.grant`
+
+#### Access Grant
+
+`access.grant` · **CANON-000007**
+
+Authorization gate for granting privileged access — IAM roles, group memberships, elevated permissions, API key provisioning, and service account grants. Access grants are the most consequential identity operation: they expand the privilege surface permanently until revoked. Unauthorized grants enable privilege escalation, lateral movement, and persistent access for attackers. Requires human approval and quorum to prevent unilateral privilege escalation.
+
+**Helps satisfy:**
+
+- HIPAA — HIPAA §164.308(a)(3) — Workforce Access Management
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-2 — Account Management
+- PCI DSS — PCI DSS v4.0 Req. 7 — Restrict Access to System Components
+- SOX — SOX §404 — Access Control as Internal Control
+
+#### Access Revocation
+
+`access.revoke` · **CANON-000008**
+
+Authorization gate for revoking access — removing IAM roles, group memberships, elevated permissions, or deprovisioning accounts. Unlike access grants, revocations are often time-critical during security incidents; requiring human approval would delay incident response. Instead, this action gates revocations with role verification and an immutable audit trail, ensuring every revocation is attributed and documented without blocking the speed needed for offboarding or incident containment.
+
+**Helps satisfy:**
+
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-2(j) — Account Management: Disable Accounts
+- SOX — SOX §404 — Termination and Access Removal Controls
+
+#### Identity Signature
+
+`identity.sign` · **CANON-000011**
+
+Authorization gate for electronic signature acts — signing regulated documents, certifying records, and affixing a legally significant identity to a decision. Electronic signatures are legal acts requiring human intent under 21 CFR Part 11, EU eIDAS, and the US eSign Act. This action structurally prevents machine execution: no AI agent, service account, or automated system can sign on behalf of a human. Requires MFA and identity + approval assertions to bind the signer's identity to the signature act.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.50 — Signature Manifestations
+- SOX — SOX §302 — CEO/CFO Certification
+- eIDAS — eIDAS Reg. (EU) 910/2014 Art. 3(9), Art. 26 — Signatory Is a Natural Person; Advanced Electronic Signatures
+
+### `industrial.control`
+
+#### Industrial Control Actuation
+
+`industrial.control.actuate` · **CANON-000023**
+
+Authorization gate for a consequential command to a physical-process controller — a breaker or switch operation on a power grid, a valve or pump actuation on a pipeline, or a control setpoint change on a DCS/PLC. These commands have direct physical, safety, and reliability consequences, so they are gated at an OT control gateway that sits between the operator's HMI and the field device, outside the real-time safety loop. Release requires two-person integrity, phishing-resistant MFA, and a state snapshot of the command and target device tag. An unverified or automated caller never reaches the actuator. Regulatory basis: NERC CIP-004/007/010, IEC 62443-3-3 SR 1.1/2.1.
+
+**Helps satisfy:**
+
+- IEC 62443 — IEC 62443-3-3 SR 2.1 — Authorization Enforcement
+- NERC CIP — NERC CIP-004-6 — Personnel & Training / Access Management
+- NERC CIP — NERC CIP-010-4 — Configuration Change Management
+
+#### Industrial Controller Configuration Change
+
+`industrial.controller.configure` · **CANON-000053**
+
+Authorization gate for downloading new control logic, program, or firmware to a physical-process controller — a PLC ladder-logic or function-block program, an RTU/IED configuration, or a DCS controller firmware image. This changes what the controller DOES the next time it runs, not a single command (industrial.control.actuate) and not IT/cloud infrastructure (infrastructure.change): it is a configuration-management event against a safety- and reliability-relevant device, gated at the engineering workstation before the download reaches the field controller. Release requires an isolated engineering workstation, offline test/simulation evidence, and a verified configuration-management sign-off; the resulting running configuration is snapshotted so a later evaluate can detect configuration drift against the approved version. Regulatory basis: IEC 62443-3-3 SR 3.4 / SR 7.6, NERC CIP-010-4.
+
+**Helps satisfy:**
+
+- IEC 62443 — IEC 62443-3-3 SR 3.4 — Software and Information Integrity
+- IEC 62443 — IEC 62443-3-3 SR 7.6 — Network and Security Configuration Settings
+- NERC CIP — NERC CIP-010-4 — Configuration Change Management and Vulnerability Assessments
+
+### `industrial.safety`
+
+#### Safety Instrumented System Bypass
+
+`industrial.safety.bypass` · **CANON-000052**
+
+Authorization gate for bypassing or inhibiting a safety instrumented function (SIF) — a pressure trip, an emergency shutdown interlock, a fire & gas detection loop — to permit maintenance, testing, or a degraded operating mode. This is distinct from control.override (generic security-control bypass): a SIS bypass disables a layer of protection against a physical hazard (overpressure, fire, toxic release), not a security or compliance control, and carries its own regulatory regime (IEC 61511 bypass/inhibit management, OSHA PSM 1910.119(l) Management of Change, API RP 754). The permit binds the bypassed function tag, the mandatory compensating measure, and a hard expiry — the bypass must auto-revert; there is no open-ended bypass. Verification proves the function was RESTORED, not merely that it was disabled.
+
+**Helps satisfy:**
+
+- API RP 754 — API RP 754 — Process Safety Performance Indicators (Tier 1/2 near-miss basis)
+- IEC 61511 — IEC 61511-1 Cl. 16.2.3 / 11.2.11 — Bypass and Override Management
+- OSHA PSM — 29 CFR 1910.119(l) — Management of Change
+
+### `infrastructure.change`
+
+#### Resource Creation
+
+`resource.create` · **CANON-000012**
+
+Authorization gate for creation of cloud resources, databases, infrastructure components, and managed services. Resource creation is the origin point of all infrastructure; without attribution at creation time, the lineage of production resources is opaque. State snapshot binding captures the desired configuration at authorization time, preventing configuration drift between approval and provisioning.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.1 — Inventory of Assets
+- SOX — SOX §404 — Change Management for IT Systems
+
+#### Resource Destruction
+
+`resource.destroy` · **CANON-000013**
+
+Authorization gate for irreversible destruction of cloud resources, databases, storage buckets, and infrastructure components. Resource destruction is one of the highest-risk infrastructure operations — a mistaken or unauthorized destroy can cause catastrophic data loss, extended outages, and regulatory violations. Requires the strongest gate: human approval, MFA, verified actor identity, and a contemporaneous risk assessment proving the actor understood the consequences before proceeding.
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 17 — Right to Erasure
+- HIPAA — HIPAA §164.310(d)(2)(i) — Media Disposal
+- SOX — SOX §802 — Document Retention and Destruction
+
+#### Service Suspension
+
+`service.suspend` · **CANON-000014**
+
+Authorization gate for deliberate suspension of a production service — taking a service offline for maintenance, as an incident response action, or as a business decision. Service suspension has direct customer impact through SLA obligations and availability commitments. State snapshot binding captures the pre-suspension service state, enabling documented justification and post-suspension comparison.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.14 — Redundancy of Information Processing Facilities
+
+#### Service Resumption
+
+`service.resume` · **CANON-000015**
+
+Authorization gate for resuming a suspended service — bringing a service back online after planned or emergency maintenance. Service resumption carries its own risks: resuming a service before the underlying issue is resolved can cause immediate re-failure. State snapshot binding captures the post-fix service configuration, enabling documented validation that the root cause was addressed before resumption.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.14 — Redundancy and Recovery
+
+#### Database Migration
+
+`database.migrate` · **CANON-000032**
+
+Authorization gate for executing a schema or data migration against a production database. Migrations are among the hardest-to-reverse production changes — a bad migration can corrupt or drop data, lock tables, or leave the schema in an inconsistent state — and carry strong change-control and record-integrity evidence demands under SOX and GxP. Human approval plus a state snapshot binding the migration's content hash gate the action to a reviewed, identified migration.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 CM-3 — Configuration Change Control
+- SOX — SOX §404 — Management Assessment of Internal Controls
+
+#### Infrastructure Change
+
+`infrastructure.change` · **CANON-000033**
+
+Authorization gate for changing production infrastructure or its configuration — applying Terraform/Helm, altering gateway routing, changing network controls (WAF rules, security groups, ingress, DNS, load balancers), and changing monitoring/alerting configuration (alert routing and thresholds, silences/mutes, health checks, on-call escalation policies, dashboards and retention windows that feed incident response). Infrastructure changes carry broad blast radius: a routing or firewall change can expose or sever production traffic across all services, and a monitoring-configuration change can blind the organization to the consequences of that same failure. Human approval plus a state snapshot binding the planned change (plan hash) gate the action to a reviewed, identified change. Production network-control and monitoring-configuration changes are governed under this action as scenarios of infrastructure change, not as separate actions. Monitoring-configuration scope (governed scenario, not a separate action): a change that SUPPRESSES, DISABLES, or MATERIALLY WEAKENS a monitoring or alerting capability — muting or snoozing an alert, raising an alert threshold, disabling a health check, removing a service from a paging rotation or dashboard, or shortening a retention window that would hide the change later — is a "cover your tracks" risk pattern: it reduces the organization's ability to detect the consequences of the very change (or a related change) it accompanies. This scenario ALWAYS requires human approval, REGARDLESS of whether the organization has otherwise configured infrastructure.change to allow change-window-based or other lower-friction handling for routine infrastructure changes. No org-level relaxation of this action's friction may ever exempt a monitoring-weakening change, even one that would otherwise qualify as "routine" and route through a low-friction path.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 CM-3 — Configuration Change Control
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 SI-4 — System Monitoring
+- PCI DSS — PCI DSS v4.0 Req. 1 — Install and Maintain Network Security Controls
+
+#### Traffic Failover
+
+`traffic.failover` · **CANON-000036**
+
+Authorization gate for failing over production traffic — transferring live traffic to a standby region, cluster, or provider to preserve availability. A failover is a first-class operational action with its own intent (preserve availability), evidence, and risk profile: it can move traffic to an under-capacity or stale standby, split-brain a stateful system, or mask a regional dependency failure. State snapshot binding captures the pre-failover topology and the failover target so the permit records exactly where traffic was moved.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.14 — Redundancy of Information Processing Facilities
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 CP-10 — System Recovery and Reconstitution
+
+#### Host Isolation
+
+`host.isolate` · **CANON-000037**
+
+Authorization gate for network-isolating a compromised host or endpoint as an incident containment action — cutting a machine off from the network (EDR quarantine, security-group lockdown, NAC quarantine) to stop lateral movement or exfiltration while preserving it for forensics. Host isolation is a distinct operational action: unlike a generic infrastructure change it is taken under incident pressure by a reliability or security responder, targets a single host, and its evidence is the containment record — who isolated what, when, and why. State snapshot binding captures the host state at isolation time for the forensic timeline.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.26 — Response to Information Security Incidents
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 IR-4 — Incident Handling
+
+#### Secret Configuration Change
+
+`secret.configuration.change` · **CANON-000054**
+
+Authorization gate for changing a secret's ACCESS-CONTROL or GOVERNANCE configuration — granting or narrowing WHO or WHAT may read a secret (an IAM policy, KMS key policy, or Vault/Secrets Manager access policy attached to it), moving or re-provisioning WHERE it is stored, or changing its rotation policy or schedule. This is distinct from secret.rotate (CANON-000035), which governs rotating the secret's VALUE — a role-only, non-approved, machine-executable operation. Configuration changes are broader and higher-authority: widening who can read a live credential is a privilege-escalation-shaped decision (the same risk identity.privileged.grant governs for general entitlements), and relocating or degrading a secret's storage or rotation posture can silently weaken every control that depends on that secret staying rotated and access-scoped. Human approval, a verified and MFA'd approver, and a state snapshot binding the before/after configuration gate this action to a reviewed, identified change. secret.rotate's own scope is limited to VALUE rotation.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.2 — Privileged Access Rights
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-6 — Least Privilege
+- PCI DSS — PCI DSS v4.0 Req. 7 — Restrict Access to System Components by Business Need to Know
+
+### `people.operations`
+
+#### Employment Termination
+
+`employment.terminate` · **CANON-000039**
+
+Authorization gate for terminating the employment relationship of a worker — the consequential employment-status decision, not the downstream technical deprovision. Ending employment carries distinct legal, final-pay, benefits, and works-council consequences that access.revoke (CANON-000008) does not: access revocation is the required EFFECT of a termination, while the decision to end the relationship is its CAUSE. Independent, credentialed sign-off (manager + HR business partner / employment counsel) and a verified actor gate the action to a reviewed, attributable authority, with a captured reason for the record.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.6.5 — Responsibilities after termination or change of employment
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 PS-4 — Personnel Termination
+- SOX — SOX §404 — segregation of duties over the employment/payroll decision
+
+#### Compensation Change
+
+`compensation.change` · **CANON-000040**
+
+Authorization gate for changing an employee's compensation — a SOX-controlled financial event with an approval chain and a downstream payroll disbursement consequence, distinct from a generic data.modify (CANON-000004) record edit. A compensation change alters a recurring financial obligation and is a recognized fraud and control surface. Independent approval (the requesting manager is not the sole authority) and a verified actor gate the action to a reviewed, attributable decision.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.3 — Segregation of duties
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-5 — Separation of Duties
+- SOX — SOX §404 — Management Assessment of Internal Controls (payroll / compensation)
+
+### `privileged.operation`
+
+#### Control Override
+
+`control.override` · **CANON-000009**
+
+Authorization gate for bypassing a security or compliance control — break-glass access, policy exceptions, emergency overrides, firewall rule bypasses, and regulatory exemptions. Control overrides are the highest-risk action class: they deliberately disable a protective control, creating a window of elevated risk. Every override must be justified, attributed to a verified human actor with MFA, and the risk must be contemporaneously assessed. AI agents must never override security controls autonomously.
+
+**Helps satisfy:**
+
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-17 — Remote Access
+- PCI DSS — PCI DSS v4.0 Req. 10.2 — Audit Logs for Security Control Bypasses
+- SOX — SOX §404 — Override of Internal Controls
+
+#### Secret Rotation
+
+`secret.rotate` · **CANON-000035**
+
+Authorization gate for rotating a production credential or signing key — API keys, database passwords, service tokens, or signing material. Rotation is a privileged operation: a botched or malicious rotation can cause a widespread outage (every consumer of the old secret breaks) or, worse, hand an attacker fresh valid credentials. State snapshot binding captures the secret identity and key version so the permit records exactly which secret was rotated to which version. Scope: this action governs rotating a secret's VALUE only — producing a new credential/key version for an existing secret. It does NOT cover changing a secret's ACCESS-CONTROL or GOVERNANCE configuration (who or what may read it, where it is stored, its rotation policy or schedule) — that is a materially broader, higher-authority access-control decision governed by secret.configuration.change (CANON-000054), which requires human approval and a verified, MFA'd approver. A caller widening who can read a secret, or relocating/reconfiguring its storage or rotation policy, must call secret.configuration.change, not this action. trust_root.publish (CANON-000035) remains a value-rotation-shaped specialization of THIS action; secret.configuration.change is a distinct standalone canonical action, not a specialization of secret.rotate.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.17 — Authentication Information
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 IA-5 — Authenticator Management
+- PCI DSS — PCI DSS v4.0 Req. 3 — Protect Stored Account Data (key management)
+
+### `production.deploy`
+
+#### Execute Authorized Change or Deployment Plan
+
+`production.deploy` · **CANON-000001**
+
+Authorization gate for executing an authorized change or deployment plan against a target system. This spans deploying code, configuration, or infrastructure to a production environment AND applying an authorized change plan to an enterprise business system — for example a CI/CD deployment, or a configuration / permission / workflow / financial-control change plan applied to a system such as a CRM or ERP. These executions carry high blast radius: an unauthorized or insufficiently-reviewed change can cause outages, data corruption, or security/compliance exposure. Every execution must be traceable to a tamper-evident permit bound to the exact canonical plan, with an auditable approval chain.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 CM-3 — Configuration Change Control
+- SOX — SOX §404 — Management Assessment of Internal Controls
+
+#### Artifact Release
+
+`artifact.release` · **CANON-000002**
+
+Authorization gate for publishing a versioned artifact to a public or private distribution channel — npm, PyPI, crates.io, Docker Hub, Maven Central, GitHub Releases, or any package registry. Once published, an artifact is consumed by downstream systems; a malicious or compromised release propagates silently through the supply chain. Requires cryptographically verified actor identity to close the spoofed-actor attack surface.
+
+**Helps satisfy:**
+
+- EU AI Act — EU AI Act Art. 11 (Annex IV) — Technical Documentation
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 SA-12 — Supply Chain Protection
+
+#### Workflow Approval
+
+`workflow.approve` · **CANON-000003**
+
+Authorization gate for recording a human approval decision within a multi-step workflow. An approval is definitionally a human act — it attests that a qualified person reviewed content and authorizes progression. Machine-generated approvals are not approvals; they are automated checks. This action requires a human actor to prevent AI systems from self-approving workflow steps they participate in — the AI self-approval loop that regulators are now mandating controls for.
+
+**Helps satisfy:**
+
+- GDPR — GDPR Art. 22 — Automated Individual Decision-Making
+- SOX — SOX §302 — Corporate Responsibility for Financial Reports
+
+#### Workflow Escalation
+
+`workflow.escalate` · **CANON-000016**
+
+Authorization gate for workflow escalation steps — capturing the moment when an AI agent, automated system, or human acknowledges it cannot proceed without additional authority and escalates to a higher-level decision maker. Escalation is intentionally low-friction (any-role, no human approval gate) because the goal is to capture and attribute escalations, not to gate them. A well-documented escalation trail proves AI agents recognized their limits and deferred to humans rather than proceeding autonomously.
+
+**Helps satisfy:**
+
+- SOX — SOX §404 — Escalation Procedures as Internal Controls
+
+#### Release Creation
+
+`release.create` · **CANON-000030**
+
+Authorization gate for creating an identified, releasable production version — assembling an approved set of changes into a versioned, reproducible release artifact. Release creation is the point where a set of merged changes becomes a candidate for deployment; an unidentified or unapproved release undermines every downstream deploy and audit. State snapshot binding captures the release's content identity (git SHA range, artifact digest, changelog hash) so the permit is bound to exactly what was released.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 CM-3 — Configuration Change Control
+
+#### Production Rollback
+
+`production.rollback` · **CANON-000031**
+
+Authorization gate for rolling back a production deployment to a prior version. A rollback is itself a production change — it can restore a version with a known vulnerability, revert a data-affecting migration, or mask an unresolved incident — and must be governed, not treated as an exempt safety valve. State snapshot binding captures the current and target versions so the permit records exactly what state the system was moved to.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 CM-3 — Configuration Change Control
+
+#### Feature Enablement
+
+`feature.enable` · **CANON-000034**
+
+Authorization gate for enabling a high-impact feature flag in production. A feature flag flip is a de-facto production change — it can expose an unfinished feature, change data-handling behavior, or shift load — without going through a deploy. This action gates the enablement of flags marked high-impact to an authorized role, so a flag flip carries the same accountability as a deploy while staying a lightweight, standard-risk operation.
+
+**Helps satisfy:**
+
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.8.32 — Change Management
+
+### `regulated.release`
+
+#### Content Publication
+
+`content.publish` · **CANON-000010**
+
+Authorization gate for publishing regulated content — medical device documentation, IFUs, SOPs, labeling, regulatory submissions, clinical study reports, and controlled documents. In regulated industries, a document released without proper authorization constitutes a quality system non-conformance. State snapshot binding captures the document hash at publication time, enabling version traceability.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.10 — Controls for Closed Systems
+- ISO/IEC 27001 — ISO/IEC 27001:2022 A.5.37 — Documented Operating Procedures
+
+#### Compliance Certification
+
+`compliance.certify` · **CANON-000017**
+
+Authorization gate for compliance certification acts — EU AI Act declarations of conformity, SOX §302 CEO/CFO certifications, GxP Qualified Person batch release certifications, HIPAA compliance officer certifications, and ISO/IEC conformity attestations. These are legal acts performed by a qualified authority with personal accountability. No AI system may certify compliance on behalf of a human — this action is structurally machine-blocked. Requires MFA, a qualified human authority, and regulatory + identity + approval assertions proving the certifier understood and accepted the obligations they are certifying.
+
+**Helps satisfy:**
+
+- 21 CFR Part 11 — 21 CFR Part 11 §11.50 — Electronic Signature Requirements for Certifications
+- EU AI Act — EU AI Act Art. 47-49 — Declaration of Conformity
+- HIPAA — HIPAA §164.308(a)(8) — Evaluation Requirements
+- SOX — SOX §302 — Corporate Responsibility for Financial Reports
+
+### `security.exception`
+
+#### Break-Glass Access
+
+`security.breakglass` · **CANON-000029**
+
+Authorization gate for emergency break-glass access — an intentional, time-bounded exception that grants elevated privilege during an incident. Break-glass is the most abused path in any system, so it is the most heavily gated: it requires a verified human actor, multi-factor authentication, an explicit approval artifact, and a bound snapshot of the incident context. A machine can never invoke it. Every use produces a tamper-evident permit for post-incident review.
+
+**Helps satisfy:**
+
+- NIST SP 800-53 — NIST SP 800-53 Rev.5 AC-6(9) — Auditing Use of Privileged Functions
+- SOX — SOX §404 — Management Assessment of Internal Controls
+
+{/* SYNC END */}

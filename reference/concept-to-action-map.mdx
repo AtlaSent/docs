@@ -1,0 +1,219 @@
+---
+title: "Concept-to-Action Map"
+description: "How AtlaSent's authorization concepts relate to the canonical protected actions they govern."
+---
+{/* Generated from the Atlasent docs source (site/reference/concept-to-action-map.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+<Info>
+  This page is generated from the AtlaSent Knowledge Atlas and Action Canon and is updated whenever either changes.
+</Info>
+
+{/* SYNC BEGIN */}
+
+AtlaSent reasons about authorization with a small set of **concepts** — the model of *authority* (who may act, on what evidence, producing what proof). The [Protected Action Canon](/reference/protected-action-canon) describes *what is governed*. This page is where the two meet: for each concept, the canonical actions that realize it.
+
+The Atlas defines **17 concepts**; **16** are realized by at least one of the **56** protected actions. The mapping is **deterministically derived** from each action's authorization requirements — it is not a hand-authored opinion.
+
+> **Absence from this map does not mean an action is unsupported at runtime.** A concept with no linked actions is simply one no *canonical* action realizes yet (for example, an emerging concept). Runtime support is governed by policy and configuration, not by this reference.
+
+## Concepts
+
+### Assertion
+
+`assertion` · status: active · model: canon/007 (Assertion Model)
+
+Realized by **27 of 56** protected actions (required as an authorization input for these):
+
+- `artifact.release` — Artifact Release (CANON-000002)
+- `control.override` — Control Override (CANON-000009)
+- `identity.sign` — Identity Signature (CANON-000011)
+- `resource.destroy` — Resource Destruction (CANON-000013)
+- `compliance.certify` — Compliance Certification (CANON-000017)
+- `trial.unblinding.execute` — Clinical Trial Unblinding (CANON-000018)
+- `trial.blinding.setup` — Clinical Trial Blind Establishment (CANON-000019)
+- `trial.unblinding.emergency` — Emergency Clinical Trial Unblinding (CANON-000020)
+- `finance.payment.authorize` — High-Value Payment Authorization (CANON-000021)
+- `finance.wire.transfer` — High-Value Wire Transfer (CANON-000022)
+- `industrial.control.actuate` — Industrial Control Actuation (CANON-000023)
+- `healthcare.record.amend` — Patient Health Record Amendment (CANON-000024)
+- `identity.privileged.grant` — Privileged Access Grant (CANON-000025)
+- `agent.tool.invoke` — Agent Tool Invocation (CANON-000026)
+- `model.promote` — Model Promotion (CANON-000027)
+- `data.export` — Bulk Data Export (CANON-000028)
+- `security.breakglass` — Break-Glass Access (CANON-000029)
+- `protocol.amend` — Clinical Protocol Amendment (CANON-000038)
+- `trial.biomarker.reclassify` — Biomarker Result Reclassification Approval (CANON-000043)
+- `trial.biomarker.eligibility.override` — Biomarker Eligibility Override (CANON-000044)
+- `genomic.data.release` — Identifiable Genomic Data Release (CANON-000045)
+- `genomic.data.export` — Cross-Border Genomic Data Export (CANON-000046)
+- `industrial.safety.bypass` — Safety Instrumented System Bypass (CANON-000052)
+- `industrial.controller.configure` — Industrial Controller Configuration Change (CANON-000053)
+- `secret.configuration.change` — Secret Configuration Change (CANON-000054)
+- `sensitive_data.access` — Sensitive Data Access (CANON-000055)
+- `submission.submit` — External Submission (CANON-000056)
+
+### Audit Chain
+
+`audit-chain` · status: active · model: canon/003 (Ontology — Audit chain)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Authority
+
+`authority` · status: active · model: canon/004 (Authority Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Caller
+
+`caller` · status: active · model: canon/003 (Ontology — Caller)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Consequential Action
+
+`consequential-action` · status: active · model: canon/008 (Consequence Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Context
+
+`context` · status: active · model: canon/003 (Ontology)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Decision
+
+`decision` · status: active · model: canon/005 (Authorization Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Delegation
+
+`delegation` · status: emerging · model: canon/010 (Permit/Instrument Model)
+
+*Emerging* — not yet realized by any canonical action.
+
+### Evidence
+
+`evidence` · status: active · model: canon/011 (Evidence Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Gate
+
+`gate` · status: active · model: canon/003 (Ontology — Gate; reference-monitor PEP / complete mediation)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Permit
+
+`permit` · status: active · model: canon/010 (Permit/Instrument Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Policy
+
+`policy` · status: active · model: canon/009 (Policy Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Resource
+
+`resource` · status: active · model: canon/003 (Ontology)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Runtime Authority
+
+`runtime-authority` · status: active · model: canon/005 (Authorization Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+### Trust Root / Issuer Registry
+
+`trust-root` · status: active · model: canon/006 (Trust Model)
+
+Realized by **33 of 56** protected actions (required as an authorization input for these):
+
+- `artifact.release` — Artifact Release (CANON-000002)
+- `control.override` — Control Override (CANON-000009)
+- `identity.sign` — Identity Signature (CANON-000011)
+- `resource.destroy` — Resource Destruction (CANON-000013)
+- `compliance.certify` — Compliance Certification (CANON-000017)
+- `trial.unblinding.execute` — Clinical Trial Unblinding (CANON-000018)
+- `trial.blinding.setup` — Clinical Trial Blind Establishment (CANON-000019)
+- `trial.unblinding.emergency` — Emergency Clinical Trial Unblinding (CANON-000020)
+- `finance.payment.authorize` — High-Value Payment Authorization (CANON-000021)
+- `finance.wire.transfer` — High-Value Wire Transfer (CANON-000022)
+- `industrial.control.actuate` — Industrial Control Actuation (CANON-000023)
+- `healthcare.record.amend` — Patient Health Record Amendment (CANON-000024)
+- `identity.privileged.grant` — Privileged Access Grant (CANON-000025)
+- `agent.tool.invoke` — Agent Tool Invocation (CANON-000026)
+- `model.promote` — Model Promotion (CANON-000027)
+- `data.export` — Bulk Data Export (CANON-000028)
+- `security.breakglass` — Break-Glass Access (CANON-000029)
+- `host.isolate` — Host Isolation (CANON-000037)
+- `protocol.amend` — Clinical Protocol Amendment (CANON-000038)
+- `employment.terminate` — Employment Termination (CANON-000039)
+- `compensation.change` — Compensation Change (CANON-000040)
+- `trial.biomarker.reclassify` — Biomarker Result Reclassification Approval (CANON-000043)
+- `trial.biomarker.eligibility.override` — Biomarker Eligibility Override (CANON-000044)
+- `genomic.data.release` — Identifiable Genomic Data Release (CANON-000045)
+- `genomic.data.export` — Cross-Border Genomic Data Export (CANON-000046)
+- `trial.randomization.break` — Trial Randomization Code Break (CANON-000048)
+- `reconciliation.certify` — Reconciliation — Certify (CANON-000049)
+- `journal_entry.approve` — Journal Entry — Approve (CANON-000050)
+- `industrial.safety.bypass` — Safety Instrumented System Bypass (CANON-000052)
+- `industrial.controller.configure` — Industrial Controller Configuration Change (CANON-000053)
+- `secret.configuration.change` — Secret Configuration Change (CANON-000054)
+- `sensitive_data.access` — Sensitive Data Access (CANON-000055)
+- `submission.submit` — External Submission (CANON-000056)
+
+### Trusted Assertion
+
+`trusted-assertion` · status: active · model: canon/006 (Trust Model)
+
+Realized by **33 of 56** protected actions (required as an authorization input for these):
+
+- `artifact.release` — Artifact Release (CANON-000002)
+- `control.override` — Control Override (CANON-000009)
+- `identity.sign` — Identity Signature (CANON-000011)
+- `resource.destroy` — Resource Destruction (CANON-000013)
+- `compliance.certify` — Compliance Certification (CANON-000017)
+- `trial.unblinding.execute` — Clinical Trial Unblinding (CANON-000018)
+- `trial.blinding.setup` — Clinical Trial Blind Establishment (CANON-000019)
+- `trial.unblinding.emergency` — Emergency Clinical Trial Unblinding (CANON-000020)
+- `finance.payment.authorize` — High-Value Payment Authorization (CANON-000021)
+- `finance.wire.transfer` — High-Value Wire Transfer (CANON-000022)
+- `industrial.control.actuate` — Industrial Control Actuation (CANON-000023)
+- `healthcare.record.amend` — Patient Health Record Amendment (CANON-000024)
+- `identity.privileged.grant` — Privileged Access Grant (CANON-000025)
+- `agent.tool.invoke` — Agent Tool Invocation (CANON-000026)
+- `model.promote` — Model Promotion (CANON-000027)
+- `data.export` — Bulk Data Export (CANON-000028)
+- `security.breakglass` — Break-Glass Access (CANON-000029)
+- `host.isolate` — Host Isolation (CANON-000037)
+- `protocol.amend` — Clinical Protocol Amendment (CANON-000038)
+- `employment.terminate` — Employment Termination (CANON-000039)
+- `compensation.change` — Compensation Change (CANON-000040)
+- `trial.biomarker.reclassify` — Biomarker Result Reclassification Approval (CANON-000043)
+- `trial.biomarker.eligibility.override` — Biomarker Eligibility Override (CANON-000044)
+- `genomic.data.release` — Identifiable Genomic Data Release (CANON-000045)
+- `genomic.data.export` — Cross-Border Genomic Data Export (CANON-000046)
+- `trial.randomization.break` — Trial Randomization Code Break (CANON-000048)
+- `reconciliation.certify` — Reconciliation — Certify (CANON-000049)
+- `journal_entry.approve` — Journal Entry — Approve (CANON-000050)
+- `industrial.safety.bypass` — Safety Instrumented System Bypass (CANON-000052)
+- `industrial.controller.configure` — Industrial Controller Configuration Change (CANON-000053)
+- `secret.configuration.change` — Secret Configuration Change (CANON-000054)
+- `sensitive_data.access` — Sensitive Data Access (CANON-000055)
+- `submission.submit` — External Submission (CANON-000056)
+
+### Verification
+
+`verification` · status: active · model: canon/012 (Verification Model)
+
+Realized by **all 56** protected actions — part of the core authorization pipeline every governed action runs through.
+
+{/* SYNC END */}
