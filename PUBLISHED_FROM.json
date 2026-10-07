@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "d7ee2060947da0285333b343ea9bd80bebe358fc",
+  "source_sha": "1c9172728cc00211ace751b08c09f1c7f11c0d08",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "f5d03239123159adf05333206a4dd63caf3ead35c5302dc1815f0a5a9859beda",
@@ -78,7 +78,7 @@
     "quickstart/verify-permit.mdx": "8562caa17b2ba3925055a381079090eee068b27825f5a3bba3c23e1dd0df1ebc",
     "README.md": "6fd37c57fc3663ae5f4e210a004c750f1089dd827902dde17a1b208889a14062",
     "reference/concept-to-action-map.mdx": "ec6d40f8525d0454aac18adf91cfab7d5cf7aa65cc99261ab71d3282401e71f1",
-    "reference/protected-action-canon.mdx": "3a8d817e9130ecf26cb7be165e9778919bd50ff52a8e71f96f9d9fafb5dd9bd1",
+    "reference/protected-action-canon.mdx": "60e20b8860201b1d65e79550010c25b70ce704470530dee615280b1cda180a48",
     "runbooks/governed-close-operations.mdx": "c9842d58579497a87c5ca88d711ea51782025ad46d8a1fc33c6802c6a4ef3eb0",
     "sdks/cli.mdx": "0afbc414f40a0691a6851ab6366eeef588967447ed1f2b262fa7274a5c92f9e2",
     "sdks/go.mdx": "4a8f4152b37fd9a90e4e34fd82235af0c6242ade76daecbc5c2d8864f6d51141",

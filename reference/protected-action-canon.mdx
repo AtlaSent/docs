@@ -70,43 +70,43 @@ Authorization gate for promoting an AI/ML model to a production-serving environm
 
 `trial.unblinding.execute` · **CANON-000018**
 
-Authorization gate for clinical trial unblinding — the irreversible act of revealing randomized treatment assignments to investigators, sponsors, and/or analysts. Unblinding compromises the statistical integrity of ongoing blinded trials and constitutes a regulated consequential transition requiring maximum controls: dual authorization, MFA, a verified human actor, and cryptographic proof of regulatory scope, actor identity, and explicit approval assertion. No AI system or automated process may execute unblinding. Regulatory basis: ICH E6(R2) §4.8.2, 21 CFR Part 11 §11.50/§11.300, EU Annex 11 §7.1.
+Authorization gate for clinical trial unblinding — the irreversible act of revealing randomized treatment assignments to investigators, sponsors, and/or analysts. Unblinding compromises the statistical integrity of ongoing blinded trials and constitutes a regulated consequential transition requiring maximum controls: dual authorization, MFA, a verified human actor, and cryptographic proof of regulatory scope, actor identity, and explicit approval assertion. No AI system or automated process may execute unblinding. Regulatory basis: ICH E6(R3) Annex 1 §2.11 and §3.16.1(g), 21 CFR Part 11 §11.50/§11.300, EU Annex 11 §9. Dual authorization is this action's own control; ICH E6 does not require two approvers.
 
 **Helps satisfy:**
 
 - 21 CFR Part 11 — 21 CFR Part 11 §11.300 — Controls for Identification Codes
 - 21 CFR Part 11 — 21 CFR Part 11 §11.50 — Signature Manifestations
-- EU Annex 11 — EU Annex 11 §7.1 — Audit Trail
-- GxP — ICH E9 §6 — Trial Conduct Issues / Blinding
-- ICH E6(R2) — ICH E6(R2) §4.8.2 — Breaking the Blind
+- EU Annex 11 — EU Annex 11 §9 — Audit Trails
+- GxP — ICH E9 §2.3.1 — Blinding
+- ICH E6(R2) — ICH E6(R3) Annex 1 §2.11 — Randomisation Procedures and Unblinding; §3.16.1(g) — Unblinding Records
 
 #### Clinical Trial Blind Establishment
 
 `trial.blinding.setup` · **CANON-000019**
 
-Authorization gate for establishing the blind in a clinical trial — the act of sealing randomization codes, binding treatment assignments to subject IDs, and activating the blinded-data enforcement state in trial management systems (RTSM/IVRS). Blinding setup is the prerequisite that makes trial.unblinding.execute irreversible once executed; errors at setup time (wrong randomization list, incorrect stratum assignments) propagate through the entire trial. Only sponsor-designated blinding authority roles may authorize blind establishment. Requires a verified identity, supervisor review of the randomization specification, a cryptographic snapshot of the randomization list hash, and a complete audit trail per 21 CFR Part 11 §11.10(a) and EU Annex 11 §7.1. Machine callers may not execute blinding setup without explicit organizational override.
+Authorization gate for establishing the blind in a clinical trial — the act of sealing randomization codes, binding treatment assignments to subject IDs, and activating the blinded-data enforcement state in trial management systems (RTSM/IVRS). Blinding setup is the prerequisite that makes trial.unblinding.execute irreversible once executed; errors at setup time (wrong randomization list, incorrect stratum assignments) propagate through the entire trial. Only sponsor-designated blinding authority roles may authorize blind establishment. Requires a verified identity, supervisor review of the randomization specification, a cryptographic snapshot of the randomization list hash, and a complete audit trail per 21 CFR Part 11 §11.10(a) and EU Annex 11 §9. Machine callers may not execute blinding setup without explicit organizational override.
 
 **Helps satisfy:**
 
 - 21 CFR Part 11 — 21 CFR Part 11 §11.10(a) — System Validation / Accurate and Complete Records
 - 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Audit Trails for Blinded Data
-- EU Annex 11 — EU Annex 11 §7.1 — Audit Trail
-- ICH E6(R2) — ICH E6(R2) §5.13 — Record Access and Traceability for Blinding
-- ICH E9 — ICH E9 §3.2 — Methods of Randomization / Blinding
+- EU Annex 11 — EU Annex 11 §9 — Audit Trails
+- ICH E6(R2) — ICH E6(R3) Annex 1 §3.15.2(d) — Sponsor Blinding Processes
+- ICH E9 — ICH E9 §2.3.1 — Blinding; §2.3.2 — Randomisation
 
 #### Emergency Clinical Trial Unblinding
 
 `trial.unblinding.emergency` · **CANON-000020**
 
-Authorization gate for emergency single-patient unblinding in a clinical trial — the act of breaking the blind for a specific subject when knowledge of their treatment assignment is required for immediate medical decision-making (e.g., a Serious Adverse Event requiring the treating physician to know whether the patient received drug or placebo). Emergency unblinding is per-subject, not a full trial unblinding, and must be performed by the principal investigator or site physician responsible for the subject's safety. REQUESTER-AUTHORIZED: the act is authorized directly by the verified treating physician (the requester) — no approval artifact, approver, or quorum — with requester-bound MFA, a documented medical-necessity attestation, and an immediate audit record. The blind is broken for one subject only — other subjects remain blinded and the trial may continue. Regulatory basis: ICH E6(R2) §4.8.2–3, ICH E9 §6.5, 21 CFR Part 11 §11.300, EU Annex 11 §14.
+Authorization gate for emergency single-patient unblinding in a clinical trial — the act of breaking the blind for a specific subject when knowledge of their treatment assignment is required for immediate medical decision-making (e.g., a Serious Adverse Event requiring the treating physician to know whether the patient received drug or placebo). Emergency unblinding is per-subject, not a full trial unblinding, and must be performed by the principal investigator or site physician responsible for the subject's safety. REQUESTER-AUTHORIZED: the act is authorized directly by the verified treating physician (the requester) — no approval artifact, approver, or quorum — with requester-bound MFA, a documented medical-necessity attestation, and an immediate audit record. The blind is broken for one subject only — other subjects remain blinded and the trial may continue. Regulatory basis: ICH E6(R3) Annex 1 §2.11 and §3.15.2(d)(ii), ICH E9 §2.3.1, 21 CFR Part 11 §11.300, EU Annex 11 §9.
 
 **Helps satisfy:**
 
 - 21 CFR Part 11 — 21 CFR Part 11 §11.300 — Controls for Identification Codes and Passwords
 - 21 CFR Part 11 — 21 CFR Part 11 §11.50(a)(2) — Signature Manifestations / Approval Meaning
-- EU Annex 11 — EU Annex 11 §14 — Audit Trails for Emergency Events
-- ICH E6(R2) — ICH E6(R2) §4.8.2–3 — Breaking the Blind / SAE Reporting
-- ICH E9 — ICH E9 §6.5 — Unblinding at Interim Analysis / Emergency Unblinding Procedures
+- EU Annex 11 — EU Annex 11 §9 — Audit Trails
+- ICH E6(R2) — ICH E6(R3) Annex 1 §2.11 — Emergency Unblinding; §3.15.2(d)(ii) — Rapid Emergency Identification; §2.7.2 — Safety Reporting
+- ICH E9 — ICH E9 §2.3.1 — Breaking the Blind for a Single Subject
 
 #### Clinical Protocol Amendment
 
@@ -118,32 +118,32 @@ Authorization gate for amending the protocol of an active clinical trial — a r
 
 - 21 CFR Part 11 — 21 CFR 312.30 — IND Protocol Amendments
 - EU Annex 11 — EU Annex 11 §1 (Risk Management) / Clinical Trials Regulation substantial modifications
-- ICH E6(R2) — ICH E6(R2) §4.5 — Compliance with Protocol / §3.3 (IRB/IEC)
+- ICH E6(R2) — ICH E6(R3) Annex 1 §2.5 — Compliance with Protocol; §1.4.7 — IRB/IEC Approval of Protocol Changes
 
 #### Biomarker Result Reclassification Approval
 
 `trial.biomarker.reclassify` · **CANON-000043**
 
-Authorization gate for approving and releasing a corrected or reinterpreted biomarker result in a genomics-enabled clinical trial — a previously reported genomic or biomarker call being revised (e.g. a variant reclassified from VUS to pathogenic, a corrected HER2/EGFR status, or a re-adjudicated companion-diagnostic result). AtlaSent protects the AUTHORIZATION of the consequential change; it does not perform the scientific interpretation — the scientific basis comes from the laboratory method, the classification criteria, the protocol's context of use, and the designated authority. The gate requires authorized reviewers, supporting source evidence, a stated reason for change, the applicable study and laboratory criteria, and a traceable record of the prior and revised classification. A reported result is trial data of record; revising it can change a subject's eligibility, arm assignment, or safety profile, so it cannot be a silent overwrite. It must be attributable to a cryptographically verified qualified reviewer (a self-asserted actor_id from a LIS/LIMS is not sufficient), and no automated pipeline may reclassify a reported result on its own. Regulatory basis: 21 CFR Part 11 §11.10(b)/(e) (change-record and audit trail — not the scientific validity of the reclassification), ICH E6(R2) §5.5.3, ALCOA+, ICH E9 §5.
+Authorization gate for approving and releasing a corrected or reinterpreted biomarker result in a genomics-enabled clinical trial — a previously reported genomic or biomarker call being revised (e.g. a variant reclassified from VUS to pathogenic, a corrected HER2/EGFR status, or a re-adjudicated companion-diagnostic result). AtlaSent protects the AUTHORIZATION of the consequential change; it does not perform the scientific interpretation — the scientific basis comes from the laboratory method, the classification criteria, the protocol's context of use, and the designated authority. The gate requires authorized reviewers, supporting source evidence, a stated reason for change, the applicable study and laboratory criteria, and a traceable record of the prior and revised classification. A reported result is trial data of record; revising it can change a subject's eligibility, arm assignment, or safety profile, so it cannot be a silent overwrite. It must be attributable to a cryptographically verified qualified reviewer (a self-asserted actor_id from a LIS/LIMS is not sufficient), and no automated pipeline may reclassify a reported result on its own. Regulatory basis: 21 CFR Part 11 §11.10(b)/(e) (change-record and audit trail — not the scientific validity of the reclassification), ICH E6(R3) Annex 1 §4.2.2 and §4.2.4, ALCOA+, ICH E9 §5.
 
 **Helps satisfy:**
 
 - 21 CFR Part 11 — 21 CFR Part 11 §11.10(b) — Accurate and Complete Copies
 - 21 CFR Part 11 — 21 CFR Part 11 §11.10(e) — Reason for Change
-- GxP — ICH E9 §5 — Data Handling / Integrity of Trial Results
-- ICH E6(R2) — ICH E6(R2) §5.5.3 — Electronic Data Handling / Audit Trail
+- GxP — ICH E9 §5 — Data Analysis Considerations
+- ICH E6(R2) — ICH E6(R3) Annex 1 §4.2.2 — Audit Trails; §4.2.4 — Data Corrections
 
 #### Biomarker Eligibility Override
 
 `trial.biomarker.eligibility.override` · **CANON-000044**
 
-Authorization gate for overriding biomarker-defined eligibility in a genomics-enabled clinical trial — enrolling or retaining a subject whose genomic or biomarker result does not meet the protocol's inclusion/exclusion criteria (e.g. enrolling an EGFR-negative subject into an EGFR-targeted arm, or waiving a companion-diagnostic cutoff). This is a protocol deviation, not a routine screening decision: it changes who receives an investigational product and can affect subject safety and the analysis population. An override requires a documented medical rationale, a cryptographically verified qualified authorizer (medical monitor or principal investigator — a self-asserted actor_id is not sufficient), and an approval; it may not be granted by an automated screening system. Regulatory basis: ICH E6(R2) §4.5 / §4.3, 21 CFR 312.66, ICH E9 §5.2.
+Authorization gate for overriding biomarker-defined eligibility in a genomics-enabled clinical trial — enrolling or retaining a subject whose genomic or biomarker result does not meet the protocol's inclusion/exclusion criteria (e.g. enrolling an EGFR-negative subject into an EGFR-targeted arm, or waiving a companion-diagnostic cutoff). This is a protocol deviation, not a routine screening decision: it changes who receives an investigational product and can affect subject safety and the analysis population. An override requires a documented medical rationale, a cryptographically verified qualified authorizer (medical monitor or principal investigator — a self-asserted actor_id is not sufficient), and an approval; it may not be granted by an automated screening system. Regulatory basis: ICH E6(R3) Annex 1 §2.5 / §2.7.1, 21 CFR 312.66, ICH E9 §5.2.
 
 **Helps satisfy:**
 
 - 21 CFR Part 11 — 21 CFR 312.66 — Assurance of IRB Review / Investigator Obligations
 - GxP — ICH E9 §5.2 — Analysis Sets / Protocol Deviations
-- ICH E6(R2) — ICH E6(R2) §4.5.3–4 — Compliance with Protocol / Deviations
+- ICH E6(R2) — ICH E6(R3) Annex 1 §2.5.3–2.5.4 — Protocol Deviations
 
 #### Trial Randomization Code Break
 
@@ -154,7 +154,7 @@ Authorization gate for breaking a clinical trial's randomization code for a sing
 **Helps satisfy:**
 
 - 21 CFR Part 11 — 21 CFR Part 11 §11.300 — Controls for Identification Codes
-- ICH E6(R2) — ICH E6(R2) §4.8 — Breaking the Blind (subject-level)
+- ICH E6(R2) — ICH E6(R3) Annex 1 §2.11 — Randomisation Procedures and Unblinding (subject-level)
 
 ### `data.access`
 
