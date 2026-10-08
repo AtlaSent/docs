@@ -52,14 +52,17 @@ Different parts of the API carry different stability commitments. The table belo
 |---|---|---|---|
 | Core evaluation | GA | 12 months | `/v1/evaluate`, `/v1/evaluate-batch` |
 | Audit + export | GA | 12 months | `/v1/audit/exports`, `/v1/verify-audit` |
-| Policy management | GA | 12 months | `/v1/policies`, `/v1/policy-bundles`, `/v1/rollback-bundle` |
+| Policy management | GA | 12 months | `/v1/policies`, `/v1-policy-bundles/:id` (legacy constraint-bundle routes), `/v1/rollback-bundle` |
 | IAM + keys | GA | 12 months | `/v1/api-keys`, `/v1/org` |
 | Webhooks | GA | 6 months | `/v1/webhooks`, `/v1/webhook-deliver` |
 | Integrations | Beta | 3 months | `/v1/integrations` |
 | AI gates | Beta | 3 months | `/v1/ai-gates` |
-| Red-team | Preview | Best-effort | `/v1/redteam`, `/v1/redteam-runs` |
+| Red-team runs | GA | 12 months | `/v1/redteam-runs` |
+| Red-team | Preview | Best-effort | `/v1/redteam` |
 
 **GA** endpoints are contractually supported under the MSA / SLA and safe to build critical workflows on.
+
+The layered `/v1/policy-bundles/*` routes are **not** GA: the production runtime answers them with `501 not_available_on_runtime`. Use the legacy `/v1-policy-bundles/:id` constraint-bundle routes.
 
 **Beta** endpoints are functionally complete but their request/response shapes may change based on customer feedback. Use them with the understanding that a 3-month migration window will be provided.
 
