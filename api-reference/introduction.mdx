@@ -13,9 +13,11 @@ The AtlaSent API is a REST API over HTTPS. All requests and responses are JSON. 
 | Production | `https://api.atlasent.io/functions/v1` |
 
 Endpoints are hyphenated function names appended to the base URL, e.g.
-`https://api.atlasent.io/functions/v1/v1-evaluate`. To test without touching production
-data, use a test-environment key (`ask_test_...`). A dedicated staging
-environment is available on request — contact support@atlasent.io.
+`https://api.atlasent.io/functions/v1/v1-evaluate`. Keys issued by
+[console.atlasent.io](https://console.atlasent.io) are live keys (`ask_live_...`), and a live
+key is accepted only with `context.environment` set to `production`. Test keys
+(`ask_test_...`) belong to a separate staging environment, available on request —
+contact support@atlasent.io.
 
 ## Source of truth
 

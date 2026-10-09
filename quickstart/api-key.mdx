@@ -26,7 +26,7 @@ API keys are the primary auth for service-to-service calls (your AI agent → At
 ## Put the key in your environment
 
 ```bash
-export ATLASENT_API_KEY="ask_live_..."   # test-environment keys start with ask_test_
+export ATLASENT_API_KEY="ask_live_..."   # keys from console.atlasent.io are live keys
 export ATLASENT_API_URL="https://api.atlasent.io/functions/v1"
 ```
 
@@ -34,6 +34,10 @@ The base URL includes the `/functions/v1` path. Endpoints are hyphenated
 function names appended directly to it — `$ATLASENT_API_URL/v1-evaluate`
 (i.e. `https://api.atlasent.io/functions/v1/v1-evaluate`), not
 `$ATLASENT_API_URL/v1/evaluate`. The next two pages use this convention.
+
+A live key is accepted only when the request's `context.environment` is
+`production`; any other value is refused with `ENVIRONMENT_MISMATCH`. The
+examples on the next pages already send `production`.
 
 <Warning>
   Do not check API keys into source control. Use your platform's secret manager (GitHub Actions secrets, AWS Secrets Manager, Vercel env, etc.).

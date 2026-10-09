@@ -168,19 +168,21 @@ how to verify it yourself.
 [/sdks/cli](/sdks/cli)) is unchanged and runs against V1
 bundles identically.
 
-## Trying the migration with a test key
+## Trying the migration before production traffic
 
-Validate your caller with a test-environment key before flipping
-production traffic:
+Test keys (`ask_test_...`) work only against AtlaSent's staging environment,
+not against `https://api.atlasent.io`, and the production console does not
+issue them. To validate your caller against staging, ask support@atlasent.io
+for a staging base URL and key, then run:
 
 ```bash
-ATLASENT_BASE_URL=https://api.atlasent.io/functions/v1 \
+ATLASENT_BASE_URL=<staging base URL from support> \
 ATLASENT_API_KEY=ask_test_... \
   npx @atlasent/sdk@2.10.0 examples/evaluate
 ```
 
-A dedicated staging environment is available on request — contact
-support@atlasent.io.
+With a live key against `https://api.atlasent.io`, send `context.environment`
+set to `production`; any other value is refused with `ENVIRONMENT_MISMATCH`.
 
 ## What this guide does NOT cover
 

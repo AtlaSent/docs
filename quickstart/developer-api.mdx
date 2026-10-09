@@ -4,9 +4,13 @@ description: "Run a safe AtlaSent evaluation, handle a Permit, verify it, and in
 ---
 {/* Generated from the Atlasent docs source (site/quickstart/developer-api.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-## 1. Use a sandbox credential
+## 1. Get a key and seed the demo action
 
-Use the supported sandbox/test credential path. Do not put a production key into examples, source control, or client-side code.
+Keys from [console.atlasent.io](https://console.atlasent.io) are **live** keys (`ask_live_...`). The production console does not issue test keys. Keep the key in a secret store, never in examples, source control, or client-side code.
+
+A live key is accepted only with `context.environment` set to `production`. Any other value (`sandbox`, `test`, `staging`) is refused with `ENVIRONMENT_MISMATCH` before any policy runs, and the refusal is recorded.
+
+Finish the console's setup flow (**Connect my organization**). It seeds a demo `database.execute_sql` action into your organization. That action authorizes nothing real: it returns a decision and executes nothing on its own. It is the safe target for this quickstart.
 
 ## 2. Evaluate a protected action
 
@@ -15,15 +19,18 @@ curl -X POST https://api.atlasent.io/functions/v1/v1-evaluate \
   -H "Authorization: Bearer $ATLASENT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "action_type": "production.deploy",
-    "actor_id": "quickstart-user",
+    "action_type": "database.execute_sql",
+    "actor_id": "dba.alice",
     "context": {
-      "environment": "sandbox",
-      "target": {"id":"service:quickstart","type":"service"},
-      "commit_sha": "1111111111111111111111111111111111111111"
+      "environment": "production",
+      "sql_text": "SELECT 1",
+      "target_database": "analytics",
+      "destructive": false
     }
   }'
 ```
+
+The demo policy allows a non-destructive statement from one of its listed DBAs, so this returns `allow` with a Permit.
 
 The canonical runtime decision is one of `allow`, `deny`, `hold`, or `escalate`.
 
@@ -41,9 +48,13 @@ Use the canonical verifier path documented in [Verify a Permit](/quickstart/veri
 
 Continue to [Audit export](/quickstart/audit-export) to inspect the decision and verification evidence. Execution/effect is shown only when the applicable observer/provider evidence establishes it.
 
-## Negative test
+## Negative tests
 
-Repeat the request after changing a decision-material field such as the commit SHA. On an execution-bound action, the changed request must not be allowed to reuse authorization for the original payload.
+Each of these changes one input and must not return `allow`:
+
+- Set `"destructive": true`, or a `sql_text` containing `DROP TABLE` or `TRUNCATE`: `hold`, pending human review.
+- Set `"actor_id"` to anything other than `dba.alice` or `dba.bob`: `deny` with `ACTOR_NOT_ALLOWED`.
+- Set `"environment"` to anything other than `production`: `deny` with `ENVIRONMENT_MISMATCH`, because the key is live.
 
 <Note>
 Production activation is intentionally outside this quickstart. Complete the sandbox/rehearsal path first, then follow the controlled customer acceptance process.
