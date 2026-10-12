@@ -22,16 +22,28 @@ A completed batch record, a signature, or technical system access does not by it
 </CardGroup>
 
 <Warning>
-**Research prototype — synthetic data only.** The GMP testbed is **not GxP-validated**, is **not a production MES/LIMS/ERP integration**, and is **not a validated batch-release process**. No customer enforcement or regulatory compliance is implied. A production claim would require a customer-specific integration, quality review, validation, and acceptance evidence.
+**Synthetic research demonstration — not GxP-validated.** These are simulated workflows, not live MES/LIMS/ERP integrations or a validated batch-release process. No production enforcement or regulatory compliance is implied; customer-specific integration, QA review, validation, and acceptance evidence would be required.
 </Warning>
 
 ## Three GMP workflows worth controlling
 
-| Action | What must be decided before execution | What the synthetic demonstration illustrates |
-| --- | --- | --- |
-| **Manufacturing batch release** | Is this certifier authorized for this product and site, is the exact batch record current, and are necessary quality conditions satisfied? | Hold or refuse release when key facts are missing; bind a single-use permission to one batch, record, certifier, and disposition. |
-| **Regulated record modification** | Who may edit this record, under which reason and training status, and what has changed since review? | Refuse unqualified, stale, or unauthorized edits; distinguish review evidence from permission to modify. |
-| **Manufacturing process control** | Is this proposed setpoint or recipe change in the permitted range, with necessary operator, supervisor, and equipment conditions? | Refuse a proposed write at a simulated controller boundary when conditions do not hold. |
+### Manufacturing batch release
+
+**Check before execution:** Is the certifier authorized for this product and site? Is the exact batch record current? Are necessary quality conditions satisfied?
+
+**Synthetic example:** Hold or refuse release when facts are missing. Bind a single-use permission to one batch, record, certifier, and disposition.
+
+### Regulated record modification
+
+**Check before execution:** Who may edit the record? Does the reason, training status, and latest record version support the change?
+
+**Synthetic example:** Refuse unqualified, stale, or unauthorized edits. Distinguish audit-review evidence from permission to modify the record.
+
+### Manufacturing process control
+
+**Check before execution:** Is the setpoint or recipe change within an acceptable range? Are the required operator, supervisor, and equipment conditions met?
+
+**Synthetic example:** Refuse a proposed write at a simulated controller boundary when conditions do not hold.
 
 The control pattern can be applied to existing MES, ERP/WMS, LIMS, QMS, or OT pathways **only after an actual execution boundary has been identified and tested**. Intercepting a request at a dashboard is not equivalent to controlling the underlying action.
 

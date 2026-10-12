@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "e940110748590bff1e545a9ed13c7cd481d391fb",
+  "source_sha": "871c8896c028c56eb07b8715c3a2c0146db9a999",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "f5d03239123159adf05333206a4dd63caf3ead35c5302dc1815f0a5a9859beda",
@@ -51,7 +51,7 @@
     "enterprise/index.mdx": "53a2ffc0b37b8c968cab2a5090036c675187fb41a21abf258c30f229c110a14a",
     "enterprise/scim-admin.mdx": "aae7fb209ffbfde0242a12673a586550f1233f25f5aa5a382c9448725d498241",
     "enterprise/siem-export.mdx": "6e8c0e8c63b4f161e3c28e6040926b627486ef5c391213b593c5d626e1807f30",
-    "gmp.mdx": "d6a8b8ae2bf49d006b00985ed24faca0b967bd6dfba53cc91ce6411cf3a1156b",
+    "gmp.mdx": "e137cfff20f1fb2b025be186fe0d08af38229a6bc918a0886dd0573c72903532",
     "guides/sso-setup.md": "745b5ba2229896f9ecccb6f0d1b476404e675bb4f2ebee87ee153feb16d0560c",
     "guides/v1-pilot-migration.mdx": "1e10d658f14c58559b5b792926dffd987f9634d6644cf7fcead9486ea908a0e5",
     "guides/webhooks.mdx": "6094a67114537793a759767fb779f0f1657ec64badc57b0f420be3bab0f328d5",
