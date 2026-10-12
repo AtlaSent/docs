@@ -1,0 +1,110 @@
+---
+title: "GMP controls: authorize consequential manufacturing actions"
+sidebarTitle: "GMP Controls"
+description: "Explore how AtlaSent's synthetic GMP testbed models execution-time authorization for batch release, regulated record changes, and process controls, and request a scoped demonstration."
+mode: "wide"
+---
+{/* Generated from the Atlasent docs source (site/gmp.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+**For batch release, data integrity, and process controls.**
+
+A completed batch record, a signature, or technical system access does not by itself establish authority to release inventory, alter a regulated record, or change a manufacturing setpoint.
+
+**AtlaSent is an authorization layer for consequential actions.** Its GMP research testbed illustrates how an organization can check current authority, supporting quality facts, and exact action binding *before* a connected system executes a regulated action. The native manufacturing, quality, and laboratory systems remain the systems of record.
+
+<CardGroup cols={2}>
+  <Card title="Request a GMP control demonstration" icon="calendar" href="https://cal.com/atlasent/discovery?utm_source=docs&utm_medium=gmp-controls">
+    Discuss one manufacturing or quality action you want to govern. We will use a synthetic scenario to map the decision point and show the proof boundary.
+  </Card>
+  <Card title="Explore GxP change controls" icon="book-open" href="/compliance/gxp-change-control">
+    Read the technical control model and regulatory context before a conversation.
+  </Card>
+</CardGroup>
+
+<Warning>
+**Research prototype — synthetic data only.** The GMP testbed is **not GxP-validated**, is **not a production MES/LIMS/ERP integration**, and is **not a validated batch-release process**. No customer enforcement or regulatory compliance is implied. A production claim would require a customer-specific integration, quality review, validation, and acceptance evidence.
+</Warning>
+
+## Three GMP workflows worth controlling
+
+| Action | What must be decided before execution | What the synthetic demonstration illustrates |
+| --- | --- | --- |
+| **Manufacturing batch release** | Is this certifier authorized for this product and site, is the exact batch record current, and are necessary quality conditions satisfied? | Hold or refuse release when key facts are missing; bind a single-use permission to one batch, record, certifier, and disposition. |
+| **Regulated record modification** | Who may edit this record, under which reason and training status, and what has changed since review? | Refuse unqualified, stale, or unauthorized edits; distinguish review evidence from permission to modify. |
+| **Manufacturing process control** | Is this proposed setpoint or recipe change in the permitted range, with necessary operator, supervisor, and equipment conditions? | Refuse a proposed write at a simulated controller boundary when conditions do not hold. |
+
+The control pattern can be applied to existing MES, ERP/WMS, LIMS, QMS, or OT pathways **only after an actual execution boundary has been identified and tested**. Intercepting a request at a dashboard is not equivalent to controlling the underlying action.
+
+## See the before-and-after boundary
+
+<Steps>
+  <Step title="A consequential action is proposed">
+    A user, service, or agent proposes releasing one batch, changing one regulated record, or writing one process parameter. The request identifies the exact action, target, actor, and relevant context.
+  </Step>
+  <Step title="Current authority and quality facts are checked">
+    The proposed policy evaluates authoritative inputs: scope of authority, training, segregation of duties, quality-system facts, record version, and any additional conditions appropriate to that workflow.
+  </Step>
+  <Step title="An authorized action receives a bounded permit">
+    Denied, held, or indeterminate requests cannot proceed through an enforcing gate. In the simulated permit flow, an allowed request receives a bounded, single-use permit.
+  </Step>
+  <Step title="Verify before the native system executes">
+    The ERP/WMS, record-store, or controller adapter checks the permit and its binding **before** the side effect. If an adapter lacks a pre-execution check, it is **observe-only** and must not be described as preventing the action.
+  </Step>
+  <Step title="Keep decision and effect evidence separate">
+    The authorization result and permit verification can be recorded. An actual batch status change, record write, or controller update is proven only by observed evidence from the execution system. A positive decision is not proof that an action ran.
+  </Step>
+</Steps>
+
+## What we can demonstrate today
+
+The GMP testbed contains **synthetic** scenarios for batch-release decisions, regulated data integrity, and process-control writes. Examples include an open deviation blocking a proposed release, a stale record preventing a write, and an out-of-range setpoint being refused in a simulated enforcing adapter.
+
+**The difference we show explicitly:** an enforcing adapter can refuse a prohibited action before execution; an observe-only integration may detect a problem afterward but cannot claim prevention.
+
+A demonstration is not a production pilot, vendor certification, regulatory assessment, or validation package.
+
+## Who should review this?
+
+- **QA and Quality Systems:** control ownership, quality decision rules, deviation handling, and defensible evidence.
+- **Manufacturing and Operations:** the exact point where batch stock status, records, or setpoints change.
+- **CSV/CSA and Validation:** intended use, computerized-system boundaries, supplier qualification, testing, and traceability.
+- **IT, OT, and Security:** identity, integration feasibility, fail-closed operation, and evidence readback.
+
+## Relevant regulatory context
+
+Organizations may evaluate these controls against requirements relevant to their products and jurisdictions, including **21 CFR Part 211**, **21 CFR Part 11**, **EU GMP Annex 11**, and, for applicable EU batch certification, **EU GMP Annex 16**. Mapping a proposed technical control to a regulation is **not a finding of compliance**.
+
+See [21 CFR Part 11](/compliance/21-cfr-part-11), [EU GMP Annex 11](/compliance/eu-annex-11), and [AtlaSent's published compliance status](/trust/compliance-status). Qualified customer QA, validation, and regulatory teams remain accountable for the intended-use determination.
+
+## Frequently asked questions
+
+### Can I connect an actual manufacturing system today?
+
+This page describes a synthetic testbed, not a generally available validated integration. A production path would first require the specific MES/ERP/LIMS/OT connection, quality-system review, and documented acceptance tests. We will not label an interface **Enforcing** until its execution boundary has been demonstrated.
+
+### Does AtlaSent replace a QP, QA unit, MES, or electronic batch record?
+
+No. AtlaSent is intended to support organizational authorization **before** an action. It does not make the product-quality decision, perform QP certification, replace the approved record, or stand in for the native system.
+
+### Is an approval enough to prove a batch was released?
+
+No. Approval, permit issuance, permit verification, native execution, and established effect are distinct facts. Each requires its own evidence.
+
+### What happens on an unavailable data feed?
+
+In the simulated **enforcing** flow, unresolved authorization facts or failed verification refuse execution. A real integration must prove that same behavior with the specific customer-controlled execution system before any prevention claim.
+
+---
+
+## Choose one decision to make safer
+
+Bring one concrete action, the system where it executes, and the team that owns its authorization. We can use a synthetic scenario to identify the applicable policy inputs, show allowed and refused outcomes, and define what would be needed to move from demonstration to a customer-specific proof.
+
+<CardGroup cols={2}>
+  <Card title="Request a GMP control demonstration" icon="arrow-right" href="https://cal.com/atlasent/discovery?utm_source=docs&utm_medium=gmp-controls&utm_campaign=demo">
+    Review your use case with AtlaSent. Synthetic demonstration; no validation or production-enforcement claim.
+  </Card>
+  <Card title="Review the technical documentation" icon="shield-check" href="/compliance/gxp-change-control">
+    See GxP change-control concepts, supporting authorization primitives, and related materials.
+  </Card>
+</CardGroup>

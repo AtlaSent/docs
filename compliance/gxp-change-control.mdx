@@ -1,70 +1,69 @@
 ---
 title: "GxP change control"
-description: "Change-control gates for regulated GxP systems — ICH Q10, Annex 11/15, 21 CFR 211, GAMP 5."
+description: "Execution-time authorization patterns for regulated system changes, their quality-system evidence, and what must be proven before a customer enforcement claim."
 ---
 {/* Generated from the Atlasent docs source (site/compliance/gxp-change-control.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-AtlaSent's `gxp:change-control` action class enforces change-control authorization gates for regulated systems, covering software validation lifecycle changes, infrastructure modifications, and manufacturing process updates.
+GxP change control is about more than recording an approved ticket. For any change that can alter a validated process or computerized system, the executing system must know whether **this exact change, by this actor, against this system and version, is currently authorized**.
 
-## Requirement-to-primitive mapping
+AtlaSent's authorization architecture can provide this decision boundary. **A policy template or a simulated evaluation is not evidence that a particular MES, LIMS, ERP, or production system is protected.** The actual execution system must be integrated and acceptance-tested.
 
-| Ref | Requirement | AtlaSent primitive |
-|---|---|---|
-| ICH Q10 §3.2          | Change management must assess impact and obtain approvals | `qrb_status`, `approvals[]` required context; QRB approval gate. |
-| EU GMP Annex 15 §10   | Validation change control must document impact on validated state | `validation_impact`, `gamp_category` gates. |
-| EU GMP Annex 11 §10   | Changes to computerized systems must follow formal change control | `system_name`, `cfr_part_11_applicable` gates. |
-| 21 CFR 211.100        | Written procedures required for production and process controls | `change_type`, `risk_level` authorization. |
-| GAMP 5 Chapter 8      | Risk-based approach to software change validation | `gamp_category`, `risk_level` routing. |
-| 21 CFR Part 11        | Electronic record integrity for audit-controlled changes | `cfr_part_11_applicable` gate + audit chain. |
+<Warning>
+**Integration and validation boundary.** This page describes a proposed GxP control pattern, not a qualified or GxP-validated deployment. A customer-specific regulated use requires appropriate QA/validation oversight, system risk assessment, change control, qualification, and proof that unauthorized execution cannot bypass the accepted gate.
+</Warning>
 
-## Starter templates
+<CardGroup cols={2}>
+  <Card title="Explore GMP control scenarios" icon="flask-conical" href="/gmp">
+    See the synthetic batch-release, data-integrity, and process-control scenarios and their limits.
+  </Card>
+  <Card title="Request a GMP demonstration" icon="calendar" href="https://cal.com/atlasent/discovery?utm_source=docs&utm_medium=gxp-change-control">
+    Bring one controlled action and discuss the exact execution boundary.
+  </Card>
+</CardGroup>
 
-Apply the full Annex 15 guard:
+## Requirement-to-control design
 
-```json
-{ "pack_id": "gxp-change-control", "template_id": "annex-15-full-guard" }
-```
+The references below inform a qualified organization's intended-use analysis; the mapping is **not a certification or compliance determination**.
 
-Or the fast path for low-risk like-for-like changes:
+| Reference | Control concern to evaluate | Candidate AtlaSent authorization input |
+| --- | --- | --- |
+| ICH Q10 change management | Approved assessment and organizational approval of relevant changes | Change identifier, risk classification, approved quality decision, actor authority |
+| EU GMP Annex 15 | Assessment and evidence of the effect of changes on validated status | Validation impact, affected equipment/process, documented test and release criteria |
+| EU GMP Annex 11 | Formal control of changes to computerized systems | Target system, exact proposed change, approved change record, execution boundary |
+| 21 CFR 211.100 | Written production/process procedures and controlled execution | Authorized change type, controlled procedure reference, qualified operator |
+| 21 CFR Part 11, where applicable | Reliable electronic records and electronic signatures | Appropriate identity, signature linkage, record integrity, attributable evidence |
 
-```json
-{ "pack_id": "gxp-change-control", "template_id": "like-for-like-fast-path" }
-```
+## Illustration: a proposed system change
 
-## Example evaluation context
+This is an **illustrative context shape**, not a copy-and-paste request guaranteed to match the deployed API or a released policy pack.
 
 ```json
 {
-  "system_name": "LIMS-v3",
-  "gamp_category": 5,
+  "change_ticket_id": "CHG-EXAMPLE-102",
+  "system_name": "LIMS-example",
   "change_type": "software_update",
+  "target_environment": "regulated-production",
   "risk_level": "major",
-  "qrb_status": "approved",
   "validation_impact": "revalidation_required",
-  "cfr_part_11_applicable": true,
-  "in_production_window": false,
-  "rollback_plan_verified": true,
-  "approvals": ["qa_head", "it_delegate", "site_qp"]
+  "quality_approval_status": "approved",
+  "rollback_plan_verified": true
 }
 ```
 
-## Implementation checklist
+Do not take an approval field supplied by the requesting actor on trust. The enforcing design must resolve or independently verify required facts from the authoritative quality/change system.
 
-- [ ] Register the change in your CMS before calling AtlaSent.
-- [ ] Include your CMS change identifier in the evaluation context (for example `change_ticket_id`) so the audit entry links back to the change record.
-- [ ] Populate `gamp_category` per GAMP 5 (1–5).
-- [ ] Set `risk_level` to `minor`, `major`, or `critical` per SOP.
-- [ ] Obtain QRB sign-off; set `qrb_status: "approved"` before release.
-- [ ] Set `validation_impact` to `none`, `revalidation_required`, or `full_validation`.
-- [ ] Set `rollback_plan_verified: true` before production changes.
-- [ ] Store the permit ID on the change record.
-- [ ] Call `/v1/permits/{id}/verify` after apply/rollback to close the loop.
+## Acceptance criteria for an enforcing implementation
 
-## ISO 27001 cross-walk
+1. **Locate the native action.** Identify where the target system commits the change; evaluating a form submission alone may leave alternate paths open.
+2. **Bind the request.** Include the exact target, version or content digest, authorized actor, and appropriate change evidence.
+3. **Evaluate fresh authority.** Resolve quality approvals, identity, responsibilities, training and relevant version/currentness from authoritative sources.
+4. **Verify the permit before execution.** A deny, hold, timeout, mismatch, expired or replayed permit must leave the protected effect unreachable on the accepted path.
+5. **Prove the outcome separately.** Record the determination and execution-point check; establish the system's applied state by native readback rather than inferring success from an authorization decision.
+6. **Test bypass and failure conditions.** Demonstrate behavior for alternate callers, retries, change mutations, stale approvers, unavailable facts, and service outages.
+7. **Complete customer validation.** The customer decides whether the controls and evidence are adequate for their intended regulated use, with qualified QA/validation approval.
 
-The same policy template satisfies the ISO 27001 change-management control A.12.1.2 when augmented with:
+An integration that cannot intercept the actual side effect is **observe-only**. It can support later review and reconciliation, but it cannot honestly claim to prevent an unauthorized change.
 
-- Information classification tag (`classification`)
-- Evidence of security review (`security_review_id`)
+## Explore and discuss
 
-See the `iso27001-change-mgmt` template in `gxp-starter`.
+Start with [GMP control scenarios](/gmp), then [21 CFR Part 11](/compliance/21-cfr-part-11), [EU GMP Annex 11](/compliance/eu-annex-11), and [published compliance status](/trust/compliance-status). To scope a specific execution boundary, [request a GMP control demonstration](https://cal.com/atlasent/discovery?utm_source=docs&utm_medium=gxp-change-control&utm_campaign=demo).

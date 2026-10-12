@@ -65,6 +65,7 @@
             "pages": [
               "deploy-gate",
               "production-change-gate-assessment",
+              "gmp",
               "ai-agent-governance",
               "protected-actions",
               "permit-verification",

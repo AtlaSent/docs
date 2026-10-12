@@ -33,10 +33,12 @@ CI pipeline / AI agent / human
   permit issued    blocked — action does not run
         │
         ▼
-  deploy executes
-        │
-        ▼
   [POST /v1-verify-permit]
+        │
+   valid│         invalid / error
+        │                └──► blocked — no deploy
+        ▼
+  deploy executes
         │
         ▼
   audit record (hash-linked, Ed25519-signed)
