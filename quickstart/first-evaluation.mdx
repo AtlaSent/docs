@@ -4,6 +4,10 @@ description: "Acquire a verified Permit and execute the action under it. Fail-cl
 ---
 {/* Generated from the Atlasent docs source (site/quickstart/first-evaluation.mdx). Do not edit here: this file is overwritten on every publish. */}
 
+<Note>
+These examples use `ehr.write`, which a new organization does not have until you provision that action and a policy for it. Without them every call here returns `deny`. On a new account, start with the [Developer / API quickstart](/quickstart/developer-api): it uses the `database.execute_sql` demo action the console seeds for you.
+</Note>
+
 The canonical AtlaSent surface is **two forms of a single
 execution-boundary contract**. Both mint a Permit, verify it
 end-to-end, and fail closed if anything other than `allow` happens.

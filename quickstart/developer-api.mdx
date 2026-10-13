@@ -6,7 +6,7 @@ description: "Run a safe AtlaSent evaluation, handle a Permit, verify it, and in
 
 ## 1. Get a key and seed the demo action
 
-Keys from [console.atlasent.io](https://console.atlasent.io) are **live** keys (`ask_live_...`). The production console does not issue test keys. Keep the key in a secret store, never in examples, source control, or client-side code.
+[Create a free account](https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=quickstart) if you don't have one. Keys from [console.atlasent.io](https://console.atlasent.io) are **live** keys (`ask_live_...`). The production console does not issue test keys. Keep the key in a secret store, never in examples, source control, or client-side code.
 
 A live key is accepted only with `context.environment` set to `production`. Any other value (`sandbox`, `test`, `staging`) is refused with `ENVIRONMENT_MISMATCH` before any policy runs, and the refusal is recorded.
 
@@ -57,5 +57,5 @@ Each of these changes one input and must not return `allow`:
 - Set `"environment"` to anything other than `production`: `deny` with `ENVIRONMENT_MISMATCH`, because the key is live.
 
 <Note>
-Production activation is intentionally outside this quickstart. Complete the sandbox/rehearsal path first, then follow the controlled customer acceptance process.
+The demo action executes nothing, so `"environment": "production"` here only matches your live key. Protecting a real production action is a separate step: provision its action class and policy, then follow the controlled customer acceptance process.
 </Note>

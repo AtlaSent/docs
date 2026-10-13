@@ -4,7 +4,9 @@ description: "Choose a safe AtlaSent quickstart and learn the authorization, Per
 ---
 {/* Generated from the Atlasent docs source (site/quickstart/overview.mdx). Do not edit here: this file is overwritten on every publish. */}
 
-Start with **[Choose your AtlaSent quickstart](/quickstart/choose-your-path)**.
+**Fastest path (about 5 minutes):** [create a free account](https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=quickstart), then follow the **[Developer / API quickstart](/quickstart/developer-api)**: one request to a demo action that returns `allow`, then the `hold` and `deny` variants.
+
+Other paths: **[Choose your AtlaSent quickstart](/quickstart/choose-your-path)**.
 
 <CardGroup cols={3}>
   <Card title="Developer / API" icon="code" href="/quickstart/developer-api">
@@ -38,5 +40,5 @@ Portable signed evidence bundles and offline third-party bundle verification mus
 </Warning>
 
 <Note>
-Quickstarts default to sandbox/rehearsal. Production activation is a separate controlled acceptance step.
+The quickstarts use a demo action that executes nothing. Console keys are live keys, so each request sends `context.environment: "production"`; that names the key's environment and activates nothing. Protecting a real production action is a separate, controlled step.
 </Note>

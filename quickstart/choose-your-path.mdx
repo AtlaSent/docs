@@ -27,5 +27,5 @@ All three paths use the same lifecycle:
 Do not collapse the stages. An `allow` does not prove execution. Permit verification does not prove the downstream effect occurred.
 
 <Note>
-Quickstarts default to sandbox or rehearsal. Production activation remains a separate, controlled acceptance step.
+The quickstarts use a demo action that executes nothing. Console keys are live keys, so each request sends `context.environment: "production"`; that names the key's environment and activates nothing. Protecting a real production action is a separate, controlled step.
 </Note>

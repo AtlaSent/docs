@@ -47,6 +47,7 @@
             "pages": [
               "index",
               "quickstart/overview",
+              "quickstart/developer-api",
               "quickstart/api-key",
               "quickstart/first-evaluation",
               "quickstart/verify-permit",
