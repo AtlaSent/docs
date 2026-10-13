@@ -9,8 +9,8 @@
     "dark": "#d7e8ed"
   },
   "logo": {
-    "light": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
-    "dark": "https://media.brand.dev/97553d34-8bba-428e-9c12-78eda9983b85.svg",
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
     "href": "https://atlasent.io/?utm_source=docs&utm_medium=docs"
   },
   "favicon": "https://media.brand.dev/6cdb6cd6-ca9b-4e45-b168-5d172d2b5554.jpg",
