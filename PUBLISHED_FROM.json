@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "9f314a2b11283184508f46ff319c41e039644c76",
+  "source_sha": "2f38505ab50988d350cddc4932dfea36e219b315",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "f5d03239123159adf05333206a4dd63caf3ead35c5302dc1815f0a5a9859beda",
@@ -73,11 +73,11 @@
     "quickstart/agent-mcp.mdx": "ad67a4efc865f7c72fb7b00e71de2098ad0246990bf7e804b2c4a10b2071e7e9",
     "quickstart/api-key.mdx": "af752998e8c844205f432e760f7e1356ae97066e6799957e81e5aa0f2e4d4c21",
     "quickstart/audit-export.mdx": "3ac974a66e16432b24b56dc136a7ff6adfb01738fba549e5fb5ae11bbca3dd28",
-    "quickstart/choose-your-path.mdx": "d41695d88be61abee2b7c51adb578b8f89626fed59ab8d2c24f8d334b5bf36e9",
-    "quickstart/developer-api.mdx": "8cb6bf416d0f38f7de36831fc22f9543e01399d9a59131f3c9c24c388d030dff",
+    "quickstart/choose-your-path.mdx": "9a76f5140219f960c9afe705031fe9f1b86e0e368ddc61445b60c19c88dac883",
+    "quickstart/developer-api.mdx": "798ce86d02bcf65269a6d367b92164f1f10afc25a737c53e14e79bf1bc966f51",
     "quickstart/enterprise-operator.mdx": "e6c3f2b1e75abfb8ac084cc865ae1c6feac53deb9b9bdfb62bbe13357226dce3",
     "quickstart/first-evaluation.mdx": "abb365d24f4dd5130f3bdaef6b8fa8d77dd82e351823641c73ab09ea0ced80ea",
-    "quickstart/overview.mdx": "0bb1e3341ba87edeb3c82c1fb1e170389bd75ba9be47a578d454d4d43c88f60f",
+    "quickstart/overview.mdx": "3e99b38d083735b03363da02511292c7aa41c9ab6ccf6dcbf041f6d0f0847a35",
     "quickstart/verify-permit.mdx": "8562caa17b2ba3925055a381079090eee068b27825f5a3bba3c23e1dd0df1ebc",
     "README.md": "6fd37c57fc3663ae5f4e210a004c750f1089dd827902dde17a1b208889a14062",
     "reference/concept-to-action-map.mdx": "ec6d40f8525d0454aac18adf91cfab7d5cf7aa65cc99261ab71d3282401e71f1",

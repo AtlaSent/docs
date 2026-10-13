@@ -6,7 +6,13 @@ description: "Run a safe AtlaSent evaluation, handle a Permit, verify it, and in
 
 ## 1. Get a key and seed the demo action
 
-[Create a free account](https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=quickstart) if you don't have one. Keys from [console.atlasent.io](https://console.atlasent.io) are **live** keys (`ask_live_...`). The production console does not issue test keys. Keep the key in a secret store, never in examples, source control, or client-side code.
+[Create a free account](https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=quickstart) if you don't have one. Then open **API Keys** in the console, click **New Key**, pick the **Evaluate only** preset, and copy the key. It is shown once. Put it in your shell:
+
+```bash
+export ATLASENT_API_KEY="ask_live_..."
+```
+
+Keys from [console.atlasent.io](https://console.atlasent.io) are **live** keys (`ask_live_...`). The production console does not issue test keys. Keep the key in a secret store, never in examples, source control, or client-side code. [Create an API key](/quickstart/api-key) has the details on scopes.
 
 A live key is accepted only with `context.environment` set to `production`. Any other value (`sandbox`, `test`, `staging`) is refused with `ENVIRONMENT_MISMATCH` before any policy runs, and the refusal is recorded.
 
