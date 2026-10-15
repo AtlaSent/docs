@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "48ef3eb69540c1b94e9e27b8265edae4b3000745",
+  "source_sha": "afc1ef2f982028d53b5d072138afb11b66f9d02e",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "f5d03239123159adf05333206a4dd63caf3ead35c5302dc1815f0a5a9859beda",
