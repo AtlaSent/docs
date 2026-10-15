@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "afc1ef2f982028d53b5d072138afb11b66f9d02e",
+  "source_sha": "4011ce7e81b2bc9673333ad0b14fa40ca5f30e59",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "f5d03239123159adf05333206a4dd63caf3ead35c5302dc1815f0a5a9859beda",
@@ -89,10 +89,10 @@
     "sdks/python.mdx": "cab11cce638560ae207eef12d3c5a879908ec26865630b79e10f8dbefa63aeef",
     "sdks/typescript.mdx": "cc2039d70771bd664d8a6f15ea445a20b043a388a66cca83ddf50a1fb9258f8a",
     "trust/audit-signing-key.mdx": "18885f9a254b1f1b4746a51f1976315954e62ca0d23deaff7c36eff53e473453",
-    "trust/compliance-status.mdx": "e9ff5d7607228c2f9eacbdb5981ae3f0621ff9d8bf8d83889e2a85397702d3bd",
+    "trust/compliance-status.mdx": "a396e5c8223e084d6a105fc0b01a1cb3e513044f4a1afb58cd5e5c3c9b4a45f3",
     "trust/contact.mdx": "1b5c0a48f0a7dae2ccc3871dc92be8cbbf6c0e424b4bc333ee37fb88a69348fd",
     "trust/get-help.mdx": "cb9d3fb2cd18add676a06877fa59053b5e67031ab12df0ad5d43448421ffb843",
-    "trust/index.mdx": "6ba1fbb0f38f8c4eaba972952b1c58a10e9f761f6437509903effac7e4f8a5fc",
+    "trust/index.mdx": "376cc1074e69e27ad078cb317bda59761911310c67737dd473950090152ee905",
     "trust/procurement.mdx": "7bd49f606a1d037c8d200b57e8c830bc8d5d5ae88eb970f0ee3a21ac1d429038",
     "trust/security-overview.mdx": "32214b5f4f59241adb9216e7eea49baf64a4dfff3dcde164c7bea2a63c9e3a5d",
     "trust/subprocessors.mdx": "52d5afe2c777c479bd08a68b34b273505245d0398efe26dc1dc19f6fddbd71ad"
