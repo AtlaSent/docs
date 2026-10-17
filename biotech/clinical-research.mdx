@@ -1,0 +1,69 @@
+---
+title: "Clinical authorization research"
+description: "Early synthetic-data research on authorization at execution and independent outcome verification in simulated clinical systems."
+---
+{/* Generated from the Atlasent docs source (site/biotech/clinical-research.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+## Research question
+
+Can authorization remain bound to the exact target and command when information changes between approval and execution?
+
+AtlaSent researches this question in two settings: automated infusion-rate changes in a simulated ICU, and disclosure of one clinical-trial participant's treatment assignment to one recipient.
+
+**All devices, clinical systems and patient data in the reported study are simulated or synthetic.** This work does not establish clinical safety, effectiveness, GxP validation, standards conformance or compatibility with any vendor.
+
+## Prototype and experiment
+
+The prototype explores checking a bounded authorization at execution and separately verifying the reported outcome. These are distinct properties: authorization does not prove that the downstream system performed the correct action.
+
+The P1-CONF-1 experiment compared five mechanisms on identical scenarios:
+
+- Access control plus an approval record.
+- A stronger baseline that invalidates approval after edits and rechecks the role at release.
+- Authorization bound to the action at execution.
+- Independent outcome verification.
+- Binding plus outcome verification.
+
+The simulated pump suite contains 13 scenario cards. The disclosure suite contains 2,400 runs per mechanism. The analysis is descriptive; the workloads have not had independent statistical review.
+
+## Recorded results and limits
+
+| Measure | Full mechanism | Stronger baseline | Interpretation |
+| --- | --- | --- | --- |
+| Unauthorized simulated pump changes | 0 | 3 | Prevention improvement within these pump scenarios |
+| Legitimate simulated pump changes wrongly refused | 0 | 0 | A workload-specific result, not a clinical safety or availability guarantee |
+| Wrong disclosure outcomes confirmed as correct | 0 | 227 | Independent outcome verification avoided false confirmation |
+| Unauthorized actual disclosures | 227 | 227 | No additional disclosure-prevention benefit over this stronger baseline |
+| Evidence completeness | 0.996 | 0.75 | The full mechanism failed its pre-specified target of 1 |
+
+Three pass/fail endpoints passed and one failed. Two other endpoints were reported comparisons without pass criteria. Downstream defects remained possible. Unacknowledged revocations could commit under every tested mechanism.
+
+The study was performed by its builder. Independent reproduction is outstanding. The protocol hash was fixed before the analysis, but an analysis was executed before the git commit recording the freeze. This procedural lapse is disclosed; the failed endpoint was not revised to pass.
+
+These results describe one experiment. Subsequent implementation changes do not retroactively change its evidence.
+
+## What we want experts to challenge
+
+- Are the clinical scenarios and strongest comparison controls appropriate?
+- What do existing device and trial-system safeguards already provide?
+- Does action binding or independent outcome verification add a useful property?
+- What safety, emergency-access and availability requirements should govern a real integration?
+- What would a credible, bounded nonproduction evaluation need to demonstrate?
+
+Clinical thresholds, human factors, real-device behavior and real-network conditions require further evaluation. The prototype's refusal behavior is not an established clinical safety policy.
+
+## Founder
+
+Betty C. Chen is the founder of AtlaSent. Her background in finance, operations and internal controls informs the company's focus on establishing organizational authority for consequential software actions.
+
+The clinical work is early research. Clinical assumptions and integration studies require domain-expert review.
+
+## Discuss or review the research
+
+We welcome technical criticism, research-design feedback and interest in independent reproduction. The initial request is a short exploratory conversation. Any later evaluation would have agreed scope, responsibilities, access and data-handling terms.
+
+Contact [contact@atlasent.io](mailto:contact@atlasent.io). Please do not send patient data or confidential clinical records.
+
+Reproduction materials are available for discussion; code access and distribution terms must be agreed before a package is shared. Reviewing this research does not imply endorsement or clinical validation.
+
+For the broader platform posture, see [Compliance status](/trust/compliance-status).

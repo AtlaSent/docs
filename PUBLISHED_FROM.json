@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "8a288216339881d36552ad71d7feb75fa39177c0",
+  "source_sha": "482ea745f6077f80672aa3e8c79ae922c09448f2",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "f5d03239123159adf05333206a4dd63caf3ead35c5302dc1815f0a5a9859beda",
@@ -14,6 +14,7 @@
     "api-reference/versioning.mdx": "844af4dab8e3f7fb7af211d9821118ba39cc9f7115dd2a865af77a96ae259f15",
     "architecture.mdx": "521f42999907afedd6c90805e3161b4da129b2a47a27ccd3baacdcf1ad15d551",
     "authorization-for-ai-agents.mdx": "9887ce1ee2cb831b578049089d78ad30d12b76587e9064dc3ae071917e4bcfda",
+    "biotech/clinical-research.mdx": "08fe5383f53f30ab8ff3319aabbcfc1ad1e5d529fadc4e7ef21edbe1724c66e0",
     "biotech/overview.mdx": "3295ca38e9bde2fdc97916aa5681b497a68010b427824f01b62f925dfedcc43a",
     "biotech/thesis.mdx": "183fd365172b192c6e4722941bc102c64ccff7b8e2769926079a9c3543ca463b",
     "changelog/api.mdx": "1cd263fc4e231e6b0e2eea4e54a1f46d85e0c25c4cf249b3575b18fe333b439d",
@@ -47,7 +48,7 @@
     "console/index.mdx": "25bc465242f043e1861b9f67eb175b851e3e18939caa5d2b95e75bf24d1b8b4e",
     "console/screens-and-fields.mdx": "6e3835b1326a9057866fda08242cbbe8b30ee53e70c0747bc24d4e16278845f2",
     "deploy-gate.mdx": "f64ec74a3b7df8f9689ec62a8b68160aef53dc4cbd166b20f9b110c0ff11768a",
-    "docs.json": "63af264ee7ed99bf111f1270918c7c3b3f07008c27e0890b6db601fd698ba6cf",
+    "docs.json": "44f1f86790a116deb406fafe2f86a9b19b3406b9d42f0573f8a5ca2f4e7f118f",
     "enterprise/index.mdx": "53a2ffc0b37b8c968cab2a5090036c675187fb41a21abf258c30f229c110a14a",
     "enterprise/scim-admin.mdx": "aae7fb209ffbfde0242a12673a586550f1233f25f5aa5a382c9448725d498241",
     "enterprise/siem-export.mdx": "6e8c0e8c63b4f161e3c28e6040926b627486ef5c391213b593c5d626e1807f30",
