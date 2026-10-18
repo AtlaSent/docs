@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "a449b4b65b4b9a2301b1a0326e63f7d4de1f39bb",
+  "source_sha": "1f9ab104871b593d984c92905e2d772b634c831d",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "768d3ca39973c523386f0e5433afeda8522b10009645d5ae8e6cb4fdb256586b",
@@ -74,7 +74,7 @@
     "production-change-gate-assessment.mdx": "989560c7ec41103df648be908f94f4d653b8701e15cc06e16be2f244b32d3f73",
     "protected-actions.mdx": "c8f49b0ff493ddfd128053a804c53fbd989743288d50721a9a9814907593f735",
     "quickstart/agent-mcp.mdx": "ad67a4efc865f7c72fb7b00e71de2098ad0246990bf7e804b2c4a10b2071e7e9",
-    "quickstart/api-key.mdx": "af752998e8c844205f432e760f7e1356ae97066e6799957e81e5aa0f2e4d4c21",
+    "quickstart/api-key.mdx": "39333317cab9d09f4ab139c4ae5b3810bf9043759ef2c86cceb553336775cbe9",
     "quickstart/audit-export.mdx": "3ac974a66e16432b24b56dc136a7ff6adfb01738fba549e5fb5ae11bbca3dd28",
     "quickstart/choose-your-path.mdx": "9a76f5140219f960c9afe705031fe9f1b86e0e368ddc61445b60c19c88dac883",
     "quickstart/developer-api.mdx": "798ce86d02bcf65269a6d367b92164f1f10afc25a737c53e14e79bf1bc966f51",
