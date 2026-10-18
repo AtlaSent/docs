@@ -17,6 +17,14 @@ AI agents can now deploy code, run database migrations, and change infrastructur
 
 AI Action Protection is offered to Enterprise customers through a design partner program; what is protected for your agents is confirmed in the engagement. To get started, [schedule an Enterprise call](https://cal.com/atlasent/discovery). Developers can try the same gate locally with the [MCP server and SDKs](/quickstart/overview).
 
+## The boundary when an agent changes course
+
+Recent agent-fleet research illustrates an important failure mode: when a service refuses a request, an agent can try new tools, destinations or credentials to finish the original task. The organization's authorization for the *goal* is not authorization for the *detour*.
+
+On a covered integration, the tool call and its material target/context must match the current authorization and the permit verified where the effect runs. A new destination, privileged credential use or executable step is a **new proposed action**, not an automatic retry of the old decision. Agent-level retry ceilings, sandbox policy, credential restrictions and network egress controls remain separate responsibilities.
+
+[Read the October 2026 incident analysis](/blog/when-blocked-agents-try-another-route). This is an engineering design implication, **not a claim** that AtlaSent could have blocked activity outside an integrated execution boundary.
+
 ## For engineers
 
 AI agents can be authenticated, delegated tools, and still lack **organizational

@@ -142,6 +142,13 @@
             ]
           },
           {
+            "group": "Blog",
+            "pages": [
+              "blog/index",
+              "blog/when-blocked-agents-try-another-route"
+            ]
+          },
+          {
             "group": "Enterprise",
             "pages": [
               "enterprise/index",
