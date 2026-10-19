@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "b5982bdb153e16e2eea6a1bf4701c93cf8789c8e",
+  "source_sha": "41113fdc89633d92c4b56c8074b8c1b5402d01d9",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "768d3ca39973c523386f0e5433afeda8522b10009645d5ae8e6cb4fdb256586b",
@@ -77,11 +77,11 @@
     "quickstart/api-key.mdx": "39333317cab9d09f4ab139c4ae5b3810bf9043759ef2c86cceb553336775cbe9",
     "quickstart/audit-export.mdx": "3ac974a66e16432b24b56dc136a7ff6adfb01738fba549e5fb5ae11bbca3dd28",
     "quickstart/choose-your-path.mdx": "9a76f5140219f960c9afe705031fe9f1b86e0e368ddc61445b60c19c88dac883",
-    "quickstart/developer-api.mdx": "798ce86d02bcf65269a6d367b92164f1f10afc25a737c53e14e79bf1bc966f51",
+    "quickstart/developer-api.mdx": "3c02426d6a2955b0c2acd7a08ced75048036861a9d7876bfe23cec39318aff54",
     "quickstart/enterprise-operator.mdx": "e6c3f2b1e75abfb8ac084cc865ae1c6feac53deb9b9bdfb62bbe13357226dce3",
     "quickstart/first-evaluation.mdx": "abb365d24f4dd5130f3bdaef6b8fa8d77dd82e351823641c73ab09ea0ced80ea",
     "quickstart/overview.mdx": "3e99b38d083735b03363da02511292c7aa41c9ab6ccf6dcbf041f6d0f0847a35",
-    "quickstart/verify-permit.mdx": "8562caa17b2ba3925055a381079090eee068b27825f5a3bba3c23e1dd0df1ebc",
+    "quickstart/verify-permit.mdx": "40affa86b4968271eaa1927f7b848de858860ecf4d2ca9387624f6385321160d",
     "README.md": "6fd37c57fc3663ae5f4e210a004c750f1089dd827902dde17a1b208889a14062",
     "reference/concept-to-action-map.mdx": "ec6d40f8525d0454aac18adf91cfab7d5cf7aa65cc99261ab71d3282401e71f1",
     "reference/protected-action-canon.mdx": "b342762dadec6880362511eba4ab7cf1485730636322f358a6bfff3313887f67",

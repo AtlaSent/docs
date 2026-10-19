@@ -21,7 +21,7 @@ Finish the console's setup flow (**Connect my organization**). It seeds a demo `
 ## 2. Evaluate a protected action
 
 ```bash
-curl -X POST https://api.atlasent.io/functions/v1/v1-evaluate \
+RESP=$(curl -sS -X POST https://api.atlasent.io/functions/v1/v1-evaluate \
   -H "Authorization: Bearer $ATLASENT_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -33,10 +33,16 @@ curl -X POST https://api.atlasent.io/functions/v1/v1-evaluate \
       "target_database": "analytics",
       "destructive": false
     }
-  }'
+  }')
+echo "$RESP" | jq '{decision, permit_token, execution_hash_expected}'
 ```
 
-The demo policy allows a non-destructive statement from one of its listed DBAs, so this returns `allow` with a Permit.
+The demo policy allows a non-destructive statement from one of its listed DBAs, so this returns `allow` with a Permit. The examples on this page use [`jq`](https://jqlang.org) to read the response.
+
+On `allow` the response carries two values you need at the next step:
+
+- `permit_token`: the signed, single-use Permit (`pt.v4.…`), valid for 1 hour.
+- `execution_hash_expected`: the payload hash the Permit is bound to. A Permit issued for `production` must be verified with this exact value, or verification is refused with `PAYLOAD_HASH_REQUIRED`.
 
 The canonical runtime decision is one of `allow`, `deny`, `hold`, or `escalate`.
 
@@ -46,13 +52,45 @@ If the response requires and includes a Permit, carry that exact artifact to the
 
 ## 4. Verify before the effect
 
-Use the canonical verifier path documented in [Verify a Permit](/quickstart/verify-permit). Verification checks the artifact's authenticity/currentness and applicable binding, expiry, revocation, and replay state.
+Present the Permit to `/v1-verify-permit` immediately before the effect. Send the same `action_type` and `actor_id` you evaluated, and the `execution_hash_expected` value as `payload_hash`:
 
-**Permit verified does not mean execution happened.** It means the execution gate has established the Permit contract required before the effect.
+```bash
+PERMIT_TOKEN=$(echo "$RESP" | jq -r '.permit_token')
+PAYLOAD_HASH=$(echo "$RESP" | jq -r '.execution_hash_expected')
+
+curl -sS -X POST https://api.atlasent.io/functions/v1/v1-verify-permit \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"permit_token\": \"$PERMIT_TOKEN\",
+    \"action_type\": \"database.execute_sql\",
+    \"actor_id\": \"dba.alice\",
+    \"environment\": \"production\",
+    \"payload_hash\": \"$PAYLOAD_HASH\"
+  }" | jq '{valid, outcome, verify_error_code, reason, consumed}'
+```
+
+A verified Permit returns `"valid": true` and `"consumed": true`. Gate the effect on `valid`, not on the HTTP status: most refusals also return HTTP 200, with `"valid": false` and a `verify_error_code`. Treat any other status, a timeout, or an unreadable body as a refusal too. The **Evaluate only** key preset includes the `verify:execute` scope this call needs.
+
+The Permit is single-use. Run the same verify request a second time and it is refused with `PERMIT_ALREADY_USED`. Evaluate again to get a new Permit.
+
+| `verify_error_code` | What it means |
+|---|---|
+| `PAYLOAD_HASH_REQUIRED` | `payload_hash` was omitted. Send the `execution_hash_expected` value from the evaluate response. |
+| `PAYLOAD_MISMATCH` | `payload_hash` is not the value the Permit is bound to. Send `execution_hash_expected` unchanged. |
+| `ACTOR_MISMATCH` / `ACTION_TYPE_MISMATCH` | `actor_id` or `action_type` differs from the evaluate request. |
+| `ENVIRONMENT_MISMATCH` | `environment` differs from the environment the Permit was issued for. |
+| `PERMIT_ALREADY_USED` | The Permit was already verified and consumed. |
+| `PERMIT_EXPIRED` | More than 1 hour passed since evaluate. |
+| `MISSING_PERMIT` | `permit_token` was empty. Check that the evaluate response was `allow`. |
+
+**Permit verified does not mean execution happened.** It means the execution gate has established the Permit contract required before the effect. [Verify a Permit](/quickstart/verify-permit) has the full request and response reference.
 
 ## 5. Inspect evidence
 
-Continue to [Audit export](/quickstart/audit-export) to inspect the decision and verification evidence. Execution/effect is shown only when the applicable observer/provider evidence establishes it.
+Open the console. **Decisions** (`/decisions`) lists the evaluation you just made, and **Permits** (`/permits`) lists the Permit it issued. Both read the runtime system of record, not a copy.
+
+Continue to [Audit export](/quickstart/audit-export) to export the decision and verification evidence. Execution/effect is shown only when the applicable observer/provider evidence establishes it.
 
 ## Negative tests
 

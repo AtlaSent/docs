@@ -17,58 +17,64 @@ A permit token is not proof of authorization on its own — it's proof of author
 
 ## The request
 
-<CodeGroup>
+`/v1-verify-permit` is the canonical verifier. Present the `permit_token` together with the `action_type`, `actor_id`, and environment you evaluated, and the evaluate response's `execution_hash_expected` value as `payload_hash`. The key needs the `verify:execute` scope; the **Evaluate only** preset includes it.
 
 ```bash curl
-curl -X POST "$ATLASENT_API_URL/v1/permits/$PERMIT_ID/verify" \
-  -H "Authorization: Bearer $ATLASENT_API_KEY"
+curl -sS -X POST "$ATLASENT_API_URL/v1-verify-permit" \
+  -H "Authorization: Bearer $ATLASENT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"permit_token\": \"$PERMIT_TOKEN\",
+    \"action_type\": \"database.execute_sql\",
+    \"actor_id\": \"dba.alice\",
+    \"environment\": \"production\",
+    \"payload_hash\": \"$PAYLOAD_HASH\"
+  }"
 ```
 
-```typescript TypeScript
-const verified = await client.verifyPermitById(result.permitId);
-if (verified.valid) {
-  await executeTheAction();
-}
-```
-
-```python Python
-verified = client.verify_permit_by_id(result.permit_token)
-if verified.valid:
-    execute_the_action()
-```
-
-</CodeGroup>
+`PERMIT_TOKEN` and `PAYLOAD_HASH` are the `permit_token` and `execution_hash_expected` fields of the `/v1-evaluate` response; the [Developer / API quickstart](/quickstart/developer-api) shows how to capture them. A Permit issued for `production` is refused with `PAYLOAD_HASH_REQUIRED` if `payload_hash` is omitted.
 
 ## The response
 
-The canonical verification envelope:
-
 <ResponseField name="valid" type="boolean" required>
-  `true` if the permit is current, signature-valid, and not revoked.
+  `true` only when the Permit verified and was consumed. Gate the action on this field.
 </ResponseField>
 
-<ResponseField name="verification_type" type="string" required>
-  Always `"permit"` on this surface.
+<ResponseField name="outcome" type="string" required>
+  `"allow"` on success, `"deny"` otherwise.
+</ResponseField>
+
+<ResponseField name="verify_error_code" type="string">
+  On `valid: false`, a stable code such as `PAYLOAD_HASH_REQUIRED`, `PAYLOAD_MISMATCH`, `ACTOR_MISMATCH`, `ACTION_TYPE_MISMATCH`, `ENVIRONMENT_MISMATCH`, `PERMIT_EXPIRED`, `PERMIT_ALREADY_USED`, or `MISSING_PERMIT`.
 </ResponseField>
 
 <ResponseField name="reason" type="string">
-  On `false`, an operator-readable explanation (e.g. "Permit expired",
-  "Permit was explicitly revoked"). `null` on success.
+  An operator-readable explanation of the outcome.
 </ResponseField>
 
-<ResponseField name="verified_at" type="string" required>
-  ISO 8601 server clock at verification.
+<ResponseField name="consumed" type="boolean">
+  `true` when this call consumed the Permit. A consumed Permit cannot be verified again.
 </ResponseField>
 
-<ResponseField name="evidence" type="object" required>
-  Type-specific evidence: `{ permit_id, status, actor_id, action_id, expires_at, payload_hash, decision_id }`.
+<ResponseField name="decision_id" type="string">
+  The Decision that issued the Permit, when known.
 </ResponseField>
+
+<ResponseField name="expires_at" type="string">
+  ISO 8601 expiry of the Permit, when known.
+</ResponseField>
+
+Most refusals return HTTP 200 with `valid: false`, so a 2xx status is not authorization. Read `valid`, and treat any other status, a timeout, or an unreadable body as a refusal.
+
+## With an SDK
+
+Use the SDK's execution-boundary helper, [`protect()` / `with_permit()` / `withPermit()`](/quickstart/first-evaluation), so verification happens immediately before the protected effect. If you separate evaluation from execution, use the canonical verification request above at the execution boundary. Do not substitute a permit lifecycle lookup for signature, binding and replay verification.
 
 ## When to call verify explicitly
 
 The canonical execution-boundary surface — [`protect()` / `with_permit()` / `withPermit()`](/quickstart/first-evaluation) — already issues this verify call internally and binds it into the audit chain. Reach for the explicit verify call in these cases:
 
-- **Permit crossed a process boundary.** Service A called `protect()` and forwarded the `permit_id` to service B; B wants to re-confirm the permit is still current before acting on it.
+- **Permit crossed a process boundary.** Service A called `evaluate()` and forwarded the unconsumed `permit_token` and its execution binding to service B; B verifies immediately before acting. A permit already consumed by `protect()` cannot be forwarded for reuse.
 - **Long-running flow.** Time has elapsed between the policy decision and the state-changing call, and policy or actor state may have moved (e.g. operator revocation, TTL drift). Verify just before execute.
 - **You held the permit token after `evaluate()` rather than `protect()`.** The raw `evaluate()` primitive does not verify — callers using it must verify before executing.
 
