@@ -1,0 +1,106 @@
+---
+title: "Account, organization and billing"
+description: "Sign up, secure your account, create an organization, add an approver, and choose, change or cancel a plan."
+---
+{/* Generated from the Atlasent docs source (site/quickstart/account-and-billing.mdx). Do not edit here: this file is overwritten on every publish. */}
+
+This page covers everything around the product itself: your account, your organization, the people who can approve, and your plan. When it is done, continue with [Create an API key](/quickstart/api-key).
+
+## 1. Create your account
+
+<Steps>
+  <Step title="Sign up">
+    Open [console.atlasent.io/auth/sign-up](https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=quickstart). Sign up with Google, or with an email address and password.
+  </Step>
+  <Step title="Confirm your email">
+    Email sign-ups get a confirmation email. The link opens the Console on a "confirmed" page. If the link has expired, sign in with the same address. The sign-in page offers to resend the confirmation email when an address is not yet confirmed.
+  </Step>
+  <Step title="Turn on an authenticator app">
+    Owners and admins must use an authenticator app (TOTP) before the Console opens administrative pages, such as members, keys and billing. You are asked to enrol the first time you open one. Save the recovery codes it shows you: they are how you get back in if you lose the device.
+  </Step>
+</Steps>
+
+<Note>
+**Forgot your password?** Use **Forgot password** on the sign-in page. The reset link works once and expires. After you set a new password, sign in again with it. An expired or already-used link shows "Invalid or Expired Link". Request a new one.
+</Note>
+
+## 2. Create your organization
+
+After your first sign-in, the Console opens onboarding (`/onboarding`) and creates your organization. That organization is your tenant: policies, keys, decisions and evidence all belong to it, and nothing is shared with other organizations. To add more later, use **Create New Organization** in the organization switcher.
+
+You start on the **Free** plan. Nothing is charged, and no payment details are requested.
+
+<Tip>
+Check the organization name in the header before you create keys or policies. Every key, policy and permit is bound to the organization it was created in. A key from one organization cannot act in another.
+</Tip>
+
+## 3. Add a second person as approver
+
+Policies that require approval need someone other than the person requesting the change. **Nobody can approve their own request, on any plan.** A one-person workspace can therefore try every part of AtlaSent except a policy that needs an independent approver. Such a request stays on hold, by design.
+
+<Steps>
+  <Step title="Invite them">
+    Go to **Team** (`/team`) and choose **Invite a Person**. They accept the emailed invitation and sign in to your organization.
+  </Step>
+  <Step title="Give them an approver grant">
+    On **Team → Members** (`/team/members`, owners and admins), use **Issue approver grant** for that person. A grant decides which consequential actions they may approve. It is separate from their role.
+  </Step>
+  <Step title="They approve from My Approvals">
+    A held request appears in the approver's **My Approvals** (`/my-approvals`). A link to a single request opens it there after sign-in.
+  </Step>
+</Steps>
+
+## 4. Plans
+
+| Plan | Price | For |
+|---|---|---|
+| **Free** | $0 | A hosted workspace to learn the authorization loop in advisory mode. 1,000 hosted evaluations per month. |
+| **Team** | $299/month or $2,990/year | Shared policy, approval workflows and **hosted fail-closed enforcement** of protected actions. |
+| **Enterprise** | Custom annual contract | Organization-wide authority, identity integration, audit export and contract terms. |
+
+Developer Cloud ($49/month) is planned and not yet on sale. Local blocking with the public MCP gate and SDKs is free for everyone, with or without an account. The [pricing page](https://console.atlasent.io/pricing?utm_source=docs&utm_medium=quickstart) is the current source for what each plan includes.
+
+### Upgrade
+
+<Steps>
+  <Step title="Open billing">
+    Go to **Settings → Billing** and choose **Upgrade plan**. Only owners and admins can change the plan.
+  </Step>
+  <Step title="Pay on the Stripe page">
+    Choose the plan. You are sent to a Stripe-hosted Checkout page; AtlaSent never sees your card. If you leave Checkout, nothing is charged and you can start again.
+  </Step>
+  <Step title="Wait for the plan to apply">
+    Payment, plan and enforcement are three separate steps. Once Stripe confirms the payment, your organization's plan updates. That normally takes seconds; refresh Billing if it has not. Enforcement does not switch on by itself: you turn it on for each protected action when you are ready.
+  </Step>
+</Steps>
+
+### Change payment method, invoices, cancel
+
+**Settings → Billing → Manage Billing** opens the Stripe customer portal. There you can change your payment method, download invoices and cancel. When a paid subscription ends, your organization returns to Free.
+
+### A payment fails
+
+If a renewal payment fails, Billing shows **"Your last payment failed — update your payment method"** with a button to the portal. Update the card there and Stripe retries it. If the subscription ends unpaid, your organization returns to Free.
+
+<Note>
+**Billing never turns protection off.** Whatever your billing state, AtlaSent keeps evaluating, verifying, denying, holding, auditing and serving evidence. A billing problem can stop you *adding* paid capability, such as upgrading, new keys or activating enforcement. It never weakens a protection that is already running.
+</Note>
+
+## 5. Troubleshooting
+
+| You see | Meaning | What to do |
+|---|---|---|
+| "Billing details could not be loaded" | The Console could not reach billing. | Use **Retry billing options**. If it persists, contact support. |
+| Activation refused, trial cannot activate | A trial can install and test a pack, but cannot switch on enforcement. | Upgrade to Team, then activate. |
+| Upgrade or new key refused, entitlement unknown | AtlaSent could not confirm your plan, so it refuses anything that would expand it. Existing protection is unaffected. | Contact support with your organization name. This is not fixed by retrying. |
+| HTTP 403 `insufficient_scope` | The API key lacks a scope the call needs. | See [key scopes](/quickstart/api-key). `production.deploy` also needs `idp_broker:mint`. |
+| HTTP 429 `QUOTA_EXCEEDED` on evaluate | The monthly evaluation allowance is used up. | Upgrade, or wait for the next month. |
+| HTTP 429 `RATE_LIMITED` | Too many requests in a short time. | Retry with backoff. This is not a plan limit. |
+| A request stays on hold | It needs an approver other than the requester. | Add an approver (step 3 above). |
+| "Request Not Found" on an approval link | The request expired or was resolved, or you cannot see it: the wrong organization is selected, or you have no approver grant covering it. AtlaSent gives the same answer in each case, so it does not reveal which requests exist. | Select the right organization, check your grant on **Team → Members**, then open **My Approvals**. If it is still missing, ask for a fresh request. |
+
+For deny codes on evaluate and verify, see [Deny codes](/concepts/deny-codes).
+
+## Get help
+
+Email **support@atlasent.io** for sign-in and billing help. Include your organization name and what you were doing; never send an API key, password or authentication code. See [Get help](/trust/get-help) for what to include, and [Contact](/trust/contact) for security reports.
