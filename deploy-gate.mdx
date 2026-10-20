@@ -76,6 +76,16 @@ steps:
 
 If the policy allows the deployment and the permit verifies, the gate step passes and sets `verified` to `true`. If not, it fails with the denial reason. Gate the deploy step on `verified`, not on `decision`.
 
+The `ATLASENT_API_KEY` secret needs the scopes `evaluate:write`,
+`verify:execute`, and `idp_broker:mint`. `production.deploy` runs only under
+a verified GitHub workload identity, and `idp_broker:mint` is what lets the
+action get one. AtlaSent refuses a key that lacks it with HTTP 403 before
+any policy decision, so the deploy never runs. The **Evaluate only** preset from
+the quickstart doesn't include `idp_broker:mint`: create the key with
+**Custom** scopes. Only an organization admin can grant `idp_broker:mint`. See
+[Key scopes](/integrations/github-action#key-scopes) for the scopes
+the other modes need.
+
 ### TypeScript SDK
 
 ```ts
@@ -149,7 +159,7 @@ Every deploy gate call produces a tamper-evident audit record:
 | `decision` | `allow` |
 | `policy_bundle_id` | `bndl_abc123` |
 | `policy_version` | `v3` |
-| `permit_token` | `pt.v2.…` (consumed on verify) |
+| `permit_token` | `pt.v4.…` (consumed on verify) |
 | `audit_hash` | SHA-256 hash chain |
 | `signature` | Ed25519-signed on export |
 
@@ -159,4 +169,4 @@ The chain is append-only and hash-linked, so any change to a recorded decision a
 
 - [GitHub Action reference](/integrations/github-action)
 - [AI Agent Governance](/ai-agent-governance) — broader context for AI agent authorization
-- Audit verification — verify the signed export offline
+- [Export and verify the audit chain](/quickstart/audit-export) — verify the signed export offline

@@ -20,7 +20,7 @@ The quickstart key's `audit:read` scope is sufficient. The export is newline-del
 
 ## Verify the bundle offline
 
-Use the public `atlasent-audit-verify` CLI (install and usage). Verify against the public key you pinned from the [Audit signing key](/trust/audit-signing-key) page, not a key returned by the same channel as the export:
+Use the public `atlasent-audit-verify` CLI. Verify against the public key you pinned from the [Audit signing key](/trust/audit-signing-key) page, not a key returned by the same channel as the export:
 
 ```bash
 atlasent-audit-verify --chain chain.ndjson --keys atlasent-audit-key.pem --require-signatures

@@ -24,6 +24,17 @@ API keys are the primary auth for service-to-service calls (your AI agent → At
 </Steps>
 
 <Note>
+  **Gating `production.deploy` with the GitHub Action needs one more scope.**
+  The **Evaluate only** preset is enough for this quickstart, but not for the
+  [GitHub Action](/integrations/github-action) gating `production.deploy` or
+  another change-controlled action. That key needs `evaluate:write`,
+  `verify:execute`, and `idp_broker:mint`: choose **Custom** scopes. Only an
+  organization admin can grant `idp_broker:mint`. Without it, the Action's
+  workload-identity request is refused with HTTP 403 before any policy
+  decision. See [Key scopes](/integrations/github-action#key-scopes).
+</Note>
+
+<Note>
   **Keys on the self-serve free plan expire within 30 days.** Leave the expiry blank and the key lasts 30 days, or pick 1–30. The create dialog shows how long the key will last. Create a new key before then, or calls start failing authentication. On a paid plan, expiry is optional, up to 365 days.
 </Note>
 

@@ -42,6 +42,30 @@ For change-controlled action types such as `production.deploy`, grant the
 job `permissions: id-token: write` so the action can mint a verified GitHub
 workload identity for the actor.
 
+## Key scopes
+
+The key in `ATLASENT_API_KEY` needs these scopes for the gate on this page:
+
+| Scope | What it's for |
+|---|---|
+| `evaluate:write` | Request the authorization decision. |
+| `verify:execute` | Verify the permit before the protected step runs. |
+| `idp_broker:mint` | Exchange the job's GitHub OIDC token for a verified workload identity. Required for the change-controlled action types: `production.deploy`, `infrastructure.change`, `production.rollback`, and `secret.configuration.change`. |
+
+Without `idp_broker:mint`, AtlaSent refuses the workload-identity request
+with HTTP 403 (`insufficient_scope`) before it makes any policy decision,
+and the step fails closed. The **Evaluate only** preset from the
+[API key quickstart](/quickstart/api-key) doesn't include it. Create the key
+with **Custom** scopes instead. Only an organization admin can grant
+`idp_broker:mint`.
+
+Two modes on this page need one more scope each:
+
+| When | Add |
+|---|---|
+| `wait-for-approval: 'true'` | `approvals:read` |
+| The action class requires human approval: the action mints signed approval artifacts from the pull request's reviews | `approval_artifact:mint` |
+
 The `atlasent-action` step fails the job if the decision is `deny`, `hold`, or `escalate`, if permit verification fails, or if the AtlaSent API is unreachable. **Gate the deploy step on `steps.gate.outputs.verified == 'true'`, not on `decision`** — `verified` is only `true` when the evaluation returned `allow` *and* the server confirmed the permit was verified.
 
 ## Execution-boundary mode

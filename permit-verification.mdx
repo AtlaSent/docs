@@ -102,7 +102,7 @@ To verify an export offline:
 npx @atlasent/verify bundle.json --pubkey @atlasent-audit-key.pem
 ```
 
-See Offline audit verification for the complete process.
+See [Offline audit verification](/trust/audit-signing-key) for the complete process.
 
 ## What gets recorded
 
@@ -110,7 +110,7 @@ Every permit verification adds a record to the audit chain:
 
 | Field | Value |
 |---|---|
-| `permit_token` | The consumed `pt.v2.*` token |
+| `permit_token` | The consumed `pt.v4.*` token |
 | `action_type` | The action that was authorized |
 | `actor_id` | Who acted |
 | `verified_at` | Timestamp |
@@ -122,7 +122,7 @@ The chain is append-only. Verification records cannot be deleted.
 
 ## Next steps
 
-- Audit verification — export and verify the full audit chain offline
+- [Audit verification](/quickstart/audit-export) — export and verify the full audit chain offline
 - [Permit concept](/concepts/permit) — full permit lifecycle reference
 - [The deploy gate step](/deploy-gate) — the most common permit use case
 - [AI Agent Governance](/ai-agent-governance) — using permits in agent workflows
