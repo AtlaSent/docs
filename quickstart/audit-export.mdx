@@ -26,10 +26,11 @@ The quickstart key's `audit:read` scope is sufficient. The export is newline-del
 go install github.com/AtlaSent/atlasent-verify/cmd/atlasent-audit-verify@v0.1.1-0.20261018065918-58ff8c82757c
 ```
 
-Go checks the downloaded source against the public Go checksum database. The binary is installed to `$(go env GOPATH)/bin`, which a fresh Go setup does not put on your `PATH`. Add it, or the next command is "not found":
+Go checks the downloaded source against the public Go checksum database. The binary is installed to `$(go env GOPATH)/bin`, which a fresh Go setup does not put on your `PATH`. Put it first, so the next command is neither "not found" nor an older `atlasent-audit-verify` (such as `v0.1.0` in `/usr/local/bin`) found earlier on your `PATH`:
 
 ```bash
-export PATH="$PATH:$(go env GOPATH)/bin"
+export PATH="$(go env GOPATH)/bin:$PATH"
+command -v atlasent-audit-verify   # should print $(go env GOPATH)/bin/atlasent-audit-verify
 ```
 
 <Warning>
