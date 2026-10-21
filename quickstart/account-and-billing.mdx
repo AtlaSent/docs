@@ -13,7 +13,7 @@ This page covers everything around the product itself: your account, your organi
     Open [console.atlasent.io/auth/sign-up](https://console.atlasent.io/auth/sign-up?utm_source=docs&utm_medium=quickstart). Sign up with Google, or with an email address and password.
   </Step>
   <Step title="Confirm your email">
-    Email sign-ups get a confirmation email. The link opens the Console on a "confirmed" page. If the link has expired, sign in with the same address. The sign-in page offers to resend the confirmation email when an address is not yet confirmed.
+    Email sign-ups get a confirmation email with a 6–8 digit code and a link. Type the code on the "Check your email" page, or open the link. Both expire shortly and work once. If they have expired, sign in with the same address: the sign-in page offers to resend the confirmation email when an address is not yet confirmed.
   </Step>
   <Step title="Turn on an authenticator app">
     Owners and admins must use an authenticator app (TOTP) before the Console opens administrative pages, such as members, keys and billing. You are asked to enrol the first time you open one. Save the recovery codes it shows you: they are how you get back in if you lose the device.
@@ -34,9 +34,14 @@ You start on the **Free** plan. Nothing is charged, and no payment details are r
 Check the organization name in the header before you create keys or policies. Every key, policy and permit is bound to the organization it was created in. A key from one organization cannot act in another.
 </Tip>
 
-## 3. Add a second person as approver
+## 3. Approvals, and adding a second person
 
-Policies that require approval need someone other than the person requesting the change. **Nobody can approve their own request, on any plan.** A one-person workspace can therefore try every part of AtlaSent except a policy that needs an independent approver. Such a request stays on hold, by design.
+A held request is approved from the **Approval Queue** (`/approval-queue`). Who may approve depends on the policy:
+
+- **No independent approver required** (the hold the quick start creates, for example): an owner or admin of the organization can approve it.
+- **Independent approver required:** someone other than the person who started the change must approve. **You can never approve a change you started, on any plan.** A one-person workspace keeps such a request on hold, by design, until a second person approves it.
+
+To add that second person:
 
 <Steps>
   <Step title="Invite them">
@@ -93,11 +98,12 @@ If a renewal payment fails, Billing shows **"Your last payment failed — update
 | "Billing details could not be loaded" | The Console could not reach billing. | Use **Retry billing options**. If it persists, contact support. |
 | Activation refused, trial cannot activate | A trial can install and test a pack, but cannot switch on enforcement. | Upgrade to Team, then activate. |
 | Upgrade or new key refused, entitlement unknown | AtlaSent could not confirm your plan, so it refuses anything that would expand it. Existing protection is unaffected. | Contact support with your organization name. This is not fixed by retrying. |
+| Making someone an admin is refused: admin limit reached | An owner has capped the number of admins (**Team → Lock down admin rights**). Pending admin invitations count toward the cap. | Ask an owner to raise the cap or remove an admin first. |
 | HTTP 403 `insufficient_scope` | The API key lacks a scope the call needs. | See [key scopes](/quickstart/api-key). `production.deploy` also needs `idp_broker:mint`. |
 | HTTP 429 `QUOTA_EXCEEDED` on evaluate | The monthly evaluation allowance is used up. | Upgrade, or wait for the next month. |
 | HTTP 429 `RATE_LIMITED` | Too many requests in a short time. | Retry with backoff. This is not a plan limit. |
-| A request stays on hold | It needs an approver other than the requester. | Add an approver (step 3 above). |
-| "Request Not Found" on an approval link | The request expired or was resolved, or you cannot see it: the wrong organization is selected, or you have no approver grant covering it. AtlaSent gives the same answer in each case, so it does not reveal which requests exist. | Select the right organization, check your grant on **Team → Members**, then open **My Approvals**. If it is still missing, ask for a fresh request. |
+| A request stays on hold | It is waiting for an approval. If its policy requires an independent approver, that must be someone other than the person who started it. | Open the **Approval Queue**. For an independent approval, add a second person (step 3 above). |
+| "Request Not Found" on an approval link | The request expired or was resolved, or you cannot see it: the wrong organization is selected, or you have no approver grant covering it. AtlaSent gives the same answer in each case, so it does not reveal which requests exist. | If the page offers **Switch to** another organization you belong to, use it. Otherwise select the right organization, check your grant on **Team → Members**, then open **My Approvals**. If it is still missing, ask for a fresh request. |
 
 For deny codes on evaluate and verify, see [Deny codes](/concepts/deny-codes).
 

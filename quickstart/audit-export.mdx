@@ -18,13 +18,33 @@ curl -X POST "$ATLASENT_API_URL/v1-export-audit-stream" \
 
 The quickstart key's `audit:read` scope is sufficient. The export is newline-delimited JSON — one chain-ordered audit entry per line, carrying the hash-link and signature fields the offline verifier checks. See Verify the audit chain for the full field list and for large exports.
 
-## Verify the bundle offline
+## Install the verifier
 
-Use the public `atlasent-audit-verify` CLI. Verify against the public key you pinned from the [Audit signing key](/trust/audit-signing-key) page, not a key returned by the same channel as the export:
+`atlasent-audit-verify` is open source: [github.com/AtlaSent/atlasent-verify](https://github.com/AtlaSent/atlasent-verify). Build it from a pinned source revision with Go 1.24 or later:
 
 ```bash
-atlasent-audit-verify --chain chain.ndjson --keys atlasent-audit-key.pem --require-signatures
+go install github.com/AtlaSent/atlasent-verify/cmd/atlasent-audit-verify@v0.1.1-0.20261018065918-58ff8c82757c
 ```
+
+Go checks the downloaded source against the public Go checksum database. The binary is installed to `$(go env GOPATH)/bin`, which a fresh Go setup does not put on your `PATH`. Add it, or the next command is "not found":
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
+<Warning>
+Do not use the `v0.1.0` release binaries for a current export. They predate the hash form `v1-export-audit-stream` produces now, and report `hash_mismatch` on a genuine, unaltered export. This page will point to a newer signed release once one is published.
+</Warning>
+
+## Verify the bundle offline
+
+Verify against the public key you pinned from the [Audit signing key](/trust/audit-signing-key) page, not a key returned by the same channel as the export. Save the key's `kid` form from that page as `atlasent-audit-key.kid.pem`:
+
+```bash
+atlasent-audit-verify --chain chain.ndjson --keys atlasent-audit-key.kid.pem --require-signatures
+```
+
+A successful run ends with `ACCEPTED (--require-signatures): N/N entr(ies) signature-verified against a known key, 0 skipped` and exits 0. Exit 1 means a check failed: the lines above it name the entry and the check. Exit 2 means the input could not be read, for example a key file without its `kid` line.
 
 `--require-signatures` makes an unloaded or wrong key a failure rather than a silent skip. Verification is performed without trusting a live AtlaSent decision at verification time.
 

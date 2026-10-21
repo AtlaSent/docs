@@ -38,13 +38,27 @@ not a key compromise — see *Corrections* below.
 | Published here | 2026-09-12 (corrected — see *Corrections*) |
 | Also published as | JWKS `kid: v1`, `role: R3_audit`, at `https://keys.atlasent.io/.well-known/atlasent-verifier-keys.json` |
 
-Save the following as `atlasent-audit-key.pem`:
+The two verifiers read the key in different forms, so save it twice.
+
+For the proof-bundle verifier (`@atlasent/verify`), save this as `atlasent-audit-key.pem`:
 
 ```
 -----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAr0leDQfIerrgVCb8M1shVf6L5Qer0C13qV3Dee70D3o=
 -----END PUBLIC KEY-----
 ```
+
+For the audit-chain verifier (`atlasent-audit-verify`), save the same key with its `kid` line as `atlasent-audit-key.kid.pem`:
+
+```
+-----BEGIN PUBLIC KEY-----
+kid: v1
+
+MCowBQYDK2VwAyEAr0leDQfIerrgVCb8M1shVf6L5Qer0C13qV3Dee70D3o=
+-----END PUBLIC KEY-----
+```
+
+`atlasent-audit-verify` picks the key for each entry by matching `kid` to the entry's `key_version`, and refuses a PEM block without exactly one `kid` line ("PEM block must contain exactly one 'kid' header"). `@atlasent/verify` cannot read the `kid` line. Keep the blank line after `kid: v1`.
 
 Raw base64 (same key, for `--pubkey` and the `ATLASENT_PUBLIC_KEY_PEM` shortcut):
 `MCowBQYDK2VwAyEAr0leDQfIerrgVCb8M1shVf6L5Qer0C13qV3Dee70D3o=`
@@ -53,7 +67,8 @@ Confirm the fingerprint before pinning:
 
 ```bash
 openssl pkey -pubin -in atlasent-audit-key.pem -outform DER | openssl dgst -sha256
-# (stdin)= 8c3d2752094d1d0a21097294867d7e51b73a223cf1c70d3872e699859a6187c7
+openssl pkey -pubin -in atlasent-audit-key.kid.pem -outform DER | openssl dgst -sha256
+# both print 8c3d2752094d1d0a21097294867d7e51b73a223cf1c70d3872e699859a6187c7
 ```
 
 **How this key was verified before publication (2026-09-12).** It was
@@ -81,12 +96,14 @@ npx @atlasent/verify bundle.json --pubkey @atlasent-audit-key.pem
 `ATLASENT_PUBLIC_KEY_PEM` environment variable is honored as an
 alternative.
 
-**Audit chain** (`atlasent-audit-verify` Go CLI) — supply the same PEM and
-require signatures, so an unloaded or wrong key is a failure rather than a
-silent skip:
+**Audit chain** (`atlasent-audit-verify` Go CLI): supply the `kid` form of
+the key and require signatures, so an unloaded or wrong key is a failure
+rather than a silent skip. [Install the verifier](/quickstart/audit-export#install-the-verifier)
+first. The v0.1.0 release binaries cannot verify a current export.
 
 ```bash
-atlasent-audit-verify --chain chain-export.ndjson --keys atlasent-audit-key.pem --require-signatures
+atlasent-audit-verify --chain chain-export.ndjson --keys atlasent-audit-key.kid.pem --require-signatures
+# ACCEPTED (--require-signatures): N/N entr(ies) signature-verified against a known key, 0 skipped
 ```
 
 ## Rotation policy
@@ -113,5 +130,6 @@ the runtime reports as its configured value.
 
 ## Corrections
 
+- **2026-10-20** — Added the `kid` form of the key (`atlasent-audit-key.kid.pem`). The audit-chain command on this page used to pass the plain PEM, which `atlasent-audit-verify` refuses to load. The key itself is unchanged.
 - **2026-09-12 (later the same day)** — Published the verified key above (`8c3d2752…6187c7`). It was obtained from the runtime's self-tested key-export route and verified offline against seven production entries spanning 2026-06-07 → 2026-09-12 (7/7). This is a **publication correction only**: the runtime always signed with this key; the value published in June was wrong. Also revoked the JWKS entry `v2-audit-2026`, which never signed anything on production.
 - **2026-09-12** — Withdrew the key published 2026-06-08 after offline verification showed it does not verify production audit-entry signatures. No entry was altered; the hash chain is intact.

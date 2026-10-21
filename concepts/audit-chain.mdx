@@ -53,7 +53,7 @@ uniform across event types.
 ## Verifying offline
 
 ```bash
-atlasent-audit-verify --chain <export> --keys atlasent-audit-key.pem --require-signatures
+atlasent-audit-verify --chain <export> --keys atlasent-audit-key.kid.pem --require-signatures
 ```
 
-`atlasent-audit-verify` is the open-source, offline verifier. Get the public key from [Audit signing key](/trust/audit-signing-key). See also [Quickstart → Export the audit bundle](/quickstart/audit-export).
+`atlasent-audit-verify` is the open-source, offline verifier. Get the public key, in its `kid` form, from [Audit signing key](/trust/audit-signing-key), and install the verifier as described in [Install the verifier](/quickstart/audit-export#install-the-verifier). See also [Quickstart → Export the audit bundle](/quickstart/audit-export).
