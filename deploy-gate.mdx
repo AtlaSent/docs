@@ -80,9 +80,13 @@ The `ATLASENT_API_KEY` secret needs the scopes `evaluate:write`,
 `verify:execute`, and `idp_broker:mint`. `production.deploy` runs only under
 a verified GitHub workload identity, and `idp_broker:mint` is what lets the
 action get one. AtlaSent refuses a key that lacks it with HTTP 403 before
-any policy decision, so the deploy never runs. The **Evaluate only** preset from
-the quickstart doesn't include `idp_broker:mint`: create the key with
-**Custom** scopes. Only an organization admin can grant `idp_broker:mint`. See
+any policy decision, so the deploy never runs. When the policy requires
+reviewers, as the self-serve install does, the key also needs
+`approval_artifact:mint`: the action mints signed approval evidence from the
+pull request's reviews, and without it a deploy with valid approvals stays
+blocked. The **Production deploy gate (CI)** key preset in the console
+includes all of these. The **Evaluate only** preset from the quickstart does
+not. Only an organization admin can grant `idp_broker:mint`. See
 [Key scopes](/integrations/github-action#key-scopes) for the scopes
 the other modes need.
 
@@ -116,6 +120,24 @@ protect(
 )
 run_deploy()  # only reachable on allow + verified permit
 ```
+
+## What the self-serve install enforces
+
+When you install Production Change Protection from the console, AtlaSent installs one policy for `production.deploy`. You review and authorize it before anything is enforced.
+
+**Reviewers.** At install you choose how many GitHub reviewers each deploy needs: **2** (the default) or **1**, for a team too small to supply two. A reviewer counts only if they approved the pull request on GitHub. The pull request's author never counts, and neither does the person or pipeline requesting the deploy. Choosing 1 is a deliberate trade for small teams. Two independent reviewers is the stronger control, and you can move to it later. AtlaSent never lowers an existing two-reviewer requirement to one.
+
+**Environments.** Keys from the production console are live keys, and a live key is accepted only when the deploy names `prod`, `production` or `live`. Every other value is refused before the policy runs. The `test` and `staging` row applies only to test keys.
+
+| Environment the deploy names | Allowed when |
+|---|---|
+| `test` or `staging` | The reviewer requirement is met. No time window applies. |
+| `prod`, `production` or `live` | The reviewer requirement is met **and** it is Monday–Friday, 09:00–17:00, in the timezone you chose at install. AtlaSent checks the time on its own clock; nothing in the deploy request can satisfy it. |
+| Anything else | Denied. |
+
+**A missing approval holds; everything else denies.** A deploy whose only problem is a missing approval is held and sent to an approver instead of being denied outright. Any other failure denies, and the deploy does not run.
+
+**Cancelling a plan doesn't switch protection off.** If a subscription is cancelled or downgraded, existing protected actions keep being enforced exactly as configured. A billing change can withhold new features, never the protection already in place.
 
 ## What policies can require
 

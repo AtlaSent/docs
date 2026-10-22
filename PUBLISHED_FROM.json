@@ -1,6 +1,6 @@
 {
   "source": "Atlasent/atlasent-docs:site",
-  "source_sha": "197d67abae51c9aedd0d42d3bb8e28b58b68b3f1",
+  "source_sha": "bb30ecde52bdf522e5811361dc55ad6a6cbf35f4",
   "files": {
     ".mintignore": "a6bc5177f7ee4a9ca39ac0a5bcdefae92d73c28e3a0382625ea4796a7f186a51",
     "ai-agent-governance.mdx": "768d3ca39973c523386f0e5433afeda8522b10009645d5ae8e6cb4fdb256586b",
@@ -49,8 +49,8 @@
     "concepts/what-can-atlasent-authorize.mdx": "cd2f8665486d9625c121343bcb268ac588f28a90605b36648b5b197f17937ab3",
     "console/index.mdx": "25bc465242f043e1861b9f67eb175b851e3e18939caa5d2b95e75bf24d1b8b4e",
     "console/screens-and-fields.mdx": "6e3835b1326a9057866fda08242cbbe8b30ee53e70c0747bc24d4e16278845f2",
-    "deploy-gate.mdx": "04ec53c631f8d437997376cf6b39d0aa55e34e86059226b32ab07bf4e2544430",
-    "docs.json": "c7ae7127bc526287bf93a691de2b5d073ed7ad3dc6cb311f2756b747aedb7aa0",
+    "deploy-gate.mdx": "afe637d197421abdcd61aa710d5cffdca72540b84d36bbdddade008da857532d",
+    "docs.json": "550e65b23c86cb9b69b05476df97265f813aba41ce1cf6547a4e75f25b1126a4",
     "enterprise/index.mdx": "53a2ffc0b37b8c968cab2a5090036c675187fb41a21abf258c30f229c110a14a",
     "enterprise/scim-admin.mdx": "aae7fb209ffbfde0242a12673a586550f1233f25f5aa5a382c9448725d498241",
     "enterprise/siem-export.mdx": "6e8c0e8c63b4f161e3c28e6040926b627486ef5c391213b593c5d626e1807f30",
@@ -73,7 +73,7 @@
     "permit-verification.mdx": "a55a5c931781a55cd0240ecc74dd0d95e1555c8a65666071984aca560ba61f88",
     "production-change-gate-assessment.mdx": "989560c7ec41103df648be908f94f4d653b8701e15cc06e16be2f244b32d3f73",
     "protected-actions.mdx": "c8f49b0ff493ddfd128053a804c53fbd989743288d50721a9a9814907593f735",
-    "quickstart/account-and-billing.mdx": "611f297ca07ad0a24d9f4ec940da3351199643f90087cd785e8dd1d31bf0e040",
+    "quickstart/account-and-billing.mdx": "9aadad81cce085d34c4901b3e66cd65951bee445777afb10eb032077f1e4efdd",
     "quickstart/agent-mcp.mdx": "ad67a4efc865f7c72fb7b00e71de2098ad0246990bf7e804b2c4a10b2071e7e9",
     "quickstart/api-key.mdx": "0a1bdbfbbd32974ffb67a0d042532c4e76c578b36bbceddfe47484de85350fc4",
     "quickstart/audit-export.mdx": "41ecdf47e9b57ae5a79a763e56bfc229e6511a09d44296a18a2d034be1f09072",
